@@ -1,0 +1,15 @@
+rules:
+  - id: no-float-currency-math
+    languages: [python]
+    message: "CRITICAL FINTECH VIOLATION: IEEE-754 floating-point operations on currency fields leak fractional paise. Use integer paise (`int`) or Python `decimal.Decimal` with explicit rounding."
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: float($X)
+          - pattern: $A * 0.18
+          - pattern: $A * 0.01
+          - pattern: $A * 0.05
+          - pattern: $A * 0.0185
+      - pattern-not-inside: |
+          def test_...(...):
+            ...
