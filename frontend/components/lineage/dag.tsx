@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { lineage, inr, type LineageNode } from '@/lib/kuber-data'
+import { lineage, lineageInvoices, inr, type LineageNode } from '@/lib/kuber-data'
 
 const NODE_W = 168
 const NODE_H = 62
@@ -13,11 +13,33 @@ const kindColor: Record<LineageNode['kind'], string> = {
   net: 'var(--gain)',
 }
 
+const kindLabel: Record<LineageNode['kind'], string> = {
+  root: 'Bank Lump-Sum (NEFT/IMPS)',
+  gmv: 'Gross Invoice GMV',
+  deduction: 'Statutory Deduction',
+  net: 'Net Settlement',
+}
+
 export function LineageDag() {
   const [active, setActive] = useState<string>('utr')
+  const [solved, setSolved] = useState(false)
+  const [solving, setSolving] = useState(false)
+
+  const activeNode = lineage.nodes.find((n) => n.id === active)
 
   const isEdgeLit = (from: string, to: string) => active === from || active === to
+
   const nodeById = (id: string) => lineage.nodes.find((n) => n.id === id)!
+
+  const runSolver = () => {
+    setSolving(true)
+    setSolved(false)
+    // Simulate Knuth Algorithm X DLX solve animation (1.4s)
+    setTimeout(() => {
+      setSolving(false)
+      setSolved(true)
+    }, 1400)
+  }
 
   return (
     <div className="rounded-lg border border-border bg-panel">
@@ -28,13 +50,43 @@ export function LineageDag() {
           </h2>
           <div className="mt-1 font-mono text-xs text-muted-foreground">{lineage.utr}</div>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            False Match Rate
+        <div className="flex items-center gap-4">
+          {/* Solver trigger */}
+          <button
+            onClick={runSolver}
+            disabled={solving}
+            className={`flex items-center gap-2 rounded-md px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-all ${
+              solved
+                ? 'border border-gain/40 bg-gain/10 text-gain'
+                : 'border border-gold/40 bg-gold/10 text-gold hover:opacity-90'
+            } disabled:opacity-60`}
+          >
+            {solving ? (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-gold" />
+                DLX Solving…
+              </>
+            ) : solved ? (
+              <>✓ Exact Cover Proved</>
+            ) : (
+              <>▶ Run Knuth DLX</>
+            )}
+          </button>
+          <div className="text-right">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">FMR</div>
+            <div className="font-mono text-lg font-semibold text-gain">{lineage.fmr.toFixed(3)}</div>
           </div>
-          <div className="font-mono text-lg font-semibold text-gain">{lineage.fmr.toFixed(3)}</div>
         </div>
       </div>
+
+      {/* Solver progress bar */}
+      {solving && (
+        <div className="h-0.5 w-full overflow-hidden bg-border">
+          <div className="h-full animate-[progress_1.4s_linear_forwards] bg-gold" style={{ width: '0%', animation: 'none' }}>
+            <div className="h-full bg-gold transition-all duration-[1400ms] ease-linear" style={{ width: solving ? '100%' : '0%' }} />
+          </div>
+        </div>
+      )}
 
       <div className="relative overflow-x-auto bg-blueprint">
         <svg viewBox="0 0 780 410" className="h-auto w-full" role="img" aria-label="Money lineage directed acyclic graph">
@@ -53,6 +105,7 @@ export function LineageDag() {
               <g key={i}>
                 <path d={path} fill="none" stroke={lit ? 'var(--gold)' : 'var(--border)'} strokeWidth={lit ? 2 : 1.25} opacity={lit ? 0.9 : 0.6} />
                 {lit && <path d={path} fill="none" stroke="var(--gold)" strokeWidth="2" className="animate-flow" />}
+                {solved && !lit && <path d={path} fill="none" stroke="var(--gain)" strokeWidth="1" opacity="0.35" className="animate-flow" />}
                 {e.label && (
                   <text x={midX} y={(y1 + y2) / 2 - 6} textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill={lit ? 'var(--gold)' : 'var(--muted-foreground)'} letterSpacing="1">
                     {e.label}
@@ -69,17 +122,21 @@ export function LineageDag() {
             return (
               <g key={n.id} onClick={() => setActive(n.id)} className="cursor-pointer" role="button" aria-label={n.label}>
                 <rect
-                  x={n.x}
-                  y={n.y}
-                  width={NODE_W}
-                  height={NODE_H}
-                  rx="7"
-                  fill={on ? 'color-mix(in oklch, ' + color + ' 14%, var(--panel))' : 'var(--panel)'}
-                  stroke={color}
-                  strokeWidth={on ? 2 : 1.25}
-                  strokeOpacity={on ? 1 : 0.55}
+                  x={n.x} y={n.y} width={NODE_W} height={NODE_H} rx="7"
+                  fill={on ? `color-mix(in oklch, ${color} 14%, var(--panel))` : 'var(--panel)'}
+                  stroke={color} strokeWidth={on ? 2 : 1.25} strokeOpacity={on ? 1 : 0.55}
                 />
                 <rect x={n.x} y={n.y} width="4" height={NODE_H} rx="2" fill={color} />
+                {/* verified tick when solved */}
+                {solved && (
+                  <circle cx={n.x + NODE_W - 12} cy={n.y + 12} r="8" fill="var(--gain)" fillOpacity="0.15" stroke="var(--gain)" strokeWidth="1" />
+                )}
+                {solved && (
+                  <path
+                    d={`M${n.x + NODE_W - 15} ${n.y + 12} l2.5 2.5 l5 -5`}
+                    stroke="var(--gain)" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  />
+                )}
                 <text x={n.x + 16} y={n.y + 22} fontSize="10.5" fontFamily="var(--font-mono)" fill="var(--muted-foreground)" letterSpacing="0.5">
                   {n.label}
                 </text>
@@ -95,13 +152,34 @@ export function LineageDag() {
         </svg>
       </div>
 
+      {/* Active node detail panel */}
+      {activeNode && (
+        <div className="border-t border-border bg-accent/20 px-5 py-3">
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: kindColor[activeNode.kind] }} />
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{kindLabel[activeNode.kind]}</span>
+            </div>
+            <span className="font-mono text-sm font-semibold text-foreground">{activeNode.label}</span>
+            <span className="font-mono text-sm text-gold">{inr(activeNode.amount)}</span>
+            {activeNode.sub && <span className="font-mono text-xs text-muted-foreground">{activeNode.sub}</span>}
+            {solved && (
+              <span className="ml-auto flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-gain">
+                <span className="h-1.5 w-1.5 rounded-full bg-gain" />
+                Exact-cover verified · ₹0.00 residual
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-4 border-t border-border p-4">
         <Legend color="var(--chart-3)" label="Bank root" />
         <Legend color="var(--gold)" label="Gross GMV" />
         <Legend color="var(--danger)" label="Statutory deduction" />
         <Legend color="var(--gain)" label="Net settlement" />
         <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          click a node to trace
+          click node · then Run Knuth DLX to prove
         </span>
       </div>
     </div>

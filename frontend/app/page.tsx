@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Panel, SectionLabel, StatTile, StatusDot, Pill } from '@/components/kuber/primitives'
+import { LiveDashboard } from '@/components/kuber/live-dashboard'
 import { systemStats, railHealth, navItems, inr } from '@/lib/kuber-data'
 
 export default function CommandCenter() {
@@ -74,6 +75,11 @@ export default function CommandCenter() {
           value={inr(systemStats.escrowHeld, { compact: true })}
           hint={`Resolves GSTR-2B · ${systemStats.gstr2bResolveDay}th`}
         />
+      </div>
+
+      {/* Live metrics dashboard */}
+      <div className="mt-6">
+        <LiveDashboard />
       </div>
 
       {/* Rail health + module map */}
