@@ -1,0 +1,138 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Domain status palette */
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-gain: var(--gain);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-grid: var(--grid);
+  --color-panel: var(--panel);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: var(--font-geist-sans), 'DejaVu Sans', ui-sans-serif, system-ui, sans-serif;
+  /* Geist Sans is appended as the final fallback: it is a loaded webfont that
+     reliably carries ₹ (U+20B9), so the rupee sign renders even on machines
+     whose mono fonts lack it. Digits still resolve to JetBrains Mono first. */
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', var(--font-geist-sans), monospace;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Treasury Control Room — deep ink base */
+  --background: oklch(0.16 0.014 255);
+  --foreground: oklch(0.93 0.006 250);
+
+  --panel: oklch(0.204 0.016 255);
+  --card: oklch(0.204 0.016 255);
+  --card-foreground: oklch(0.93 0.006 250);
+  --popover: oklch(0.185 0.015 255);
+  --popover-foreground: oklch(0.93 0.006 250);
+
+  --primary: oklch(0.93 0.006 250);
+  --primary-foreground: oklch(0.17 0.014 255);
+  --secondary: oklch(0.25 0.017 255);
+  --secondary-foreground: oklch(0.93 0.006 250);
+  --muted: oklch(0.24 0.016 255);
+  --muted-foreground: oklch(0.64 0.014 250);
+  --accent: oklch(0.26 0.02 255);
+  --accent-foreground: oklch(0.95 0.006 250);
+
+  /* Kuber gold — reserved for sovereign/authority moments */
+  --gold: oklch(0.79 0.12 84);
+  --gold-foreground: oklch(0.18 0.03 84);
+
+  /* Functional status system */
+  --gain: oklch(0.74 0.14 158);
+  --warn: oklch(0.8 0.13 74);
+  --danger: oklch(0.64 0.2 22);
+  --destructive: oklch(0.64 0.2 22);
+
+  --border: oklch(0.3 0.016 255);
+  --grid: oklch(0.26 0.014 255);
+  --input: oklch(0.3 0.016 255);
+  --ring: oklch(0.79 0.12 84);
+
+  --chart-1: oklch(0.79 0.12 84);
+  --chart-2: oklch(0.74 0.14 158);
+  --chart-3: oklch(0.66 0.13 250);
+  --chart-4: oklch(0.8 0.13 74);
+  --chart-5: oklch(0.64 0.2 22);
+
+  --radius: 0.3rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv01', 'ss01';
+  }
+  /* Tabular figures everywhere numbers matter */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum', 'zero';
+  }
+}
+
+/* Fine engineering grid used on data surfaces */
+.bg-blueprint {
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@keyframes ticker {
+  0% { opacity: 0.35; }
+  50% { opacity: 1; }
+  100% { opacity: 0.35; }
+}
+.animate-pulse-dot {
+  animation: ticker 1.8s ease-in-out infinite;
+}
+
+@keyframes flow-dash {
+  to { stroke-dashoffset: -16; }
+}
+.animate-flow {
+  stroke-dasharray: 4 4;
+  animation: flow-dash 0.9s linear infinite;
+}
