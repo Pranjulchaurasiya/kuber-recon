@@ -11,7 +11,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`rounded-lg border border-border bg-panel ${flush ? '' : 'p-5'} ${className}`}
+      className={`kuber-panel border border-border bg-panel ${flush ? '' : 'p-5'} ${className}`}
     >
       {children}
     </section>
@@ -20,8 +20,9 @@ export function Panel({
 
 export function SectionLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="h-1.5 w-1.5 bg-gold shadow-[0_0_12px_var(--gold)]" />
         {children}
       </h2>
       {right}
@@ -57,7 +58,8 @@ export function StatTile({
             ? 'text-danger'
             : 'text-foreground'
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-panel p-5">
+    <div className="kuber-stat group relative flex flex-col gap-1.5 overflow-hidden border border-border bg-panel p-5">
+      <span className={`absolute inset-x-0 top-0 h-px ${accent === 'gold' ? 'bg-gold' : accent === 'gain' ? 'bg-gain' : accent === 'warn' ? 'bg-warn' : accent === 'danger' ? 'bg-danger' : 'bg-border'}`} />
       <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </span>
@@ -85,7 +87,7 @@ export function Pill({
   }
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${map[tone]}`}
+      className={`inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest ${map[tone]}`}
     >
       {children}
     </span>

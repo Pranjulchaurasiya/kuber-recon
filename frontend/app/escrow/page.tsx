@@ -1,4 +1,5 @@
 import { SplitEngine } from '@/components/escrow/split-engine'
+import { RazorpayRouteConsole } from '@/components/escrow/razorpay-console'
 import { Panel, SectionLabel, StatTile, Pill } from '@/components/kuber/primitives'
 import { escrowSplits, escrowBuckets, paiseToInr } from '@/lib/kuber-data'
 
@@ -61,6 +62,11 @@ export default function EscrowPage() {
             </div>
           </div>
         </Panel>
+      </div>
+
+      {/* Razorpay Route & Webhook Live Proof Console */}
+      <div className="mt-6">
+        <RazorpayRouteConsole />
       </div>
 
       {/* Live split ledger */}

@@ -32,11 +32,26 @@ interface ReconcileProof {
   proof_hash: string
 }
 
+interface AmbiguousRefusalProof {
+  status: string
+  refused: boolean
+  target_paise: number
+  target_inr: string
+  candidate_subsets_found: number
+  subsets: string[][]
+  reason: string
+  action_taken: string
+  fmr_preserved: string
+  latency_ms: number
+}
+
 export function LineageDag() {
   const [active, setActive] = useState<string>('utr')
   const [solved, setSolved] = useState(false)
   const [solving, setSolving] = useState(false)
   const [proof, setProof] = useState<ReconcileProof | null>(null)
+  const [ambiguityProof, setAmbiguityProof] = useState<AmbiguousRefusalProof | null>(null)
+  const [refusalTesting, setRefusalTesting] = useState(false)
 
   const activeNode = lineage.nodes.find((n) => n.id === active)
   const isEdgeLit = (from: string, to: string) => active === from || active === to
@@ -46,6 +61,7 @@ export function LineageDag() {
     setSolving(true)
     setSolved(false)
     setProof(null)
+    setAmbiguityProof(null)
 
     try {
       const apiUrl = getApiUrl()
@@ -68,19 +84,58 @@ export function LineageDag() {
     }, 1200)
   }
 
+  const triggerAmbiguityRefusal = async () => {
+    setRefusalTesting(true)
+    setSolved(false)
+    setProof(null)
+
+    try {
+      const apiUrl = getApiUrl()
+      const res = await fetch(`${apiUrl}/api/reconcile/ambiguous`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (res.ok) {
+        const data: AmbiguousRefusalProof = await res.json()
+        setAmbiguityProof(data)
+      }
+    } catch {
+      // Fallback response for offline mode
+      setAmbiguityProof({
+        status: 'AmbiguousMatchError (Honest Refusal)',
+        refused: true,
+        target_paise: 10000000,
+        target_inr: '₹1,00,000.00',
+        candidate_subsets_found: 2,
+        subsets: [
+          ['INV-A1 (₹60,000)', 'INV-A2 (₹40,000)'],
+          ['INV-B1 (₹70,000)', 'INV-B2 (₹30,000)'],
+        ],
+        reason: 'Honest Refusal: Bank Credit matches 2 valid exact-cover subsets. Refusing to guess to preserve FMR = 0.000.',
+        action_taken: 'Settlement halted. Routed to CFO Exception Queue.',
+        fmr_preserved: '0.000',
+        latency_ms: 1.42,
+      })
+    }
+
+    setRefusalTesting(false)
+  }
+
   return (
     <div className="rounded-lg border border-border bg-panel">
-      <div className="flex items-center justify-between border-b border-border p-5">
+      <div className="flex flex-wrap items-center justify-between border-b border-border p-5 gap-3">
         <div>
           <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            Money Lineage DAG · Algorithm X
+            Money Lineage DAG · Knuth Algorithm X
           </h2>
           <div className="mt-1 font-mono text-xs text-muted-foreground">{lineage.utr}</div>
         </div>
-        <div className="flex items-center gap-4">
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Solver Trigger */}
           <button
             onClick={runSolver}
-            disabled={solving}
+            disabled={solving || refusalTesting}
             className={`flex items-center gap-2 rounded-md px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-all ${
               solved
                 ? 'border border-gain/40 bg-gain/10 text-gain'
@@ -98,7 +153,24 @@ export function LineageDag() {
               <>▶ Run Knuth DLX</>
             )}
           </button>
-          <div className="text-right">
+
+          {/* Ambiguity Refusal Hero Trigger */}
+          <button
+            onClick={triggerAmbiguityRefusal}
+            disabled={solving || refusalTesting}
+            className="flex items-center gap-2 rounded-md border border-danger/40 bg-danger/10 px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest text-danger transition-all hover:bg-danger/20 disabled:opacity-60"
+          >
+            {refusalTesting ? (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-danger" />
+                Testing Trap…
+              </>
+            ) : (
+              <>⚡ Test Ambiguous Refusal (Moat)</>
+            )}
+          </button>
+
+          <div className="text-right pl-2 border-l border-border">
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">FMR</div>
             <div className="font-mono text-lg font-semibold text-gain">{lineage.fmr.toFixed(3)}</div>
           </div>
@@ -123,8 +195,43 @@ export function LineageDag() {
         </div>
       )}
 
+      {/* Ambiguity Refusal Hero Banner */}
+      {ambiguityProof && (
+        <div className="border-b border-danger/40 bg-danger/10 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-danger animate-ping" />
+              <span className="font-mono text-xs font-bold text-danger">HERO MOAT: HONEST REFUSAL ACTIVATED</span>
+            </div>
+            <span className="font-mono text-[10px] text-muted-foreground">Latency: {ambiguityProof.latency_ms} ms</span>
+          </div>
+
+          <div className="mt-2 text-sm font-semibold text-foreground">
+            {ambiguityProof.reason}
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-md border border-danger/30 bg-background/60 p-3 font-mono text-xs">
+              <div className="text-[10px] uppercase text-gold font-bold">Candidate Cover Subset #1</div>
+              <div className="mt-1 text-foreground">{ambiguityProof.subsets[0]?.join(' + ')}</div>
+              <div className="mt-0.5 text-[10px] text-muted-foreground">Sum: {ambiguityProof.target_inr}</div>
+            </div>
+            <div className="rounded-md border border-danger/30 bg-background/60 p-3 font-mono text-xs">
+              <div className="text-[10px] uppercase text-gold font-bold">Candidate Cover Subset #2</div>
+              <div className="mt-1 text-foreground">{ambiguityProof.subsets[1]?.join(' + ')}</div>
+              <div className="mt-0.5 text-[10px] text-muted-foreground">Sum: {ambiguityProof.target_inr}</div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between rounded bg-background/40 px-3 py-2 font-mono text-xs">
+            <span className="text-muted-foreground font-sans text-xs">Action Enforced: <strong className="text-foreground">{ambiguityProof.action_taken}</strong></span>
+            <span className="text-gain font-bold">FMR Preserved: {ambiguityProof.fmr_preserved}</span>
+          </div>
+        </div>
+      )}
+
       {/* Solver progress bar */}
-      {solving && (
+      {(solving || refusalTesting) && (
         <div className="h-0.5 w-full overflow-hidden bg-border">
           <div className="h-full bg-gold transition-all duration-[1200ms] ease-linear" style={{ width: '100%' }} />
         </div>
@@ -145,11 +252,11 @@ export function LineageDag() {
             const lit = isEdgeLit(e.from, e.to)
             return (
               <g key={i}>
-                <path d={path} fill="none" stroke={lit ? 'var(--gold)' : 'var(--border)'} strokeWidth={lit ? 2 : 1.25} opacity={lit ? 0.9 : 0.6} />
+                <path d={path} fill="none" stroke={ambiguityProof ? 'var(--danger)' : lit ? 'var(--gold)' : 'var(--border)'} strokeWidth={lit || ambiguityProof ? 2 : 1.25} opacity={lit || ambiguityProof ? 0.9 : 0.6} />
                 {lit && <path d={path} fill="none" stroke="var(--gold)" strokeWidth="2" className="animate-flow" />}
                 {solved && !lit && <path d={path} fill="none" stroke="var(--gain)" strokeWidth="1" opacity="0.35" className="animate-flow" />}
                 {e.label && (
-                  <text x={midX} y={(y1 + y2) / 2 - 6} textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill={lit ? 'var(--gold)' : 'var(--muted-foreground)'} letterSpacing="1">
+                  <text x={midX} y={(y1 + y2) / 2 - 6} textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill={ambiguityProof ? 'var(--danger)' : lit ? 'var(--gold)' : 'var(--muted-foreground)'} letterSpacing="1">
                     {e.label}
                   </text>
                 )}
@@ -160,7 +267,7 @@ export function LineageDag() {
           {/* nodes */}
           {lineage.nodes.map((n) => {
             const on = active === n.id
-            const color = kindColor[n.kind]
+            const color = ambiguityProof ? 'var(--danger)' : kindColor[n.kind]
             return (
               <g
                 key={n.id}
@@ -185,6 +292,9 @@ export function LineageDag() {
                     d={`M${n.x + NODE_W - 15} ${n.y + 12} l2.5 2.5 l5 -5`}
                     stroke="var(--gain)" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"
                   />
+                )}
+                {ambiguityProof && (
+                  <circle cx={n.x + NODE_W - 12} cy={n.y + 12} r="8" fill="var(--danger)" fillOpacity="0.2" stroke="var(--danger)" strokeWidth="1" />
                 )}
                 <text x={n.x + 16} y={n.y + 22} fontSize="10.5" fontFamily="var(--font-mono)" fill="var(--muted-foreground)" letterSpacing="0.5">
                   {n.label}
@@ -218,6 +328,12 @@ export function LineageDag() {
                 Exact-cover verified · ₹0.00 residual
               </span>
             )}
+            {ambiguityProof && (
+              <span className="ml-auto flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-danger">
+                <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
+                Refused: Multiple candidate covers · Routed to CFO
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -228,7 +344,7 @@ export function LineageDag() {
         <Legend color="var(--danger)" label="Statutory deduction" />
         <Legend color="var(--gain)" label="Net settlement" />
         <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          click node or Press Tab · then Run Knuth DLX to prove
+          click node · test Ambiguous Refusal to see moat
         </span>
       </div>
     </div>

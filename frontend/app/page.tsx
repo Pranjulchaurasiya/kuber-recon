@@ -5,22 +5,23 @@ import { systemStats, railHealth, navItems, inr } from '@/lib/kuber-data'
 
 export default function CommandCenter() {
   return (
-    <div className="mx-auto max-w-[1400px] px-5 py-8">
-      {/* Hero band */}
-      <section className="relative overflow-hidden rounded-xl border border-border bg-panel">
-        <div className="bg-blueprint pointer-events-none absolute inset-0 opacity-40" />
-        <div className="relative flex flex-col gap-6 p-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <Pill tone="gold">Autonomous Financial Integrity OS</Pill>
-            <h1 className="mt-4 text-balance text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
-              Every rupee tracked to its statutory root.
+    <div className="mx-auto max-w-[1480px] px-5 py-6 md:px-8 md:py-8">
+      <section className="kuber-hero relative overflow-hidden border border-gold/25 px-6 py-7 md:px-9 md:py-10">
+        <div className="signal-track absolute inset-x-0 top-0 h-px opacity-80" />
+        <div className="relative grid gap-9 lg:grid-cols-[minmax(0,1.1fr)_minmax(22rem,0.72fr)] lg:items-end">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-3">
+              <Pill tone="gold">KuberRecon / 01</Pill>
+              <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Financial control plane</span>
+            </div>
+            <h1 className="mt-7 max-w-2xl text-balance text-4xl font-semibold leading-[0.98] tracking-[-0.045em] md:text-6xl">
+              Money should leave a <span className="text-gold">proof</span>, not a guess.
             </h1>
-            <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
-              Zero tax lost, zero math guessed. KuberRecon prevents loss at the gateway, proves
-              lineage with exact math, and stress-tests future liquidity — a closed-loop financial
-              controller built on the Razorpay rail.
+            <p className="mt-5 max-w-xl text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
+              KuberRecon seals statutory exposure at capture, proves each settlement with exact-cover lineage,
+              then exposes tomorrow&apos;s liquidity risk before the rail moves.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 href="/escrow"
                 className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-gold-foreground transition-opacity hover:opacity-90"
@@ -36,23 +37,26 @@ export default function CommandCenter() {
             </div>
           </div>
 
-          <div className="shrink-0 rounded-lg border border-gold/30 bg-gold/5 p-5">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              False Match Rate
+          <div className="border border-border bg-background/45 p-5 backdrop-blur-sm md:p-6">
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Settlement confidence</div>
+                <div className="mt-2 font-mono text-6xl font-semibold tabular-nums tracking-[-0.06em] text-gain">
+                  {systemStats.fmr.toFixed(3)}
+                </div>
+              </div>
+              <div className="border border-gain/30 bg-gain/10 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-gain">FMR</div>
             </div>
-            <div className="mt-1 font-mono text-5xl font-semibold tabular-nums text-gain">
-              {systemStats.fmr.toFixed(3)}
-            </div>
-            <div className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              <StatusDot status="ok" />
-              Knuth Algorithm X · exact cover
+            <div className="mt-6 grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 border-t border-border pt-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              <StatusDot status="ok" /><span>DLX exact cover verified</span>
+              <StatusDot status="ok" /><span>Paise kernel locked</span>
+              <StatusDot status="warn" /><span>GSTR-2B cycle: T−3 days</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Headline stats */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Protected today"
           value={inr(systemStats.protectedToday, { compact: true })}
@@ -77,13 +81,11 @@ export default function CommandCenter() {
         />
       </div>
 
-      {/* Live metrics dashboard */}
-      <div className="mt-6">
+      <div className="mt-4">
         <LiveDashboard />
       </div>
 
-      {/* Rail health + module map */}
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-1">
           <SectionLabel right={<Pill tone="gain">4 rails</Pill>}>Rail Health</SectionLabel>
           <ul className="flex flex-col divide-y divide-border">
@@ -110,7 +112,7 @@ export default function CommandCenter() {
         </Panel>
 
         <Panel className="lg:col-span-2" flush>
-          <div className="flex items-center justify-between border-b border-border p-5">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Control Modules
             </h2>
@@ -123,7 +125,7 @@ export default function CommandCenter() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="group flex flex-col gap-2 p-5 transition-colors hover:bg-accent/40"
+                className="group relative flex flex-col gap-2 overflow-hidden p-5 transition-colors hover:bg-accent/40"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[10px] tracking-widest text-gold">
@@ -137,8 +139,8 @@ export default function CommandCenter() {
                 <span className="text-xs leading-relaxed text-muted-foreground">
                   {moduleBlurbs[item.href]}
                 </span>
-                <span className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70 transition-colors group-hover:text-gold">
-                  Open →
+                <span className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70 transition-colors group-hover:text-gold">
+                  <span className="h-px w-5 bg-current" /> Open rail
                 </span>
               </Link>
             ))}
