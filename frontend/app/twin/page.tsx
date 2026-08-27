@@ -6,8 +6,8 @@ export default function TwinPage() {
   return (
     <div className="mx-auto max-w-[1400px] px-5 py-8">
       <header className="mb-6">
-        <Pill tone="gold">Causal Digital Twin · Screen 03</Pill>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">Causal Digital Twin</h1>
+        <Pill tone="gold">Causal Inference · What-If Stress Engine</Pill>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Causal Digital Twin</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Move from reporting the past to stress-testing the future. The twin models causal shocks —
           bank-holiday freezes, vendor GSTR-1 defaults, chargeback surges — and projects their impact

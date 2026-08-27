@@ -6,8 +6,8 @@ export default function LineagePage() {
   return (
     <div className="mx-auto max-w-[1400px] px-5 py-8">
       <header className="mb-6">
-        <Pill tone="gold">KuberRecon · Screen 02</Pill>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">Money Lineage</h1>
+        <Pill tone="gold">Knuth Algorithm X · Combinatorial Exact Cover</Pill>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Money Lineage</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           A single bank lump-sum can hide dozens of invoices. KuberRecon uses Donald Knuth&apos;s
           Algorithm X to solve the exact cover — proving how one UTR decomposes into gross GMV, MDR,

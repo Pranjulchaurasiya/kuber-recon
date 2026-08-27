@@ -11,8 +11,8 @@ export default function EscrowPage() {
     <div className="mx-auto max-w-[1400px] px-5 py-8">
       <header className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Pill tone="gold">Pre-Settlement Escrow · Screen 01</Pill>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight">Gateway Escrow Rail</h1>
+          <Pill tone="gold">Razorpay Route · T=0 Statutory Escrow</Pill>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Gateway Escrow Rail</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
             Money is protected <span className="text-foreground">before</span> it leaves the merchant&apos;s
             account. Every incoming order is split at T=0, with statutory dues held in escrow until the
