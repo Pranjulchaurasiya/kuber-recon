@@ -34,7 +34,7 @@ from kuber_recon.simulation import FinancialDigitalTwin
 from kuber_recon.generator import ChaosDataGenerator
 from kuber_recon.engine import ReconciliationEngine
 from kuber_recon.actions import ActionGuardrailEngine
-from kuber_recon.types import PaymentMethod, paise_to_inr_decimal, inr_to_paise
+from kuber_recon.types import PaymentMethod, paise_to_inr_decimal
 
 app = FastAPI(
     title="KuberRecon API",
@@ -45,13 +45,13 @@ app = FastAPI(
 # Allow Next.js frontend (localhost:3000) to call us
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Singleton engine instances
+# Singletons
 escrow_engine = KuberSovereignEscrowEngine()
 action_guard = ActionGuardrailEngine(
     kyc_payee_whitelist=["ACC_HDFC_001", "ACC_ICICI_002", "ACC_AXIS_003"]
@@ -62,7 +62,7 @@ action_guard = ActionGuardrailEngine(
 
 class InterceptRequest(BaseModel):
     order_id: str
-    amount_inr: float              # User enters in ₹ — converted to paise
+    amount_inr: float              # User enters in ₹ — we convert to paise internally
     gst_rate_pct: float = 18.0    # 0, 5, 12, 18, 28
     exempt_194o: bool = False
     merchant: str = "Demo Merchant"
@@ -131,24 +131,28 @@ def intercept_payment(req: InterceptRequest):
     """
     t0 = time.perf_counter()
 
+    # Convert ₹ → paise (integer, no floats)
     gross_paise = int(round(req.amount_inr * 100))
     if gross_paise <= 0:
         raise HTTPException(status_code=400, detail="Amount must be > ₹0")
+    if gross_paise > 100_000_000:
+        raise HTTPException(status_code=400, detail="Amount exceeds ₹10 lakh demo limit")
 
-    gst_ratio = Decimal(str(req.gst_rate_pct / 100.0))
+    gst_rate = Decimal(str(req.gst_rate_pct / 100.0))
 
     split = escrow_engine.intercept_and_split_payment(
         order_id=req.order_id,
-        payment_id=f"pay_{req.order_id}_{int(time.time()*1000)}",
+        payment_id=f"pay_{req.order_id}",
         gross_amount_paise=gross_paise,
         supplier_gstin="27AAPCA1234F1Z5",
         merchant_gstin="29BBBBB5678G2Z1",
-        gst_rate_pct=gst_ratio,
+        gst_rate_pct=gst_rate,
         is_section_194o_exempt=req.exempt_194o,
     )
 
     latency_ms = (time.perf_counter() - t0) * 1000
 
+    # Proof hash over the exact paise integers
     proof_input = f"{split.split_id}:{split.gross_captured_paise}:{split.net_principal_paise}:{split.gst_escrow_paise}:{split.tds_194o_paise}"
     proof_hash = "sha256:" + hashlib.sha256(proof_input.encode()).hexdigest()[:16]
 
@@ -174,7 +178,7 @@ def intercept_payment(req: InterceptRequest):
         exempt_194o=req.exempt_194o,
         split_id=split.split_id,
         proof_hash=proof_hash,
-        computed_by="Python KuberSovereignEscrowEngine (Decimal ROUND_HALF_UP)",
+        computed_by="KuberSovereignEscrowEngine · Python Decimal ROUND_HALF_UP",
         latency_ms=round(latency_ms, 3),
     )
 
@@ -189,6 +193,7 @@ def reconcile(req: ReconcileRequest):
     t0 = time.perf_counter()
     generator = ChaosDataGenerator(seed=req.seed)
     invoices, bank_credits, _, _ = generator.generate_suite(num_records=min(req.records, 1000))
+    gen_ms = (time.perf_counter() - t0) * 1000
 
     t1 = time.perf_counter()
     engine = ReconciliationEngine()
@@ -238,4 +243,4 @@ def twin_simulate(req: TwinRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("kuber_recon.server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
