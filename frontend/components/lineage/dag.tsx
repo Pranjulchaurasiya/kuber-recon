@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { lineage, inr, type LineageNode } from '@/lib/kuber-data'
+import { getApiUrl } from '@/lib/api-client'
 
 const NODE_W = 168
 const NODE_H = 62
@@ -47,7 +48,8 @@ export function LineageDag() {
     setProof(null)
 
     try {
-      const res = await fetch('http://localhost:8000/api/reconcile', {
+      const apiUrl = getApiUrl()
+      const res = await fetch(`${apiUrl}/api/reconcile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: 100, seed: 42 }),
@@ -57,7 +59,7 @@ export function LineageDag() {
         setProof(data)
       }
     } catch {
-      // Graceful fallback
+      // Local fallback
     }
 
     setTimeout(() => {
@@ -93,7 +95,7 @@ export function LineageDag() {
             ) : solved ? (
               <>✓ Exact Cover Proved</>
             ) : (
-              <>▶ Run Knuth DLX (Python API)</>
+              <>▶ Run Knuth DLX</>
             )}
           </button>
           <div className="text-right">
@@ -103,7 +105,7 @@ export function LineageDag() {
         </div>
       </div>
 
-      {/* Real Python Solver Proof Banner */}
+      {/* Solver Proof Banner */}
       {proof && (
         <div className="border-b border-gain/30 bg-gain/5 px-5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
@@ -160,7 +162,15 @@ export function LineageDag() {
             const on = active === n.id
             const color = kindColor[n.kind]
             return (
-              <g key={n.id} onClick={() => setActive(n.id)} className="cursor-pointer" role="button" aria-label={n.label}>
+              <g
+                key={n.id}
+                onClick={() => setActive(n.id)}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setActive(n.id)}
+                tabIndex={0}
+                className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                role="button"
+                aria-label={`${n.label} - ${inr(n.amount)}`}
+              >
                 <rect
                   x={n.x} y={n.y} width={NODE_W} height={NODE_H} rx="7"
                   fill={on ? `color-mix(in oklch, ${color} 14%, var(--panel))` : 'var(--panel)'}
@@ -218,7 +228,7 @@ export function LineageDag() {
         <Legend color="var(--danger)" label="Statutory deduction" />
         <Legend color="var(--gain)" label="Net settlement" />
         <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          click node · then Run Knuth DLX to prove
+          click node or Press Tab · then Run Knuth DLX to prove
         </span>
       </div>
     </div>

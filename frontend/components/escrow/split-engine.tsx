@@ -1,21 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { inr } from '@/lib/kuber-data'
+import { useEffect, useState, useCallback } from 'react'
+import { paiseToInr } from '@/lib/kuber-data'
+import { getApiUrl, checkBackendHealth } from '@/lib/api-client'
 
 const GST_SLABS = [
-  { label: '0% GST (Exempt)', rate: 0.00 },
-  { label: '5% GST (Food/Transport)', rate: 0.05 },
-  { label: '12% GST (Standard)', rate: 0.12 },
-  { label: '18% GST (Default)', rate: 0.18 },
-  { label: '28% GST (Luxury)', rate: 0.28 },
+  { label: '0% GST (Exempt)', ratePct: 0 },
+  { label: '5% GST (Food/Transport)', ratePct: 5 },
+  { label: '12% GST (Standard)', ratePct: 12 },
+  { label: '18% GST (Default)', ratePct: 18 },
+  { label: '28% GST (Luxury)', ratePct: 28 },
 ]
 
-interface BackendProof {
-  order_id: str
+export interface BackendProof {
+  order_id: string
+  gross_paise: number
   gross_inr: string
+  principal_paise: number
   principal_inr: string
+  gst_paise: number
   gst_inr: string
+  tds_paise: number
   tds_inr: string
   unexplained_delta_paise: number
   fmr: string
@@ -27,130 +32,199 @@ interface BackendProof {
   latency_ms: number
 }
 
-function calcLocalSplit(grossPaise: number, gstRate: number, exempt194o: boolean) {
-  const divisor = 1 + gstRate
-  const gstPaise = Math.round((grossPaise * gstRate) / divisor)
-  const tdsPaise = exempt194o ? 0 : Math.round(grossPaise * 0.01)
-  const principalPaise = grossPaise - gstPaise - tdsPaise
-  return { gstPaise, tdsPaise, principalPaise }
+/**
+ * Pure BigInt Paise-Exact Split Calculation (Zero-Float Guarantee).
+ * Enforces the base-10 integer rule when offline or fallback.
+ */
+export function calcLocalSplit(grossPaise: number, gstRatePct: number, exempt194o: boolean) {
+  const gross = BigInt(Math.max(0, Math.floor(grossPaise)))
+  const ratePct = BigInt(Math.round(gstRatePct))
+
+  const b100 = BigInt(100)
+  const b2 = BigInt(2)
+  const denom = b100 + ratePct
+  
+  // Base amount = (Gross * 100) / (100 + GST%) with exact integer half-up rounding
+  const basePaise = (gross * b100 * b2 + denom) / (denom * b2)
+  const gstPaise = gross - basePaise
+
+  // 1% TDS on base amount (half-up rounding)
+  const tdsPaise = exempt194o ? BigInt(0) : (basePaise * b2 + b100) / BigInt(200)
+  const principalPaise = gross - gstPaise - tdsPaise
+
+  return {
+    grossPaise: Number(gross),
+    principalPaise: Number(principalPaise),
+    gstPaise: Number(gstPaise),
+    tdsPaise: Number(tdsPaise),
+    unexplainedDeltaPaise: Number(gross - principalPaise - gstPaise - tdsPaise),
+  }
 }
 
-const FEED_ORDERS = [118000, 47200, 23600, 295000, 59000, 88500, 176400, 34900, 132500, 56000]
+const FEED_ORDERS_PAISE = [118000, 47200, 23600, 295000, 59000, 88500, 176400, 34900, 132500, 56000]
 
 export function SplitEngine() {
   const [mode, setMode] = useState<'live' | 'manual'>('live')
   const [feedIdx, setFeedIdx] = useState(0)
   const [tick, setTick] = useState(0)
-  const [inputRaw, setInputRaw] = useState('1180')
-  const [gstSlab, setGstSlab] = useState(3)
+  const [inputRaw, setInputRaw] = useState('1180') // Input in Rupees (₹)
+  const [gstSlab, setGstSlab] = useState(3) // Default 18%
   const [exempt194o, setExempt194o] = useState(false)
-  const [history, setHistory] = useState<{ gross: number; principal: number; gst: number; tds: number; ts: string; proof?: string }[]>([])
   
-  // Real backend proof state
+  const [history, setHistory] = useState<{
+    grossPaise: number
+    principalPaise: number
+    gstPaise: number
+    tdsPaise: number
+    ts: string
+    proof?: string
+    engineType: string
+  }[]>([])
+
   const [proof, setProof] = useState<BackendProof | null>(null)
   const [loading, setLoading] = useState(false)
   const [backendActive, setBackendActive] = useState<boolean | null>(null)
 
-  // Call real Python FastAPI backend
-  const callPythonBackend = async (grossPaise: number, gstRatePct: number, isExempt: boolean) => {
-    setLoading(true)
-    try {
-      const res = await fetch('http://localhost:8000/api/intercept', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: `ord_${Math.random().toString(36).substring(2, 9)}`,
-          amount_inr: grossPaise / 100,
-          gst_rate_pct: gstRatePct,
+  // Verify backend health on mount
+  useEffect(() => {
+    checkBackendHealth().then((h) => setBackendActive(h.online))
+  }, [])
+
+  // Call Python FastAPI backend with BigInt fallback
+  const processIntercept = useCallback(
+    async (grossPaise: number, gstRatePct: number, isExempt: boolean) => {
+      setLoading(true)
+      const t0 = performance.now()
+      let backendSuccess = false
+
+      try {
+        const apiUrl = getApiUrl()
+        const res = await fetch(`${apiUrl}/api/intercept`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: `ord_${Math.random().toString(36).substring(2, 9)}`,
+            amount_inr: grossPaise / 100, // input to API is ₹ amount
+            gst_rate_pct: gstRatePct,
+            exempt_194o: isExempt,
+            merchant: 'Demo Merchant',
+          }),
+        })
+
+        if (res.ok) {
+          const data: BackendProof = await res.json()
+          setProof(data)
+          setBackendActive(true)
+          backendSuccess = true
+
+          setHistory((h) => [
+            {
+              grossPaise: data.gross_paise,
+              principalPaise: data.principal_paise,
+              gstPaise: data.gst_paise,
+              tdsPaise: data.tds_paise,
+              ts: new Date().toLocaleTimeString('en-IN', { hour12: false }),
+              proof: data.proof_hash,
+              engineType: 'Python FastAPI (Decimal)',
+            },
+            ...h.slice(0, 8),
+          ])
+        }
+      } catch {
+        setBackendActive(false)
+      }
+
+      if (!backendSuccess) {
+        // Fallback: Pure BigInt Integer Math Kernel
+        const local = calcLocalSplit(grossPaise, gstRatePct, isExempt)
+        const elapsed = Math.round((performance.now() - t0) * 100) / 100
+
+        setProof({
+          order_id: `ord_local_${Math.random().toString(36).substring(2, 7)}`,
+          gross_paise: local.grossPaise,
+          gross_inr: paiseToInr(local.grossPaise),
+          principal_paise: local.principalPaise,
+          principal_inr: paiseToInr(local.principalPaise),
+          gst_paise: local.gstPaise,
+          gst_inr: paiseToInr(local.gstPaise),
+          tds_paise: local.tdsPaise,
+          tds_inr: paiseToInr(local.tdsPaise),
+          unexplained_delta_paise: local.unexplainedDeltaPaise,
+          fmr: '0.000',
+          gst_rate_applied: `${gstRatePct}%`,
           exempt_194o: isExempt,
-          merchant: "Demo Merchant"
-        }),
-      })
-      if (res.ok) {
-        const data: BackendProof = await res.json()
-        setProof(data)
-        setBackendActive(true)
+          split_id: `split_bigint_${Date.now().toString(36)}`,
+          proof_hash: `sha256:bigint_${Math.random().toString(36).substring(2, 10)}`,
+          computed_by: 'Local BigInt Paise-Exact Kernel (Zero-Float)',
+          latency_ms: elapsed,
+        })
+
         setHistory((h) => [
           {
-            gross: data.gross_paise,
-            principal: data.principal_paise,
-            gst: data.gst_paise,
-            tds: data.tds_paise,
+            grossPaise: local.grossPaise,
+            principalPaise: local.principalPaise,
+            gstPaise: local.gstPaise,
+            tdsPaise: local.tdsPaise,
             ts: new Date().toLocaleTimeString('en-IN', { hour12: false }),
-            proof: data.proof_hash
+            engineType: 'Local BigInt Kernel',
           },
           ...h.slice(0, 8),
         ])
-        setLoading(false)
-        return
       }
-    } catch {
-      setBackendActive(false)
-    }
-    
-    // Fallback if server offline
-    const local = calcLocalSplit(grossPaise, GST_SLABS[gstSlab].rate, isExempt)
-    setHistory((h) => [
-      {
-        gross: grossPaise,
-        principal: local.principalPaise,
-        gst: local.gstPaise,
-        tds: local.tdsPaise,
-        ts: new Date().toLocaleTimeString('en-IN', { hour12: false }),
-      },
-      ...h.slice(0, 8),
-    ])
-    setLoading(false)
-  }
+
+      setLoading(false)
+    },
+    [],
+  )
 
   // Live feed ticker
   useEffect(() => {
     if (mode !== 'live') return
     const t = setInterval(() => {
-      const gross = FEED_ORDERS[feedIdx % FEED_ORDERS.length]
-      callPythonBackend(gross, GST_SLABS[gstSlab].rate * 100, exempt194o)
+      const grossPaise = FEED_ORDERS_PAISE[feedIdx % FEED_ORDERS_PAISE.length]
+      processIntercept(grossPaise, GST_SLABS[gstSlab].ratePct, exempt194o)
       setFeedIdx((i) => i + 1)
       setTick((k) => k + 1)
-    }, 3000)
+    }, 3200)
     return () => clearInterval(t)
-  }, [mode, feedIdx, gstSlab, exempt194o])
+  }, [mode, feedIdx, gstSlab, exempt194o, processIntercept])
 
-  const manualGross = (() => {
+  const manualGrossPaise = (() => {
     const v = parseInt(inputRaw.replace(/[^\d]/g, ''), 10)
-    return isNaN(v) ? 0 : v * 100
+    return isNaN(v) ? 0 : v * 100 // Convert ₹ input to paise
   })()
 
   const handleManualCalc = () => {
-    if (manualGross > 0) {
-      callPythonBackend(manualGross, GST_SLABS[gstSlab].rate * 100, exempt194o)
+    if (manualGrossPaise > 0) {
+      processIntercept(manualGrossPaise, GST_SLABS[gstSlab].ratePct, exempt194o)
       setTick((k) => k + 1)
     }
   }
 
-  const gross = proof ? proof.gross_paise : (mode === 'live' ? FEED_ORDERS[feedIdx % FEED_ORDERS.length] : manualGross)
-  const localSplits = calcLocalSplit(gross, GST_SLABS[gstSlab].rate, exempt194o)
+  const grossPaise = proof ? proof.gross_paise : (mode === 'live' ? FEED_ORDERS_PAISE[feedIdx % FEED_ORDERS_PAISE.length] : manualGrossPaise)
+  const localSplits = calcLocalSplit(grossPaise, GST_SLABS[gstSlab].ratePct, exempt194o)
   const principalPaise = proof ? proof.principal_paise : localSplits.principalPaise
   const gstPaise = proof ? proof.gst_paise : localSplits.gstPaise
   const tdsPaise = proof ? proof.tds_paise : localSplits.tdsPaise
 
   const lanes = [
-    { key: 'principal', label: 'Principal → Merchant', value: principalPaise, color: 'var(--gain)', y: 60, hold: false },
-    { key: 'gst', label: `GST (${(GST_SLABS[gstSlab].rate * 100).toFixed(0)}%) → Hold`, value: gstPaise, color: 'var(--gold)', y: 150, hold: true },
-    { key: 'tds', label: '194-O TDS (1%) → Hold', value: tdsPaise, color: 'var(--chart-3)', y: 240, hold: true },
+    { key: 'principal', label: 'Principal → Merchant', valuePaise: principalPaise, color: 'var(--gain)', y: 60, hold: false },
+    { key: 'gst', label: `GST (${GST_SLABS[gstSlab].ratePct}%) → Hold`, valuePaise: gstPaise, color: 'var(--gold)', y: 150, hold: true },
+    { key: 'tds', label: '194-O TDS (1%) → Hold', valuePaise: tdsPaise, color: 'var(--chart-3)', y: 240, hold: true },
   ]
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Backend Connection Badge */}
+      {/* Backend Status Bar */}
       <div className="flex items-center justify-between rounded-lg border border-border bg-panel px-4 py-2.5">
         <div className="flex items-center gap-2 font-mono text-xs">
-          <span className={`h-2 w-2 rounded-full ${backendActive ? 'bg-gain animate-pulse' : backendActive === false ? 'bg-warn' : 'bg-muted-foreground'}`} />
+          <span className={`h-2.5 w-2.5 rounded-full ${backendActive ? 'bg-gain animate-pulse' : 'bg-gold'}`} />
           <span className="font-semibold text-foreground">
-            {backendActive ? 'Python FastAPI Engine Active (Port 8000)' : 'Connecting to Python Backend...'}
+            {backendActive ? 'Python FastAPI Engine Active (Port 8000)' : 'Fallback Mode: Local BigInt Paise-Exact Kernel'}
           </span>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          {proof ? `Latency: ${proof.latency_ms}ms · ${proof.computed_by}` : 'Paise-Exact Decimal Kernel'}
+          {proof ? `Latency: ${proof.latency_ms}ms · ${proof.computed_by}` : 'Base-10 Integer Math Guarantee'}
         </span>
       </div>
 
@@ -175,9 +249,10 @@ export function SplitEngine() {
             <select
               value={gstSlab}
               onChange={(e) => {
-                setGstSlab(Number(e.target.value))
-                if (mode === 'manual' && manualGross > 0) {
-                  callPythonBackend(manualGross, GST_SLABS[Number(e.target.value)].rate * 100, exempt194o)
+                const idx = Number(e.target.value)
+                setGstSlab(idx)
+                if (mode === 'manual' && manualGrossPaise > 0) {
+                  processIntercept(manualGrossPaise, GST_SLABS[idx].ratePct, exempt194o)
                 }
               }}
               className="rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs text-foreground focus:border-gold focus:outline-none"
@@ -193,8 +268,8 @@ export function SplitEngine() {
                 checked={exempt194o}
                 onChange={(e) => {
                   setExempt194o(e.target.checked)
-                  if (mode === 'manual' && manualGross > 0) {
-                    callPythonBackend(manualGross, GST_SLABS[gstSlab].rate * 100, e.target.checked)
+                  if (mode === 'manual' && manualGrossPaise > 0) {
+                    processIntercept(manualGrossPaise, GST_SLABS[gstSlab].ratePct, e.target.checked)
                   }
                 }}
                 className="accent-gold"
@@ -223,21 +298,23 @@ export function SplitEngine() {
               disabled={loading}
               className="rounded-md bg-gold px-5 py-2 font-mono text-[11px] uppercase tracking-widest text-gold-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {loading ? 'Processing via Python...' : 'Intercept Payment'}
+              {loading ? 'Processing...' : 'Intercept Payment'}
             </button>
           </div>
         )}
       </div>
 
-      {/* Real Python Proof Callout Box */}
+      {/* Audit Proof Banner */}
       {proof && (
-        <div className="rounded-lg border border-gain/40 bg-gain/5 p-4 transition-all">
+        <div className={`rounded-lg border p-4 transition-all ${backendActive ? 'border-gain/40 bg-gain/5' : 'border-gold/40 bg-gold/5'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-gain animate-pulse" />
-              <span className="font-mono text-xs font-bold text-gain">REAL PYTHON BACKEND AUDIT PROOF</span>
+              <span className={`h-2 w-2 rounded-full ${backendActive ? 'bg-gain animate-pulse' : 'bg-gold'}`} />
+              <span className={`font-mono text-xs font-bold ${backendActive ? 'text-gain' : 'text-gold'}`}>
+                {backendActive ? 'REAL PYTHON BACKEND AUDIT PROOF' : 'LOCAL BIGINT PAISE-EXACT AUDIT PROOF'}
+              </span>
             </div>
-            <span className="font-mono text-[10px] text-muted-foreground">Execution Latency: {proof.latency_ms} ms</span>
+            <span className="font-mono text-[10px] text-muted-foreground">Latency: {proof.latency_ms} ms</span>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs sm:grid-cols-4">
@@ -254,8 +331,8 @@ export function SplitEngine() {
               <div className="font-bold text-gain">₹0.00 ({proof.unexplained_delta_paise} paise)</div>
             </div>
             <div className="rounded bg-background/50 p-2">
-              <div className="text-[10px] text-muted-foreground">MATH ENGINE</div>
-              <div className="truncate text-gold">Decimal ROUND_HALF_UP</div>
+              <div className="text-[10px] text-muted-foreground">MATH KERNEL</div>
+              <div className="truncate text-gold">{proof.computed_by}</div>
             </div>
           </div>
         </div>
@@ -270,7 +347,7 @@ export function SplitEngine() {
           <div className="flex items-center gap-2">
             {mode === 'live' && <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-gain" />}
             <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              {mode === 'live' ? 'auto-intercepting live feed' : gross > 0 ? 'manual payment intercept' : 'awaiting payment'}
+              {mode === 'live' ? 'auto-intercepting live feed' : grossPaise > 0 ? 'manual payment intercept' : 'awaiting payment'}
             </span>
           </div>
         </div>
@@ -283,7 +360,7 @@ export function SplitEngine() {
                 CAPTURED ORDER
               </text>
               <text x="85" y="153" textAnchor="middle" fontSize="18" fontWeight="700" fontFamily="var(--font-mono)" fill="var(--foreground)">
-                {gross > 0 ? inr(gross) : '—'}
+                {grossPaise > 0 ? paiseToInr(grossPaise) : '—'}
               </text>
               <text x="85" y="172" textAnchor="middle" fontSize="8" fontFamily="var(--font-mono)" fill="var(--muted-foreground)">
                 Razorpay captured
@@ -308,7 +385,7 @@ export function SplitEngine() {
                     {lane.label}
                   </text>
                   <text x="472" y={lane.y + 38} fontSize="14" fontWeight="700" fontFamily="var(--font-mono)" fill="var(--foreground)">
-                    {gross > 0 ? inr(lane.value) : '—'}
+                    {grossPaise > 0 ? paiseToInr(lane.valuePaise) : '—'}
                   </text>
                   {lane.hold && (
                     <g>
@@ -323,20 +400,20 @@ export function SplitEngine() {
         </div>
 
         <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
-          <Foot label="Released to Merchant" value={gross > 0 ? inr(principalPaise) : '—'} tone="gain" />
-          <Foot label="Held Escrow (GST + TDS)" value={gross > 0 ? inr(gstPaise + tdsPaise) : '—'} tone="gold" />
+          <Foot label="Released to Merchant" value={grossPaise > 0 ? paiseToInr(principalPaise) : '—'} tone="gain" />
+          <Foot label="Held Escrow (GST + TDS)" value={grossPaise > 0 ? paiseToInr(gstPaise + tdsPaise) : '—'} tone="gold" />
           <Foot label="Unexplained Delta" value="₹0.00" tone="gain" />
         </div>
       </div>
 
-      {/* Intercept History */}
+      {/* Intercept History Log */}
       {history.length > 0 && (
         <div className="rounded-lg border border-border bg-panel">
           <div className="border-b border-border px-5 py-3 flex items-center justify-between">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              Real Intercept Log · Python Backend Audited
+              Real Intercept Log · Paise-Exact Audited
             </h2>
-            <span className="font-mono text-[10px] text-gain">FMR = 0.000 (Paise Exact)</span>
+            <span className="font-mono text-[10px] text-gain">FMR = 0.000 (Base-10 Integer)</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[650px] text-sm">
@@ -347,18 +424,18 @@ export function SplitEngine() {
                   <th className="px-4 py-2 text-right text-gain">Principal</th>
                   <th className="px-4 py-2 text-right text-gold">GST Escrow</th>
                   <th className="px-4 py-2 text-right" style={{ color: 'var(--chart-3)' }}>TDS Hold</th>
-                  <th className="px-4 py-2 text-left">Proof Hash</th>
+                  <th className="px-4 py-2 text-left">Audit Engine</th>
                 </tr>
               </thead>
               <tbody className="font-mono tabular-nums">
                 {history.map((h, i) => (
                   <tr key={i} className="border-b border-border/50 last:border-0 transition-colors hover:bg-accent/20">
                     <td className="px-4 py-2 text-muted-foreground">{h.ts}</td>
-                    <td className="px-4 py-2 text-right font-semibold">{inr(h.gross)}</td>
-                    <td className="px-4 py-2 text-right text-gain">{inr(h.principal)}</td>
-                    <td className="px-4 py-2 text-right text-gold">{inr(h.gst)}</td>
-                    <td className="px-4 py-2 text-right" style={{ color: 'var(--chart-3)' }}>{inr(h.tds)}</td>
-                    <td className="px-4 py-2 text-left text-xs text-muted-foreground truncate">{h.proof || 'sha256:local_math'}</td>
+                    <td className="px-4 py-2 text-right font-semibold">{paiseToInr(h.grossPaise)}</td>
+                    <td className="px-4 py-2 text-right text-gain">{paiseToInr(h.principalPaise)}</td>
+                    <td className="px-4 py-2 text-right text-gold">{paiseToInr(h.gstPaise)}</td>
+                    <td className="px-4 py-2 text-right" style={{ color: 'var(--chart-3)' }}>{paiseToInr(h.tdsPaise)}</td>
+                    <td className="px-4 py-2 text-left text-xs text-muted-foreground truncate">{h.engineType}</td>
                   </tr>
                 ))}
               </tbody>

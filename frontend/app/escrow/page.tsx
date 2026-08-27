@@ -1,6 +1,6 @@
 import { SplitEngine } from '@/components/escrow/split-engine'
 import { Panel, SectionLabel, StatTile, Pill } from '@/components/kuber/primitives'
-import { escrowSplits, escrowBuckets, inr } from '@/lib/kuber-data'
+import { escrowSplits, escrowBuckets, paiseToInr } from '@/lib/kuber-data'
 
 export default function EscrowPage() {
   const held = escrowSplits.filter((s) => s.onHold)
@@ -22,10 +22,10 @@ export default function EscrowPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Gross intake" value={inr(totalGross, { compact: true })} hint={`${escrowSplits.length} orders in window`} />
-        <StatTile label="Held in escrow" value={inr(totalHeld, { compact: true })} accent="gold" hint="Statutory dues on_hold" />
+        <StatTile label="Gross intake" value={paiseToInr(totalGross, { compact: true })} hint={`${escrowSplits.length} orders in window`} />
+        <StatTile label="Held in escrow" value={paiseToInr(totalHeld, { compact: true })} accent="gold" hint="Statutory dues on_hold" />
         <StatTile label="Orders on hold" value={held.length} accent="warn" hint="Awaiting GSTR-2B" />
-        <StatTile label="Leakage" value="₹0" accent="gain" hint="Prevented at gateway" />
+        <StatTile label="Leakage" value="₹0.00" accent="gain" hint="Prevented at gateway" />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -91,10 +91,10 @@ export default function EscrowPage() {
                 <tr key={s.id} className="border-b border-border/60 last:border-0 transition-colors hover:bg-accent/30">
                   <td className="px-5 py-3 text-left text-foreground">{s.order}</td>
                   <td className="px-5 py-3 text-left font-sans text-muted-foreground">{s.merchant}</td>
-                  <td className="px-5 py-3 text-right">{inr(s.gross)}</td>
-                  <td className="px-5 py-3 text-right text-gain">{inr(s.principal)}</td>
-                  <td className="px-5 py-3 text-right text-gold">{inr(s.gst)}</td>
-                  <td className="px-5 py-3 text-right text-muted-foreground">{inr(s.tds)}</td>
+                  <td className="px-5 py-3 text-right">{paiseToInr(s.gross)}</td>
+                  <td className="px-5 py-3 text-right text-gain">{paiseToInr(s.principal)}</td>
+                  <td className="px-5 py-3 text-right text-gold">{paiseToInr(s.gst)}</td>
+                  <td className="px-5 py-3 text-right text-muted-foreground">{paiseToInr(s.tds)}</td>
                   <td className="px-5 py-3 text-left">
                     {s.onHold ? (
                       <Pill tone="gold">held · {s.resolvesOn}</Pill>
