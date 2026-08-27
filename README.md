@@ -14,19 +14,19 @@
 
 ## 🎯 The Core Thesis: Authorisation vs. Assurance
 
-> *"Razorpay can authorise an agent's spend. APEX proves whether the seller agent delivered before its settlement is released."*
+> *"Razorpay can authorise an agent's spend. KuberRecon proves whether the seller agent delivered before its settlement is released."*
 
-In autonomous multi-agent commerce, payment gateways authorize spending at transaction inception ($T_0$). However, releasing settlements before cryptographic proof of delivery creates counterparty risk. **KuberRecon + APEX Assurance** provides deterministic, paise-exact settlement gating:
+In autonomous multi-agent commerce, payment gateways authorize spending at transaction inception ($T_0$). However, releasing settlements before cryptographic proof of delivery creates counterparty risk. **KuberRecon** provides deterministic, paise-exact settlement gating and multi-source reconciliation:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                              THE APEX ASSURANCE PIPELINE                               │
+│                         THE KUBERRECON ASSURANCE PIPELINE                              │
 ├───────────────────┬───────────────────────────────┬────────────────────────────────────┤
 │ 1. CONTRACT HOLD  │ 2. DETERMINISTIC VERIFICATION │ 3. ATOMIC CAS ROUTE RELEASE        │
 ├───────────────────┼───────────────────────────────┼────────────────────────────────────┤
 │ Buyer Agent signs │ Seller delivers B2B payload.  │ Maker-Checker gate verified.       │
-│ spend contract.   │ APEX runs Mod-36 GSTIN check, │ Atomic CAS: WHERE version = ?      │
-│ Razorpay Route:   │ line item exactness, payload  │ Razorpay Route: on_hold -> false.  │
+│ spend contract.   │ KuberRecon runs Mod-36 GSTIN  │ Atomic CAS: WHERE version = ?      │
+│ Razorpay Route:   │ check, line item exactness,   │ Razorpay Route: on_hold -> false.  │
 │ on_hold = true.   │ bounds. If corrupted -> 412.  │ 5 racing checkers -> 1 OK, 4 409s. │
 └───────────────────┴───────────────────────────────┴────────────────────────────────────┘
 ```
@@ -37,7 +37,7 @@ In autonomous multi-agent commerce, payment gateways authorize spending at trans
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                          KUBERRECON + APEX TECHNICAL MATRIX                           │
+│                             KUBERRECON TECHNICAL MATRIX                                │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                        │
 │  [ INGESTION LAYER ]                                                                   │
@@ -121,7 +121,7 @@ npm install
 npm run dev
 ```
 * Open `http://localhost:3000` for the Reconciliation Dashboard.
-* Open `http://localhost:3000/apex` for the **APEX Dual-Agent Assurance Console**.
+* Open `http://localhost:3000/apex` for the **KuberRecon Assurance Console**.
 
 ---
 
