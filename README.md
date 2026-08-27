@@ -10,6 +10,18 @@
 [![Whitebox Pentest](https://img.shields.io/badge/Whitebox%20Audit-5%2F5%20Vectors%20Mitigated-purple)](tests/test_shannon_whitebox_audit.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
+[ 🚀 Quickstart ](#-quickstart--local-reproduction) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-8-verified-engineering-invariants) • [ 🧪 51/51 Tests ](#-full-verified-test-suite-breakdown-51-items) • [ 📡 API Reference ](#-api-reference)
+
+---
+
+## 💬 Real-World CFO & Controller Queries
+
+| Real-World Query | System Resolution | Invariant Enforced |
+|---|---|---|
+| *"Why was Route contract #CN_7781 held on Razorpay?"* | **Gated on `on_hold: true`** until Mod-36 GSTIN verification passed. | Dual-Agent Pre-Settlement Assurance |
+| *"Show Section 194-O TDS & MDR deduction for HDFC settlement #SETTLE_9981."* | Computes **paise-exact 1% TDS, 1.85% MDR, 18% GST** with zero float drift. | Base-10 Integer Paise Math Kernel |
+| *"List all ambiguous bank credits in the 10,000 transaction batch."* | **4/4 Planted Undecidables** isolated to Exception Drawer without guessing. | Zero False Match Rate ($FMR = 0.000$) |
+
 ---
 
 ## 🎯 The Core Thesis: Authorisation vs. Assurance
