@@ -104,8 +104,8 @@ export function SplitEngine() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             order_id: `ord_${Math.random().toString(36).substring(2, 9)}`,
-            amount_inr: grossPaise / 100, // input to API is ₹ amount
-            gst_rate_pct: gstRatePct,
+            amount_paise: grossPaise,           // integer paise — no float division
+            gst_rate_pct: Math.round(gstRatePct), // integer slab
             exempt_194o: isExempt,
             merchant: 'Demo Merchant',
           }),
