@@ -482,18 +482,23 @@ async def razorpay_webhook_listener(
     t0 = time.perf_counter()
     raw_body = await request.body()
 
-    # ── 1. HMAC Signature Verification ────────────────────────────────────────
-    if x_razorpay_signature:
-        expected = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, x_razorpay_signature):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid X-Razorpay-Signature — HMAC mismatch. Request rejected.",
-            )
-        signature_verified = True
-    else:
-        # Signature header absent — accepted in sandbox mode, logged
-        signature_verified = False
+    # ── 1. HMAC Signature Verification (mandatory in every mode) ─────────────
+    if not x_razorpay_signature:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Missing X-Razorpay-Signature header. "
+                "All webhook requests must be signed. "
+                "In sandbox mode use GET /api/webhook/test-payload to obtain a valid fixture."
+            ),
+        )
+    expected = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, x_razorpay_signature):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid X-Razorpay-Signature — HMAC mismatch. Request rejected.",
+        )
+    signature_verified = True
 
     # ── 2. Derive event_id ────────────────────────────────────────────────────
     event_id = x_razorpay_event_id or (

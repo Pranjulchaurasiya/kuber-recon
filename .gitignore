@@ -51,6 +51,14 @@ htmlcov/
 *.log
 .system_generated/
 
+# SQLite idempotency store (runtime state — never commit)
+kuber_idempotency.db
+kuber_idempotency.db-shm
+kuber_idempotency.db-wal
+src/kuber_recon/kuber_idempotency.db
+src/kuber_recon/kuber_idempotency.db-shm
+src/kuber_recon/kuber_idempotency.db-wal
+
 # OS & IDE
 .DS_Store
 Thumbs.db

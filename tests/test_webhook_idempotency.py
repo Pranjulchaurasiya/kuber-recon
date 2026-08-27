@@ -219,3 +219,27 @@ def test_test_payload_available_in_sandbox(client):
     raw = data["raw_body"].encode("utf-8")
     expected_sig = hmac.new(_SECRET.encode(), raw, hashlib.sha256).hexdigest()
     assert expected_sig == data["x_razorpay_signature"]
+
+
+# ── 9. Absent signature rejected in every mode ────────────────────────────────
+
+def test_webhook_absent_signature_rejected(client):
+    """
+    X-Razorpay-Signature is now mandatory in every mode (including sandbox).
+    A request without the header must receive 400, not 200.
+    The signed fixture from /api/webhook/test-payload is the correct path for sandbox.
+    """
+    raw, _ = _make_signed_payload(_SAMPLE_EVENT, "evt_nosig_009")
+    resp = client.post(
+        "/api/webhook/razorpay",
+        content=raw,
+        headers={
+            "Content-Type": "application/json",
+            # X-Razorpay-Signature deliberately omitted
+            "X-Razorpay-Event-Id": "evt_nosig_009",
+        },
+    )
+    assert resp.status_code == 400
+    detail = resp.json()["detail"]
+    assert "Missing" in detail or "signed" in detail.lower()
+
