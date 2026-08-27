@@ -1,7 +1,7 @@
-# 🏛️ KuberRecon + APEX Assurance
+# 🏛️ KuberRecon (कुबेर मिलान)
 
 > **Track 04: AI Finance Controller · Razorpay AI Buildathon 2026**  
-> **Autonomous Financial Integrity & Agentic Route Settlement Engine:** *Pre-Settlement Route Hold Gating (`on_hold: true`), Paise-Exact Combinatorial Settlement Engine, Dual-Agent Delivery Assurance (APEX), Atomic CAS Hold Release & White-Box Pentest Defense.*
+> **Autonomous Financial Integrity & Pre-Settlement Route Assurance Engine:** *Pre-Settlement Route Hold Gating (`on_hold: true`), Paise-Exact Combinatorial Settlement Engine (Donald Knuth DLX), Dual-Agent Delivery Assurance, Atomic CAS Hold Release & White-Box Pentest Defense.*
 
 [![Tests Passing](https://img.shields.io/badge/pytest-51%20passed-brightgreen)](tests/)
 [![Undecidable Handling](https://img.shields.io/badge/Planted%20Undecidables-4%2F4%20Isolated-blue)](tests/test_planted_undecidables.py)
