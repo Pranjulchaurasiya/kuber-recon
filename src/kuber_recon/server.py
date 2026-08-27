@@ -1,20 +1,22 @@
 """
-KuberRecon FastAPI Server — Live REST API & Razorpay Webhook Gateway
-=====================================================================
+KuberRecon & APEX Assurance FastAPI Server — Live REST API & Webhook Gateway
+=============================================================================
 Endpoints:
-  GET  /api/health                  — Liveness probe
-  GET  /api/integration-status      — Sandbox vs Test-Mode mode badge
+  GET  /api/health                  — Liveness probe & status
+  GET  /api/integration-status      — Sandbox vs Live Test Mode status
   POST /api/intercept               — T=0 escrow split (amount_paise: int)
   POST /api/reconcile               — Knuth DLX exact-cover solve
   POST /api/reconcile/ambiguous     — Honest Refusal (AmbiguousMatchError demo)
   POST /api/razorpay/route-transfer — Route Transfer with on_hold: True (amount_paise: int)
-  GET  /api/webhook/test-payload    — SANDBOX ONLY: pre-signed fixture for HMAC smoke-test
+  GET  /api/webhook/test-payload    — SANDBOX ONLY: pre-signed fixture for HMAC test
   POST /api/webhook/razorpay        — Signed webhook ingestion (HMAC + SQLite idempotency)
   POST /api/twin/simulate           — Causal stress test
 
-Paise-exact rule: ALL payment-facing request models use `amount_paise: int`.
-Float inputs from the user are converted to integer paise by the frontend
-before the HTTP call is made. The backend never touches float on currency.
+  APEX Assurance Protocol Endpoints:
+  POST /api/apex/contracts/create   — Initialize agent contract & lock Route settlement (on_hold: true)
+  POST /api/apex/contracts/deliver  — Ingest seller payload manifest, verify invariants, SQLite atomic lock
+  POST /api/apex/contracts/release  — Execute PATCH /v1/transfers/:id (on_hold: false) on 100% verification
+  GET  /api/apex/contracts/{id}     — Query live contract status & audit trail
 """
 
 import hashlib
@@ -27,7 +29,7 @@ import time
 from decimal import Decimal
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -40,6 +42,14 @@ except ImportError:
     raise
 
 from kuber_recon.actions import ActionGuardrailEngine
+from kuber_recon.assurance import (
+    AssuranceContract,
+    AssertionResult,
+    ContractStatus,
+    DeliveryManifest,
+    DeterministicAssertionEngine,
+    MAX_DIRECT_PAYLOAD_BYTES,
+)
 from kuber_recon.client import RazorpayClientAdapter
 from kuber_recon.engine import AmbiguousMatchError, KnuthExactCoverSolver, ReconciliationEngine
 from kuber_recon.escrow import KuberSovereignEscrowEngine
@@ -48,18 +58,12 @@ from kuber_recon.simulation import FinancialDigitalTwin
 from kuber_recon.types import paise_to_inr_decimal
 
 
-# ── SQLite-Backed Durable Idempotency Store ───────────────────────────────────
+# ── SQLite-Backed Durable Idempotency & Contract Store ────────────────────────
 
 class WebhookIdempotencyStore:
     """
-    Durable SQLite idempotency guard for Razorpay webhooks.
-
-    Uses a table with `event_id TEXT PRIMARY KEY` and an atomic INSERT.
-    A UNIQUE constraint violation IS the duplicate-detection mechanism —
-    no separate lookup, no race window, survives server restarts.
-
-    For a buildathon demo, SQLite is the correct local durable store.
-    In production, swap the backend for Redis or Postgres UNIQUE INSERT.
+    Durable SQLite idempotency guard for Razorpay webhooks & APEX contracts.
+    Uses atomic INSERT & UNIQUE constraints to prevent race conditions.
     """
 
     DB_FILE = Path(__file__).parent / "kuber_idempotency.db"
@@ -70,7 +74,7 @@ class WebhookIdempotencyStore:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.DB_FILE), check_same_thread=False)
-        conn.execute("PRAGMA journal_mode=WAL")   # concurrent reads during writes
+        conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
     def _init_db(self) -> None:
@@ -83,30 +87,84 @@ class WebhookIdempotencyStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS apex_contracts (
+                    contract_id TEXT PRIMARY KEY,
+                    buyer_agent_id TEXT NOT NULL,
+                    seller_agent_id TEXT NOT NULL,
+                    seller_account_id TEXT NOT NULL,
+                    amount_paise INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    transfer_id TEXT,
+                    on_hold INTEGER NOT NULL,
+                    on_hold_until INTEGER NOT NULL,
+                    assertions_passed INTEGER NOT NULL,
+                    refusal_reason TEXT,
+                    proof_hash TEXT,
+                    created_at INTEGER NOT NULL
+                )
+                """
+            )
 
     def try_insert(self, event_id: str) -> bool:
-        """
-        Atomically attempt to claim event_id.
-        Returns True  → new event, caller should process.
-        Returns False → duplicate, caller should return 'ignored_duplicate'.
-        """
         with self._lock, self._connect() as conn:
             try:
                 conn.execute(
                     "INSERT INTO processed_events (event_id, received_at) VALUES (?, ?)",
                     (event_id, int(time.time())),
                 )
-                return True   # new event
+                return True
             except sqlite3.IntegrityError:
-                return False  # duplicate: UNIQUE constraint fired
+                return False
+
+    def save_contract(self, c: AssuranceContract) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO apex_contracts (
+                    contract_id, buyer_agent_id, seller_agent_id, seller_account_id,
+                    amount_paise, status, transfer_id, on_hold, on_hold_until,
+                    assertions_passed, refusal_reason, proof_hash, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    c.contract_id, c.buyer_agent_id, c.seller_agent_id, c.seller_account_id,
+                    c.amount_paise, c.status.value, c.transfer_id, 1 if c.on_hold else 0,
+                    c.on_hold_until, 1 if c.assertions_passed else 0, c.refusal_reason,
+                    c.proof_hash, c.created_at,
+                ),
+            )
+
+    def get_contract(self, contract_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock, self._connect() as conn:
+            cur = conn.execute("SELECT * FROM apex_contracts WHERE contract_id = ?", (contract_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {
+                "contract_id": row[0],
+                "buyer_agent_id": row[1],
+                "seller_agent_id": row[2],
+                "seller_account_id": row[3],
+                "amount_paise": row[4],
+                "status": row[5],
+                "transfer_id": row[6],
+                "on_hold": bool(row[7]),
+                "on_hold_until": row[8],
+                "assertions_passed": bool(row[9]),
+                "refusal_reason": row[10],
+                "proof_hash": row[11],
+                "created_at": row[12],
+            }
 
 
 # ── Singletons ────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="KuberRecon API",
-    description="Autonomous Financial Integrity OS — Razorpay AI Buildathon 2026",
-    version="1.2.0",
+    title="KuberRecon & APEX Assurance API",
+    description="Autonomous Financial Integrity & Agentic Settlement OS — Razorpay AI Buildathon 2026",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -122,17 +180,12 @@ razorpay_adapter = RazorpayClientAdapter()
 idempotency_store = WebhookIdempotencyStore()
 
 _WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "whsec_kuber_demo_key_2026")
-_IS_SANDBOX = not razorpay_adapter.is_live   # True when no real keys
+_IS_SANDBOX = not razorpay_adapter.is_live
 
 
-# ── Pydantic Models ───────────────────────────────────────────────────────────
+# ── Pydantic Request Models ───────────────────────────────────────────────────
 
 class InterceptRequest(BaseModel):
-    """
-    T=0 escrow split request.
-    `amount_paise` is a mandatory integer; the frontend converts typed rupees
-    to paise using BigInt arithmetic before sending this request.
-    """
     order_id: str
     amount_paise: int = Field(..., gt=0, description="Gross amount in integer paise (no floats)")
     gst_rate_pct: int = Field(18, ge=0, le=28, description="GST slab integer: 0,5,12,18,28")
@@ -190,10 +243,6 @@ class AmbiguousRefusalResponse(BaseModel):
 
 
 class RouteTransferRequest(BaseModel):
-    """
-    Route Transfer creation request.
-    `amount_paise` is mandatory integer; frontend converts rupees via BigInt.
-    """
     account_id: str = "acc_merchant_001"
     amount_paise: int = Field(..., gt=0, description="Transfer amount in integer paise (no floats)")
     notes: Optional[Dict[str, str]] = None
@@ -207,7 +256,7 @@ class RouteTransferResponse(BaseModel):
     amount_inr: str
     on_hold: bool
     status: str
-    mode: str               # "test_mode" | "sandbox_simulation"
+    mode: str
     proof_hash: str
 
 
@@ -217,11 +266,33 @@ class TwinRequest(BaseModel):
 
 
 class IntegrationStatusResponse(BaseModel):
-    mode: str               # "test_mode" | "sandbox_simulation"
+    mode: str
     razorpay_api_live: bool
     webhook_secret_configured: bool
     idempotency_backend: str
     fmr: str
+
+
+# ── APEX Assurance Models ─────────────────────────────────────────────────────
+
+class CreateContractRequest(BaseModel):
+    buyer_agent_id: str = "agent_buyer_procurement_01"
+    seller_agent_id: str = "agent_seller_data_01"
+    seller_account_id: str = "acc_seller_linked_001"
+    amount_paise: int = Field(..., gt=0, description="Contract amount in integer paise")
+    ttl_seconds: int = Field(86400, ge=60, description="Contract hold TTL in seconds (default 24h)")
+
+
+class DeliverContractRequest(BaseModel):
+    contract_id: str
+    seller_agent_id: str
+    payload_records: List[Dict[str, Any]] = Field(..., description="Direct batch of delivered records")
+    manifest_signature: Optional[str] = None
+
+
+class ReleaseContractRequest(BaseModel):
+    contract_id: str
+    checker_id: str = "cfo_approver_01"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -231,14 +302,15 @@ def _fmt_paise(paise: int) -> str:
     return f"₹{d:,.2f}"
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Core Endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/api/health")
 def health():
     return {
         "status": "live",
-        "service": "KuberRecon API",
-        "engine": "Knuth DLX + Paise-Exact Decimal",
+        "service": "KuberRecon & APEX Assurance API",
+        "protocol": "APEX Assurance v2.0 (Razorpay Route Escrow)",
+        "engine": "Knuth DLX + Paise-Exact Decimal + Non-LLM Assertion Kernel",
         "mode": "test_mode" if razorpay_adapter.is_live else "sandbox_simulation",
         "fmr": "0.000",
         "timestamp": int(time.time()),
@@ -247,10 +319,6 @@ def health():
 
 @app.get("/api/integration-status", response_model=IntegrationStatusResponse)
 def integration_status():
-    """
-    Read-only endpoint exposing sandbox vs test_mode mode.
-    Never exposes API keys; safe to call from the public frontend.
-    """
     webhook_secret_set = os.getenv("RAZORPAY_WEBHOOK_SECRET") is not None
     return IntegrationStatusResponse(
         mode="test_mode" if razorpay_adapter.is_live else "sandbox_simulation",
@@ -263,14 +331,7 @@ def integration_status():
 
 @app.post("/api/intercept", response_model=InterceptResponse)
 def intercept_payment(req: InterceptRequest):
-    """
-    T=0 Pre-Settlement Split.
-    Accepts `amount_paise: int` directly. No float conversion on the server side.
-    All math uses Python Decimal(ROUND_HALF_UP).
-    """
     t0 = time.perf_counter()
-
-    # amount_paise is already an integer by the Pydantic model — no float path.
     gross_paise = req.amount_paise
     gst_rate = Decimal(req.gst_rate_pct) / Decimal(100)
 
@@ -312,7 +373,6 @@ def intercept_payment(req: InterceptRequest):
 
 @app.post("/api/reconcile", response_model=ReconcileResponse)
 def reconcile(req: ReconcileRequest):
-    """Knuth Algorithm X / DLX Exact-Cover Reconciliation."""
     t0 = time.perf_counter()
     generator = ChaosDataGenerator(seed=req.seed)
     invoices, bank_credits, _, _ = generator.generate_suite(num_records=min(req.records, 1000))
@@ -339,15 +399,8 @@ def reconcile(req: ReconcileRequest):
 
 @app.post("/api/reconcile/ambiguous", response_model=AmbiguousRefusalResponse)
 def demonstrate_ambiguity_refusal():
-    """
-    Moat Feature — Honest Refusal (AmbiguousMatchError).
-    Bank credit ₹1,00,000 matches two distinct invoice subsets:
-      Subset A: [INV-A1 ₹60,000  + INV-A2 ₹40,000]
-      Subset B: [INV-B1 ₹70,000  + INV-B2 ₹30,000]
-    KuberRecon refuses to guess, preserving FMR = 0.000.
-    """
     t0 = time.perf_counter()
-    target_paise = 10_000_000  # ₹1,00,000
+    target_paise = 10_000_000
 
     candidates = [
         ("INV-A1 (₹60,000)", 6_000_000),
@@ -380,21 +433,14 @@ def demonstrate_ambiguity_refusal():
 
 @app.post("/api/razorpay/route-transfer", response_model=RouteTransferResponse)
 def create_route_transfer(req: RouteTransferRequest):
-    """
-    Create a Razorpay Route Transfer with on_hold: True.
-    `amount_paise` is an integer — no float conversion needed.
-    Calls live Razorpay API if keys are configured, otherwise sandbox simulation.
-    """
     res = razorpay_adapter.create_route_escrow_transfer(
         account_id=req.account_id,
         amount_paise=req.amount_paise,
         currency="INR",
-        notes=req.notes or {"protocol": "KUBERSOVEREIGN_GSTR2B_ESCROW"},
+        notes=req.notes or {"protocol": "APEX_ASSURANCE_AGENTIC_ESCROW"},
     )
 
-    proof = hashlib.sha256(
-        f"{res['id']}:{req.amount_paise}:on_hold_true".encode()
-    ).hexdigest()
+    proof = hashlib.sha256(f"{res['id']}:{req.amount_paise}:on_hold_true".encode()).hexdigest()
 
     return RouteTransferResponse(
         transfer_id=res["id"],
@@ -411,24 +457,10 @@ def create_route_transfer(req: RouteTransferRequest):
 
 @app.get("/api/webhook/test-payload")
 def get_webhook_test_payload():
-    """
-    SANDBOX/DEVELOPMENT ONLY.
-
-    Returns a deterministic JSON body and its correct HMAC-SHA256 signature,
-    computed with the server's RAZORPAY_WEBHOOK_SECRET. The frontend POSTs
-    this body + signature to /api/webhook/razorpay to prove the HMAC pathway
-    end-to-end without an actual Razorpay call.
-
-    This endpoint is DISABLED when real Razorpay credentials are configured,
-    because an endpoint that signs arbitrary payloads is unsafe in live mode.
-    """
     if razorpay_adapter.is_live:
         raise HTTPException(
             status_code=403,
-            detail=(
-                "test-payload endpoint is disabled in live Test Mode. "
-                "Use a real Razorpay webhook event instead."
-            ),
+            detail="test-payload endpoint is disabled in live Test Mode. Use real Razorpay webhook.",
         )
 
     body_dict = {
@@ -440,27 +472,22 @@ def get_webhook_test_payload():
             "payment": {
                 "entity": {
                     "id": "pay_sandbox_demo_001",
-                    "amount": 118000,   # 118,000 paise = ₹1,180.00
+                    "amount": 118000,
                     "currency": "INR",
                     "status": "captured",
-                    "description": "KuberRecon sandbox demo payment",
+                    "description": "APEX Assurance sandbox demo payment",
                 }
             }
         },
     }
-    # Canonical deterministic serialisation — same bytes every call
-    raw_body: bytes = json.dumps(body_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    raw_body = json.dumps(body_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
     signature = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
 
     return {
         "raw_body": raw_body.decode("utf-8"),
         "x_razorpay_signature": signature,
-        "x_razorpay_event_id": "evt_sandbox_kuber_demo_001",
-        "instruction": (
-            "POST raw_body to /api/webhook/razorpay with headers "
-            "X-Razorpay-Signature and X-Razorpay-Event-Id set as shown. "
-            "The server will verify the HMAC and acknowledge."
-        ),
+        "x_razorpay_event_id": "evt_sandbox_apex_demo_001",
+        "instruction": "POST raw_body to /api/webhook/razorpay with headers X-Razorpay-Signature and X-Razorpay-Event-Id.",
     }
 
 
@@ -470,27 +497,13 @@ async def razorpay_webhook_listener(
     x_razorpay_signature: Optional[str] = Header(None, alias="X-Razorpay-Signature"),
     x_razorpay_event_id: Optional[str] = Header(None, alias="X-Razorpay-Event-Id"),
 ):
-    """
-    Razorpay Webhook Listener — HMAC Verification + SQLite Idempotency.
-
-    1. Reads raw body first (before JSON parse) for correct HMAC surface.
-    2. Verifies X-Razorpay-Signature with constant-time compare_digest.
-    3. Returns 400 on invalid signature (never silently accepts bad requests).
-    4. Atomically inserts event_id into SQLite; UNIQUE conflict = duplicate.
-    5. Acknowledges with 200 OK immediately (async processing model).
-    """
     t0 = time.perf_counter()
     raw_body = await request.body()
 
-    # ── 1. HMAC Signature Verification (mandatory in every mode) ─────────────
     if not x_razorpay_signature:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Missing X-Razorpay-Signature header. "
-                "All webhook requests must be signed. "
-                "In sandbox mode use GET /api/webhook/test-payload to obtain a valid fixture."
-            ),
+            detail="Missing X-Razorpay-Signature header. All webhook requests must be signed.",
         )
     expected = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, x_razorpay_signature):
@@ -498,14 +511,9 @@ async def razorpay_webhook_listener(
             status_code=400,
             detail="Invalid X-Razorpay-Signature — HMAC mismatch. Request rejected.",
         )
-    signature_verified = True
 
-    # ── 2. Derive event_id ────────────────────────────────────────────────────
-    event_id = x_razorpay_event_id or (
-        "evt_body_" + hashlib.sha256(raw_body).hexdigest()[:16]
-    )
+    event_id = x_razorpay_event_id or ("evt_body_" + hashlib.sha256(raw_body).hexdigest()[:16])
 
-    # ── 3. SQLite Atomic Idempotency Check ────────────────────────────────────
     is_new = idempotency_store.try_insert(event_id)
     if not is_new:
         return {
@@ -514,7 +522,6 @@ async def razorpay_webhook_listener(
             "message": "Event already processed. Idempotency preserved (SQLite).",
         }
 
-    # ── 4. Parse payload (after idempotency gate) ─────────────────────────────
     try:
         payload = json.loads(raw_body)
     except Exception:
@@ -527,7 +534,7 @@ async def razorpay_webhook_listener(
         "status": "acknowledged",
         "event_id": event_id,
         "event": event_name,
-        "signature_verified": signature_verified,
+        "signature_verified": True,
         "idempotency_backend": "SQLite (durable — survives restart)",
         "processed_background": True,
         "proof_hash": "sha256:" + hashlib.sha256(raw_body).hexdigest()[:16],
@@ -535,9 +542,174 @@ async def razorpay_webhook_listener(
     }
 
 
+# ── APEX ASSURANCE PROTOCOL ENDPOINTS ─────────────────────────────────────────
+
+@app.post("/api/apex/contracts/create")
+def apex_create_contract(req: CreateContractRequest):
+    """
+    Step 1: Buyer Agent initiates an escrow contract.
+    Creates a Razorpay Route transfer with on_hold: true and TTL timeout.
+    """
+    now = int(time.time())
+    ttl_expiry = now + req.ttl_seconds
+    contract_id = f"apex_cnt_{int(time.time() * 1000) % 10000000:07d}"
+
+    # Lock seller settlement via Route
+    route_res = razorpay_adapter.create_route_escrow_transfer(
+        account_id=req.seller_account_id,
+        amount_paise=req.amount_paise,
+        currency="INR",
+        on_hold_until=ttl_expiry,
+        notes={"apex_contract_id": contract_id, "buyer_agent": req.buyer_agent_id},
+    )
+
+    contract = AssuranceContract(
+        contract_id=contract_id,
+        buyer_agent_id=req.buyer_agent_id,
+        seller_agent_id=req.seller_agent_id,
+        seller_account_id=req.seller_account_id,
+        amount_paise=req.amount_paise,
+        currency="INR",
+        status=ContractStatus.HELD,
+        transfer_id=route_res["id"],
+        on_hold=True,
+        on_hold_until=ttl_expiry,
+        created_at=now,
+        assertions_passed=False,
+        proof_hash=hashlib.sha256(f"{contract_id}:{req.amount_paise}:HELD".encode()).hexdigest()[:16],
+    )
+
+    idempotency_store.save_contract(contract)
+
+    return {
+        "contract_id": contract.contract_id,
+        "status": contract.status.value,
+        "amount_paise": contract.amount_paise,
+        "amount_inr": _fmt_paise(contract.amount_paise),
+        "transfer_id": contract.transfer_id,
+        "on_hold": contract.on_hold,
+        "on_hold_until": contract.on_hold_until,
+        "proof_hash": f"sha256:{contract.proof_hash}",
+        "message": "Route Transfer created with on_hold: true. Awaiting seller delivery manifest.",
+    }
+
+
+@app.post("/api/apex/contracts/deliver")
+def apex_deliver_payload(req: DeliverContractRequest):
+    """
+    Step 2: Seller Agent submits delivery payload records.
+    Runs non-LLM deterministic assertions (<5MB memory bounded).
+    """
+    raw_str = json.dumps(req.payload_records)
+    if len(raw_str.encode("utf-8")) > MAX_DIRECT_PAYLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Payload exceeds {MAX_DIRECT_PAYLOAD_BYTES // (1024*1024)}MB memory bounds. Use S3 manifest URL.",
+        )
+
+    contract_data = idempotency_store.get_contract(req.contract_id)
+    if not contract_data:
+        raise HTTPException(status_code=404, detail="Contract not found.")
+
+    # Run deterministic assertions
+    assertion_res = DeterministicAssertionEngine.verify_payload_records(req.payload_records)
+
+    # Update contract status in SQLite
+    new_status = ContractStatus.VERIFYING if assertion_res.passed else ContractStatus.REFUSED
+    refusal_reason = assertion_res.refusal_certificate if not assertion_res.passed else None
+
+    contract = AssuranceContract(
+        contract_id=contract_data["contract_id"],
+        buyer_agent_id=contract_data["buyer_agent_id"],
+        seller_agent_id=contract_data["seller_agent_id"],
+        seller_account_id=contract_data["seller_account_id"],
+        amount_paise=contract_data["amount_paise"],
+        status=new_status,
+        transfer_id=contract_data["transfer_id"],
+        on_hold=True,  # Remains on hold until explicit release
+        on_hold_until=contract_data["on_hold_until"],
+        assertions_passed=assertion_res.passed,
+        refusal_reason=refusal_reason,
+        verified_at=int(time.time()),
+        proof_hash=assertion_res.manifest_sha256,
+    )
+    idempotency_store.save_contract(contract)
+
+    return {
+        "contract_id": contract.contract_id,
+        "assertions_passed": assertion_res.passed,
+        "status": contract.status.value,
+        "on_hold": contract.on_hold,
+        "valid_records": assertion_res.valid_records,
+        "failed_records": assertion_res.failed_records,
+        "violation_samples": assertion_res.violation_samples,
+        "manifest_sha256": assertion_res.manifest_sha256,
+        "refusal_certificate": assertion_res.refusal_certificate,
+        "action_taken": "Settlement remains on_hold: true" if not assertion_res.passed else "Ready for settlement release.",
+    }
+
+
+@app.post("/api/apex/contracts/release")
+def apex_release_settlement(req: ReleaseContractRequest):
+    """
+    Step 3: Release Route Settlement.
+    Executes PATCH /v1/transfers/{id} with on_hold: false.
+    """
+    contract_data = idempotency_store.get_contract(req.contract_id)
+    if not contract_data:
+        raise HTTPException(status_code=404, detail="Contract not found.")
+
+    if not contract_data["assertions_passed"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot release settlement: delivery assertions have not passed. Transfer remains on hold.",
+        )
+
+    # Call Razorpay Route to release the hold
+    transfer_id = contract_data["transfer_id"] or f"trf_{req.contract_id[-6:]}"
+    release_res = razorpay_adapter.modify_transfer_hold(transfer_id, on_hold=False)
+
+    contract = AssuranceContract(
+        contract_id=contract_data["contract_id"],
+        buyer_agent_id=contract_data["buyer_agent_id"],
+        seller_agent_id=contract_data["seller_agent_id"],
+        seller_account_id=contract_data["seller_account_id"],
+        amount_paise=contract_data["amount_paise"],
+        status=ContractStatus.RELEASED,
+        transfer_id=transfer_id,
+        on_hold=False,
+        on_hold_until=contract_data["on_hold_until"],
+        assertions_passed=True,
+        verified_at=int(time.time()),
+        proof_hash=hashlib.sha256(f"{req.contract_id}:RELEASED:{req.checker_id}".encode()).hexdigest()[:16],
+    )
+    idempotency_store.save_contract(contract)
+
+    return {
+        "contract_id": contract.contract_id,
+        "status": contract.status.value,
+        "transfer_id": transfer_id,
+        "on_hold": False,
+        "amount_paise": contract.amount_paise,
+        "amount_inr": _fmt_paise(contract.amount_paise),
+        "checker_id": req.checker_id,
+        "route_status": release_res.get("status", "settled"),
+        "proof_hash": f"sha256:{contract.proof_hash}",
+        "message": "Route Transfer hold released successfully. Seller settlement unlocked.",
+    }
+
+
+@app.get("/api/apex/contracts/{contract_id}")
+def apex_get_contract(contract_id: str):
+    contract_data = idempotency_store.get_contract(contract_id)
+    if not contract_data:
+        raise HTTPException(status_code=404, detail="Contract not found.")
+    contract_data["amount_inr"] = _fmt_paise(contract_data["amount_paise"])
+    return contract_data
+
+
 @app.post("/api/twin/simulate")
 def twin_simulate(req: TwinRequest):
-    """Causal Financial Digital Twin — stress-test a shock scenario."""
     t0 = time.perf_counter()
     invoices, _, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=50)
     twin = FinancialDigitalTwin(invoices)

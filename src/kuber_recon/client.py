@@ -1,10 +1,10 @@
 """Razorpay Live Production API Client & Gateway Adapter.
 
 Supports:
-1. Fetching live settlement reconciliation rows (`fetch_settlement_recon_details`).
-2. Creating live Route Transfers with `on_hold: True` escrow.
-3. Programmatically releasing holds via `POST /v1/transfers/{id}/hold`.
-4. Seamless fallback to Zero-Key Mock Engine if keys are unset.
+1. Fetching live settlement reconciliation rows (`fetch_settlement_recon`).
+2. Creating live Route Transfers with `on_hold: True` and optional `on_hold_until` TTL.
+3. Modifying settlement hold status via `PATCH /v1/transfers/{id}` (`on_hold: False`).
+4. Seamless fallback to Zero-Key Sandbox Engine if keys are unset.
 """
 
 import os
@@ -49,12 +49,13 @@ class RazorpayClientAdapter:
         account_id: str,
         amount_paise: int,
         currency: str = "INR",
+        on_hold_until: Optional[int] = None,
         notes: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        """Create a Razorpay Route transfer with on_hold: True."""
+        """Create a Razorpay Route transfer with on_hold: True and optional on_hold_until TTL."""
         if not self.is_live:
-            # Mock response in Zero-Key mode
-            return {
+            # Mock response in Zero-Key Sandbox mode
+            res = {
                 "id": f"trf_mock_{account_id[-6:]}",
                 "entity": "transfer",
                 "account": account_id,
@@ -63,26 +64,44 @@ class RazorpayClientAdapter:
                 "on_hold": True,
                 "status": "processed",
             }
+            if on_hold_until:
+                res["on_hold_until"] = on_hold_until
+            return res
 
         url = f"{self.base_url}/transfers"
-        payload = {
+        payload: Dict[str, Any] = {
             "account": account_id,
             "amount": amount_paise,
             "currency": currency,
             "on_hold": True,  # <--- NATIVE ESCROW PRIMITIVE
-            "notes": notes or {"protocol": "KUBERSOVEREIGN_GSTR2B_ESCROW"},
+            "notes": notes or {"protocol": "APEX_ASSURANCE_AGENTIC_ESCROW"},
         }
+        if on_hold_until:
+            payload["on_hold_until"] = on_hold_until
+
         response = requests.post(url, auth=self.auth, json=payload, timeout=10)
         response.raise_for_status()
         return response.json()
 
-    def release_route_hold(self, transfer_id: str) -> Dict[str, Any]:
-        """Programmatically release an escrowed transfer upon GSTR-2B confirmation."""
+    def modify_transfer_hold(self, transfer_id: str, on_hold: bool = False) -> Dict[str, Any]:
+        """
+        Modify the settlement hold status of a transfer.
+        PATCH /v1/transfers/{transfer_id} with {"on_hold": false}
+        """
         if not self.is_live:
-            return {"id": transfer_id, "on_hold": False, "status": "settled"}
+            return {
+                "id": transfer_id,
+                "entity": "transfer",
+                "on_hold": on_hold,
+                "status": "settled" if not on_hold else "processed",
+            }
 
-        url = f"{self.base_url}/transfers/{transfer_id}/hold"
-        payload = {"on_hold": False}
+        url = f"{self.base_url}/transfers/{transfer_id}"
+        payload = {"on_hold": on_hold}
         response = requests.patch(url, auth=self.auth, json=payload, timeout=10)
         response.raise_for_status()
         return response.json()
+
+    def release_route_hold(self, transfer_id: str) -> Dict[str, Any]:
+        """Legacy helper for releasing an escrowed transfer."""
+        return self.modify_transfer_hold(transfer_id, on_hold=False)
