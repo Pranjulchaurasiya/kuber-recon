@@ -20,6 +20,19 @@ wheels/
 .installed.cfg
 *.egg
 
+# Node.js & Next.js artifacts
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+next-env.d.ts
+frontend/next-env.d.ts
+*.zip
+
 # Virtual environments & secrets
 .env
 .env.*
