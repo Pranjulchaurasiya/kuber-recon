@@ -701,6 +701,20 @@ def apex_release_settlement(req: ReleaseContractRequest):
     if not contract_data:
         raise HTTPException(status_code=404, detail="Contract not found.")
 
+    # 0. Idempotent Retry Handling: If already released by previous request, return HTTP 200 OK smoothly
+    if contract_data.get("status") == "RELEASED":
+        return {
+            "contract_id": req.contract_id,
+            "status": "RELEASED",
+            "transfer_id": contract_data["transfer_id"] or f"trf_{req.contract_id[-6:]}",
+            "on_hold": False,
+            "amount_paise": contract_data["amount_paise"],
+            "amount_inr": _fmt_paise(contract_data["amount_paise"]),
+            "checker_id": req.checker_id,
+            "route_status": "already_settled",
+            "message": "Idempotency Notice: Contract was already released by a previous request.",
+        }
+
     # 1. Anti-Collusion Gate: Maker cannot be Checker
     if req.checker_id in (contract_data["buyer_agent_id"], contract_data["seller_agent_id"]):
         raise HTTPException(
