@@ -75,6 +75,7 @@ class WebhookIdempotencyStore:
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.DB_FILE), check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")  # 5s busy timeout for concurrent writers
         return conn
 
     def _init_db(self) -> None:
@@ -102,6 +103,7 @@ class WebhookIdempotencyStore:
                     assertions_passed INTEGER NOT NULL,
                     refusal_reason TEXT,
                     proof_hash TEXT,
+                    version INTEGER DEFAULT 1,
                     created_at INTEGER NOT NULL
                 )
                 """
@@ -125,14 +127,14 @@ class WebhookIdempotencyStore:
                 INSERT OR REPLACE INTO apex_contracts (
                     contract_id, buyer_agent_id, seller_agent_id, seller_account_id,
                     amount_paise, status, transfer_id, on_hold, on_hold_until,
-                    assertions_passed, refusal_reason, proof_hash, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    assertions_passed, refusal_reason, proof_hash, version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     c.contract_id, c.buyer_agent_id, c.seller_agent_id, c.seller_account_id,
                     c.amount_paise, c.status.value, c.transfer_id, 1 if c.on_hold else 0,
                     c.on_hold_until, 1 if c.assertions_passed else 0, c.refusal_reason,
-                    c.proof_hash, c.created_at,
+                    c.proof_hash, c.version, c.created_at,
                 ),
             )
 
@@ -155,8 +157,48 @@ class WebhookIdempotencyStore:
                 "assertions_passed": bool(row[9]),
                 "refusal_reason": row[10],
                 "proof_hash": row[11],
-                "created_at": row[12],
+                "version": row[12] if len(row) > 13 else 1,
+                "created_at": row[13] if len(row) > 13 else row[12],
             }
+
+    def cas_release_contract(self, contract_id: str, expected_version: int, new_proof_hash: str) -> bool:
+        """Atomic Compare-And-Swap (CAS) update to prevent double-release / concurrency race."""
+        with self._lock, self._connect() as conn:
+            cur = conn.execute(
+                """
+                UPDATE apex_contracts
+                SET status = 'RELEASED', on_hold = 0, version = version + 1, proof_hash = ?
+                WHERE contract_id = ? AND version = ? AND on_hold = 1 AND assertions_passed = 1
+                """,
+                (new_proof_hash, contract_id, expected_version),
+            )
+            return cur.rowcount > 0
+
+    def sweep_expired_contracts(self) -> List[str]:
+        """Liveness sweep: force-resolves contracts where on_hold_until <= now with CAS race protection."""
+        now = int(time.time())
+        expired_ids: List[str] = []
+        with self._lock, self._connect() as conn:
+            cur = conn.execute(
+                """
+                SELECT contract_id, version FROM apex_contracts
+                WHERE on_hold_until <= ? AND status IN ('HELD', 'VERIFYING', 'REFUSED') AND on_hold = 1
+                """,
+                (now,),
+            )
+            rows = cur.fetchall()
+            for cid, ver in rows:
+                update_cur = conn.execute(
+                    """
+                    UPDATE apex_contracts
+                    SET status = 'EXPIRED_AUTO_REFUNDED', on_hold = 0, version = version + 1
+                    WHERE contract_id = ? AND version = ? AND on_hold = 1
+                    """,
+                    (cid, ver),
+                )
+                if update_cur.rowcount > 0:
+                    expired_ids.append(cid)
+        return expired_ids
 
 
 # ── Singletons ────────────────────────────────────────────────────────────────
@@ -652,50 +694,64 @@ def apex_deliver_payload(req: DeliverContractRequest):
 @app.post("/api/apex/contracts/release")
 def apex_release_settlement(req: ReleaseContractRequest):
     """
-    Step 3: Release Route Settlement.
+    Step 3: Release Route Settlement with Anti-Collusion & CAS Concurrency Safety.
     Executes PATCH /v1/transfers/{id} with on_hold: false.
     """
     contract_data = idempotency_store.get_contract(req.contract_id)
     if not contract_data:
         raise HTTPException(status_code=404, detail="Contract not found.")
 
+    # 1. Anti-Collusion Gate: Maker cannot be Checker
+    if req.checker_id in (contract_data["buyer_agent_id"], contract_data["seller_agent_id"]):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Anti-Collusion Violation: Checker '{req.checker_id}' cannot match Buyer or Seller Agent ID.",
+        )
+
+    # 2. Invariant Gate
     if not contract_data["assertions_passed"]:
         raise HTTPException(
             status_code=400,
             detail="Cannot release settlement: delivery assertions have not passed. Transfer remains on hold.",
         )
 
-    # Call Razorpay Route to release the hold
+    # 3. Call Razorpay Route to release the hold
     transfer_id = contract_data["transfer_id"] or f"trf_{req.contract_id[-6:]}"
     release_res = razorpay_adapter.modify_transfer_hold(transfer_id, on_hold=False)
 
-    contract = AssuranceContract(
-        contract_id=contract_data["contract_id"],
-        buyer_agent_id=contract_data["buyer_agent_id"],
-        seller_agent_id=contract_data["seller_agent_id"],
-        seller_account_id=contract_data["seller_account_id"],
-        amount_paise=contract_data["amount_paise"],
-        status=ContractStatus.RELEASED,
-        transfer_id=transfer_id,
-        on_hold=False,
-        on_hold_until=contract_data["on_hold_until"],
-        assertions_passed=True,
-        verified_at=int(time.time()),
-        proof_hash=hashlib.sha256(f"{req.contract_id}:RELEASED:{req.checker_id}".encode()).hexdigest()[:16],
-    )
-    idempotency_store.save_contract(contract)
+    # 4. Atomic CAS State Update
+    new_proof = hashlib.sha256(f"{req.contract_id}:RELEASED:{req.checker_id}".encode()).hexdigest()[:16]
+    expected_version = contract_data.get("version", 1)
+    cas_success = idempotency_store.cas_release_contract(req.contract_id, expected_version, new_proof)
+    if not cas_success:
+        raise HTTPException(
+            status_code=409,
+            detail="Concurrent Release Conflict: Contract version mismatch or already released (CAS prevented double-release).",
+        )
 
     return {
-        "contract_id": contract.contract_id,
-        "status": contract.status.value,
+        "contract_id": req.contract_id,
+        "status": "RELEASED",
         "transfer_id": transfer_id,
         "on_hold": False,
-        "amount_paise": contract.amount_paise,
-        "amount_inr": _fmt_paise(contract.amount_paise),
+        "amount_paise": contract_data["amount_paise"],
+        "amount_inr": _fmt_paise(contract_data["amount_paise"]),
         "checker_id": req.checker_id,
         "route_status": release_res.get("status", "settled"),
-        "proof_hash": f"sha256:{contract.proof_hash}",
-        "message": "Route Transfer hold released successfully. Seller settlement unlocked.",
+        "proof_hash": f"sha256:{new_proof}",
+        "message": "Route Transfer hold released successfully. Seller settlement unlocked via CAS.",
+    }
+
+
+@app.post("/api/apex/contracts/sweep-expired")
+def apex_sweep_expired():
+    """Liveness sweep: force-resolves expired contracts to EXPIRED_AUTO_REFUNDED."""
+    swept_ids = idempotency_store.sweep_expired_contracts()
+    return {
+        "status": "success",
+        "expired_contracts_count": len(swept_ids),
+        "swept_contract_ids": swept_ids,
+        "action": "Funds automatically unlocked/refunded due to TTL timeout expiry.",
     }
 
 

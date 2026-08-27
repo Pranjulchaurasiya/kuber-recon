@@ -58,6 +58,8 @@ class AssuranceContract(BaseModel):
     assertions_passed: bool = False
     refusal_reason: Optional[str] = None
     proof_hash: Optional[str] = None
+    version: int = 1
+    etag: Optional[str] = None
     liability_allocation: str = "linked_account_indemnified"
 
 

@@ -8,10 +8,13 @@ from pathlib import Path
 def test_no_llm_imports_in_solvers_and_tax():
     """Verify that `engine.py`, `tax.py`, and `actions.py` NEVER import an LLM library."""
     src_dir = Path(__file__).parent.parent / "src" / "kuber_recon"
-    forbidden_modules = {"openai", "anthropic", "langchain", "llama_index", "litellm", "google.generativeai"}
+    forbidden_modules = {
+        "openai", "anthropic", "langchain", "llama_index", "litellm",
+        "google.generativeai", "transformers", "crewai", "autogen", "mistralai", "cohere",
+    }
 
     violations = []
-    core_files = ["engine.py", "tax.py", "actions.py", "types.py"]
+    core_files = ["engine.py", "tax.py", "actions.py", "types.py", "assurance.py", "escrow.py"]
 
     for file_name in core_files:
         file_path = src_dir / file_name
@@ -23,7 +26,7 @@ def test_no_llm_imports_in_solvers_and_tax():
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name in forbidden_modules:
+                    if any(alias.name.startswith(m) for m in forbidden_modules):
                         violations.append(f"{file_name} imports forbidden LLM: {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 if node.module and any(node.module.startswith(m) for m in forbidden_modules):

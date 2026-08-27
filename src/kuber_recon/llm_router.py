@@ -51,7 +51,7 @@ def query_tabitoken(
         },
     )
 
-    with urllib.request.urlopen(req, timeout=60) as res:
+    with urllib.request.urlopen(req, timeout=180) as res:
         if res.getcode() != 200:
             raise RuntimeError(f"TabiToken API returned HTTP {res.getcode()}")
         raw = res.read().decode("utf-8")

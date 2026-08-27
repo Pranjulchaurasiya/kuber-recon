@@ -28,11 +28,18 @@ class AmbiguousMatchError(Exception):
         )
 
 
+class SolverComplexityLimitError(Exception):
+    """Raised when solver exceeds node expansion or timeout bounds under adversarial load."""
+    pass
+
+
 class KnuthExactCoverSolver:
     """Donald Knuth's Algorithm X / Dancing Links (DLX) Solver for Integer Paise."""
 
-    def __init__(self):
+    def __init__(self, max_nodes: int = 10000, timeout_ms: float = 500.0):
         self.solutions: List[List[int]] = []
+        self.max_nodes = max_nodes
+        self.timeout_ms = timeout_ms
 
     def solve_exact_subsets(
         self,
@@ -40,9 +47,13 @@ class KnuthExactCoverSolver:
         candidates: List[Tuple[str, int]],  # (item_id, amount_in_paise)
         max_solutions: int = 5,
     ) -> List[List[str]]:
-        """Find all subsets of candidates that sum EXACTLY to target_paise."""
+        """Find all subsets of candidates that sum EXACTLY to target_paise with complexity bounds."""
         if not candidates or target_paise <= 0:
             return []
+
+        import time
+        t_start = time.perf_counter()
+        nodes_explored = 0
 
         # Sort candidates descending for branch-and-bound pruning
         sorted_candidates = sorted(candidates, key=lambda x: x[1], reverse=True)
@@ -62,6 +73,19 @@ class KnuthExactCoverSolver:
             suffix_sums[i] = suffix_sums[i + 1] + sorted_candidates[i][1]
 
         def backtrack(index: int, current_sum: int):
+            nonlocal nodes_explored
+            nodes_explored += 1
+
+            # Bounded Complexity Gates
+            if nodes_explored > self.max_nodes:
+                raise SolverComplexityLimitError(
+                    f"Complexity Bound Exceeded: {nodes_explored} nodes explored > limit {self.max_nodes}"
+                )
+            if (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
+                raise SolverComplexityLimitError(
+                    f"Solver Timeout Exceeded: elapsed > {self.timeout_ms}ms limit"
+                )
+
             if current_sum == target_paise:
                 solutions.append(list(current_subset))
                 return
@@ -84,7 +108,12 @@ class KnuthExactCoverSolver:
             # Branch 2: Exclude item
             backtrack(index + 1, current_sum)
 
-        backtrack(0, 0)
+        try:
+            backtrack(0, 0)
+        except SolverComplexityLimitError:
+            # On complexity explosion, return whatever exact solutions were already discovered
+            pass
+
         return solutions
 
     def _solve_meet_in_middle(
@@ -93,18 +122,30 @@ class KnuthExactCoverSolver:
         candidates: List[Tuple[str, int]],
         max_solutions: int,
     ) -> List[List[str]]:
-        """Horowitz-Sahni Meet-in-the-Middle Partitioning (O(2^(N/2)))."""
-        mid = len(candidates) // 2
-        left_half = candidates[:mid]
-        right_half = candidates[mid:]
+        """Horowitz-Sahni Meet-in-the-Middle Partitioning (O(2^(N/2))) with Complexity Gates."""
+        import time
+        t_start = time.perf_counter()
+        nodes_explored = 0
+
+        # Cap candidates to most significant 24 to prevent combinatorial explosion under DoS
+        bounded_candidates = candidates[:24]
+        mid = len(bounded_candidates) // 2
+        left_half = bounded_candidates[:mid]
+        right_half = bounded_candidates[mid:]
 
         left_map: Dict[int, List[List[str]]] = {}
 
         def build_left(idx: int, current_sum: int, current_list: List[str]):
+            nonlocal nodes_explored
+            nodes_explored += 1
+            if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
+                return
             if current_sum > target_paise:
                 return
             if idx == len(left_half):
-                left_map.setdefault(current_sum, []).append(list(current_list))
+                entry = left_map.setdefault(current_sum, [])
+                if len(entry) < max_solutions:
+                    entry.append(list(current_list))
                 return
             current_list.append(left_half[idx][0])
             build_left(idx + 1, current_sum + left_half[idx][1], current_list)
@@ -116,6 +157,10 @@ class KnuthExactCoverSolver:
         solutions: List[List[str]] = []
 
         def match_right(idx: int, current_sum: int, current_list: List[str]):
+            nonlocal nodes_explored
+            nodes_explored += 1
+            if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
+                return
             if current_sum > target_paise or len(solutions) >= max_solutions:
                 return
             if idx == len(right_half):
