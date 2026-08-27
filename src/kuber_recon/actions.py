@@ -64,17 +64,17 @@ class ActionGuardrailEngine:
         reason: str,
     ) -> AdjustmentDraft:
         """Create an itemized adjustment draft in DRAFT_MODE."""
-        # 1. Whitelist Verification
+        # 1. Strict Integer Type & Value Bounds Validation (Shannon V2.a)
+        if not isinstance(variance_paise, int) or variance_paise <= 0 or variance_paise > self.MAX_TXN_ADJUSTMENT_PAISE:
+            raise SecuritySpendViolation(
+                f"Spend Guard: Variance {variance_paise} paise is invalid or exceeds hard threshold ₹200.00. "
+                "Must be a positive integer <= 20000 paise and routed to HITL exception drawer."
+            )
+
+        # 2. Whitelist Verification
         if target_account not in self.whitelist:
             raise PayeeWhitelistViolation(
                 f"Security Guard: Target account {target_account} is not in the pre-verified KYC whitelist."
-            )
-
-        # 2. Hard Spend Cap Floor Check
-        if abs(variance_paise) > self.MAX_TXN_ADJUSTMENT_PAISE:
-            raise SecuritySpendViolation(
-                f"Spend Guard: Variance ₹{abs(variance_paise)/100:.2f} exceeds hard threshold ₹200.00. "
-                "Must be routed to Human-in-the-Loop (HITL) exception drawer."
             )
 
         draft_id = f"draft_{hashlib.sha256(f'{settlement_id}:{variance_paise}'.encode()).hexdigest()[:12]}"
@@ -99,14 +99,21 @@ class ActionGuardrailEngine:
         if not draft:
             raise KeyError(f"Draft {draft_id} not found.")
 
-        # Zero-Silent-Mutation Pre-Flight Check
+        # 1. Execution-Time KYC Whitelist Re-Assertion (Shannon V1.a)
+        if draft.target_account_number not in self.whitelist:
+            raise PayeeWhitelistViolation(
+                f"Security Guard: Target account {draft.target_account_number} is no longer in active KYC whitelist."
+            )
+
+        # 2. Zero-Silent-Mutation Pre-Flight Check
         if draft.variance_amount_paise != current_live_variance_paise:
             raise StateDriftViolation(
                 f"State Drift Guard: Expected variance ₹{draft.variance_amount_paise/100:.2f} "
                 f"shifted to ₹{current_live_variance_paise/100:.2f}. Aborting transaction to prevent double-payout."
             )
 
-        if self.daily_dispatched_paise + abs(draft.variance_amount_paise) > self.MAX_DAILY_ADJUSTMENT_PAISE:
+        # 3. Daily Aggregate Limit Check
+        if self.daily_dispatched_paise + draft.variance_amount_paise > self.MAX_DAILY_ADJUSTMENT_PAISE:
             raise SecuritySpendViolation("Daily aggregate auto-adjustment threshold exceeded.")
 
         # Execute
