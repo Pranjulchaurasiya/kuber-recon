@@ -113,12 +113,12 @@ def test_apex_delivery_refusal_on_corrupted_gstin(client):
     assert data["valid_records"] == 8
     assert "CERT:REFUSAL:APEX" in data["refusal_certificate"]
 
-    # Step 3: Attempting release MUST be blocked with 400
+    # Step 3: Attempting release MUST be blocked with 412 Precondition Failed
     r_resp = client.post(
         "/api/apex/contracts/release",
         json={"contract_id": contract_id, "checker_id": "cfo_test"},
     )
-    assert r_resp.status_code == 400
+    assert r_resp.status_code == 412
     assert "delivery assertions have not passed" in r_resp.json()["detail"]
 
 

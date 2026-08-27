@@ -708,11 +708,11 @@ def apex_release_settlement(req: ReleaseContractRequest):
             detail=f"Anti-Collusion Violation: Checker '{req.checker_id}' cannot match Buyer or Seller Agent ID.",
         )
 
-    # 2. Invariant Gate
+    # 2. Invariant Gate (HTTP 412 Precondition Failed)
     if not contract_data["assertions_passed"]:
         raise HTTPException(
-            status_code=400,
-            detail="Cannot release settlement: delivery assertions have not passed. Transfer remains on hold.",
+            status_code=412,
+            detail="Precondition Failed: Cannot release settlement: delivery assertions have not passed. Transfer remains on hold.",
         )
 
     # 3. Call Razorpay Route to release the hold
