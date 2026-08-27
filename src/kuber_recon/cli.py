@@ -38,9 +38,9 @@ console = Console(force_terminal=True)
 def print_banner():
     console.print(
         Panel.fit(
-            "[bold cyan]KUBERRECON / KUBERSOVEREIGN[/bold cyan] [white]-- Autonomous Tax Escrow, Settlement Lineage & Digital Twin[/white]\n"
+            "[bold cyan]KUBERRECON (कुबेर मिलान)[/bold cyan] [white]-- Autonomous Financial Operating System[/white]\n"
             "[dim]Track 04: AI Finance Controller | Razorpay AI Buildathon 2026[/dim]\n"
-            "[green]Status: Zero-Float Verified | Knuth DLX Solver | Route Escrow | Digital Twin Active[/green]",
+            "[green]Status: Zero-Float AST Verified | Knuth DLX Solver | Route Escrow | Digital Twin Active[/green]",
             border_style="cyan",
         )
     )

@@ -27,7 +27,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KuberRecon & KuberSovereign | Razorpay AI Finance Controller</title>
+    <title>KuberRecon | Razorpay AI Finance Controller</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
@@ -182,7 +182,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="brand">
                 <div class="brand-badge">RAZORPAY 2026</div>
                 <div>
-                    <div class="brand-title">KuberRecon & KuberSovereign Console</div>
+                    <div class="brand-title">KuberRecon Control Console</div>
                     <div class="brand-subtitle">Autonomous Pre-Settlement Tax Escrow, Knuth DLX Lineage & Causal Digital Twin</div>
                 </div>
             </div>
@@ -195,7 +195,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('tab-dag')">1. Knuth DLX Money Lineage</button>
-            <button class="tab-btn" onclick="switchTab('tab-escrow')">2. KuberSovereign Pre-Settlement Escrow</button>
+            <button class="tab-btn" onclick="switchTab('tab-escrow')">2. Pre-Settlement Route Escrow</button>
             <button class="tab-btn" onclick="switchTab('tab-twin')">3. Causal Financial Digital Twin</button>
             <button class="tab-btn" onclick="switchTab('tab-bench')">4. 10,000-Record Stress Benchmark</button>
         </div>
