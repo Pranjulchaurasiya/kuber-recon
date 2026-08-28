@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { Sidebar } from '@/components/shell/sidebar'
-import { Topbar } from '@/components/shell/topbar'
+import { AppShell } from '@/components/shell/app-shell'
 import './globals.css'
 
 const geistSans = Geist({
@@ -23,7 +22,6 @@ export const metadata: Metadata = {
     'Razorpay Route locks the settlement; APEX releases it only when delivery proof passes. Powered by the KuberRecon deterministic verification kernel.',
 }
 
-
 export const viewport: Viewport = {
   colorScheme: 'dark light',
   themeColor: [
@@ -40,13 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${geistSans.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased bg-background text-foreground">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Topbar />
-            <main className="flex-1">{children}</main>
-          </div>
-        </div>
+        <AppShell>{children}</AppShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

@@ -1,15 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { navItems } from '@/lib/kuber-data'
 import { ThemeToggle } from './theme-toggle'
+import { getApiUrl } from '@/lib/api-client'
 
 export function Topbar() {
   const pathname = usePathname()
   const current = navItems.find((n) => n.href === pathname) ?? navItems[0]
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [gatewayMode, setGatewayMode] = useState<'test_mode' | 'sandbox_simulation'>('sandbox_simulation')
+
+  useEffect(() => {
+    fetch(`${getApiUrl()}/api/integration-status`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.mode === 'test_mode' || data.razorpay_api_live) {
+          setGatewayMode('test_mode')
+        } else {
+          setGatewayMode('sandbox_simulation')
+        }
+      })
+      .catch(() => setGatewayMode('sandbox_simulation'))
+  }, [])
 
   return (
     <header className="sticky top-0 z-20 flex flex-col border-b border-border bg-background/90 backdrop-blur-md">
@@ -46,18 +61,23 @@ export function Topbar() {
 
         {/* Right controls */}
         <div className="ml-auto flex items-center gap-3">
-          {/* Live rail status */}
-          <div className="hidden items-center gap-2 rounded-full border border-border bg-panel px-3 py-1.5 sm:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-gain animate-status-dot" />
-            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-              Live · Razorpay Rail
-            </span>
-          </div>
+          {/* Dynamic Truthful Mode Badge */}
+          {gatewayMode === 'test_mode' ? (
+            <div className="hidden items-center gap-2 rounded-full border border-gain/30 bg-gain/10 px-3 py-1 sm:flex font-mono text-[11px] font-semibold text-gain">
+              <span className="h-1.5 w-1.5 rounded-full bg-gain animate-status-dot" />
+              RAZORPAY TEST MODE
+            </div>
+          ) : (
+            <div className="hidden items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:flex font-mono text-[11px] font-semibold text-amber-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-status-dot" />
+              SANDBOX SIMULATION
+            </div>
+          )}
 
-          {/* FMR display */}
+          {/* Test Corpus FMR display */}
           <div className="hidden text-right md:block">
-            <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-              FMR
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              TEST CORPUS FMR
             </div>
             <div className="font-mono text-sm font-semibold text-gain">0.000</div>
           </div>

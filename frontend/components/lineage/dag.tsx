@@ -8,10 +8,10 @@ const NODE_W = 168
 const NODE_H = 62
 
 const kindColor: Record<LineageNode['kind'], string> = {
-  root: 'var(--chart-3)',
-  gmv: 'var(--gold)',
-  deduction: 'var(--danger)',
-  net: 'var(--gain)',
+  root: '#3b82f6', // Vivid blue for bank lump-sum root
+  gmv: '#f59e0b',  // Gold for invoice GMV
+  deduction: '#f43f5e', // Rose for statutory deductions
+  net: '#10b981',  // Emerald for net settlement
 }
 
 const kindLabel: Record<LineageNode['kind'], string> = {
@@ -279,30 +279,30 @@ export function LineageDag() {
                 aria-label={`${n.label} - ${inr(n.amount)}`}
               >
                 <rect
-                  x={n.x} y={n.y} width={NODE_W} height={NODE_H} rx="7"
-                  fill={on ? `color-mix(in oklch, ${color} 14%, var(--panel))` : 'var(--panel)'}
-                  stroke={color} strokeWidth={on ? 2 : 1.25} strokeOpacity={on ? 1 : 0.55}
+                  x={n.x} y={n.y} width={NODE_W} height={NODE_H} rx="8"
+                  fill={on ? 'var(--accent)' : 'var(--panel)'}
+                  stroke={color} strokeWidth={on ? 2.5 : 1.75} strokeOpacity={1}
                 />
-                <rect x={n.x} y={n.y} width="4" height={NODE_H} rx="2" fill={color} />
+                <rect x={n.x} y={n.y} width="5" height={NODE_H} rx="2.5" fill={color} />
                 {solved && (
-                  <circle cx={n.x + NODE_W - 12} cy={n.y + 12} r="8" fill="var(--gain)" fillOpacity="0.15" stroke="var(--gain)" strokeWidth="1" />
+                  <circle cx={n.x + NODE_W - 12} cy={n.y + 12} r="8" fill="var(--gain)" fillOpacity="0.2" stroke="var(--gain)" strokeWidth="1.5" />
                 )}
                 {solved && (
                   <path
                     d={`M${n.x + NODE_W - 15} ${n.y + 12} l2.5 2.5 l5 -5`}
-                    stroke="var(--gain)" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"
+                    stroke="var(--gain)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"
                   />
                 )}
                 {ambiguityProof && (
-                  <circle cx={n.x + NODE_W - 12} cy={n.y + 12} r="8" fill="var(--danger)" fillOpacity="0.2" stroke="var(--danger)" strokeWidth="1" />
+                  <circle cx={n.x + NODE_W - 12} cy={n.y + 12} r="8" fill="var(--danger)" fillOpacity="0.2" stroke="var(--danger)" strokeWidth="1.5" />
                 )}
-                <text x={n.x + 16} y={n.y + 22} fontSize="10.5" fontFamily="var(--font-mono)" fill="var(--muted-foreground)" letterSpacing="0.5">
+                <text x={n.x + 16} y={n.y + 22} fontSize="11" fontWeight="500" fontFamily="var(--font-mono)" fill="var(--foreground)">
                   {n.label}
                 </text>
-                <text x={n.x + 16} y={n.y + 42} fontSize="15" fontWeight="600" fontFamily="var(--font-mono)" fill="var(--foreground)">
+                <text x={n.x + 16} y={n.y + 42} fontSize="15" fontWeight="700" fontFamily="var(--font-mono)" fill="var(--foreground)">
                   {inr(n.amount)}
                 </text>
-                <text x={n.x + 16} y={n.y + 55} fontSize="8.5" fontFamily="var(--font-mono)" fill="var(--muted-foreground)">
+                <text x={n.x + 16} y={n.y + 55} fontSize="9.5" fontFamily="var(--font-mono)" fill="var(--muted-foreground)">
                   {n.sub}
                 </text>
               </g>
