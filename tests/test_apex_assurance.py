@@ -14,6 +14,7 @@ Unit & Resilience Tests for APEX Assurance:
 """
 
 import hashlib
+import hmac
 import json
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -425,5 +426,110 @@ def test_audit_log_database_triggers_prevent_tampering():
         # 2. Direct DELETE must be aborted by SQLite trigger
         with pytest.raises(sqlite3.DatabaseError, match="apex_contract_audit_log is append-only"):
             conn.execute("DELETE FROM apex_contract_audit_log WHERE id = ?", (row_id,))
+
+
+# ── 9. Contract Status Polling & Authoritative Webhook Lifecycle ───────────────
+
+def test_apex_contract_lifecycle_polling_to_released(client):
+    # 1. Create Contract
+    c_resp = client.post(
+        "/api/apex/contracts/create",
+        json={
+            "buyer_agent_id": "agent_buyer_007",
+            "seller_agent_id": "agent_seller_data_01",
+            "seller_account_id": "acc_mock_seller_99",
+            "amount_paise": 2500000,
+            "expected_record_count": 500,
+            "ttl_seconds": 86400,
+        },
+    )
+    assert c_resp.status_code == 200
+    cid = c_resp.json()["contract_id"]
+    trf_id = c_resp.json()["transfer_id"]
+
+    # Poll status -> HELD
+    p1 = client.get(f"/api/apex/contracts/{cid}")
+    assert p1.status_code == 200
+    assert p1.json()["status"] == "HELD"
+
+    # 2. Deliver Valid 500 Records
+    clean_records = [
+        {"supplier_name": "Supplier A", "gstin": "27AAPFU0939F1ZV", "invoice_number": f"INV-{i}", "amount_paise": 5000}
+        for i in range(500)
+    ]
+    pub_k, sig_k = _sign_seller_manifest(clean_records, "agent_seller_data_01")
+    d_resp = client.post(
+        "/api/apex/contracts/deliver",
+        json={
+            "contract_id": cid,
+            "seller_agent_id": "agent_seller_data_01",
+            "payload_records": clean_records,
+            "manifest_signature": sig_k,
+            "seller_public_key_hex": pub_k,
+        },
+    )
+    assert d_resp.status_code == 200
+    assert d_resp.json()["assertions_passed"] is True
+
+    # 3. Release Hold (Sign with CFO key)
+    leaf_hash = d_resp.json()["manifest_sha256"].replace("sha256:", "")
+    cfo_pub, cfo_sig = _sign_release(cid, leaf_hash, "cfo_autonomous_verifier")
+
+    r_resp = client.post(
+        "/api/apex/contracts/release",
+        json={
+            "contract_id": cid,
+            "checker_id": "cfo_autonomous_verifier",
+            "public_key_hex": cfo_pub,
+            "signature_hex": cfo_sig,
+        },
+    )
+    assert r_resp.status_code == 200
+    assert r_resp.json()["status"] == "RELEASING"
+
+    # Poll status -> RELEASING
+    p2 = client.get(f"/api/apex/contracts/{cid}")
+    assert p2.status_code == 200
+    assert p2.json()["status"] == "RELEASING"
+
+    # 4. Ingest Authoritative transfer.processed Webhook
+    from kuber_recon.server import _WEBHOOK_SECRET
+    wh_payload = {
+        "entity": "event",
+        "account_id": "acc_mock_seller_99",
+        "event": "transfer.processed",
+        "contains": ["transfer"],
+        "payload": {
+            "transfer": {
+                "entity": {
+                    "id": trf_id,
+                    "entity": "transfer",
+                    "amount": 2500000,
+                    "currency": "INR",
+                    "status": "processed",
+                    "notes": {"contract_id": cid},
+                }
+            }
+        },
+    }
+    raw_bytes = json.dumps(wh_payload).encode("utf-8")
+    sig = hmac.new(_WEBHOOK_SECRET.encode("utf-8"), raw_bytes, hashlib.sha256).hexdigest()
+    wh_resp = client.post(
+        "/api/webhook/razorpay",
+        content=raw_bytes,
+        headers={
+            "Content-Type": "application/json",
+            "X-Razorpay-Signature": sig,
+            "X-Razorpay-Event-Id": f"evt_lifecycle_{cid}",
+        },
+    )
+    assert wh_resp.status_code == 200
+
+    # 5. Authoritative Polling confirms RELEASED
+    p3 = client.get(f"/api/apex/contracts/{cid}")
+    assert p3.status_code == 200
+    assert p3.json()["status"] == "RELEASED"
+    assert p3.json()["webhook_event_id"] == f"evt_lifecycle_{cid}"
+
 
 

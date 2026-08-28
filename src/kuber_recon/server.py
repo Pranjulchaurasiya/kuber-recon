@@ -28,8 +28,9 @@ import sys
 import time
 from decimal import Decimal
 from pathlib import Path
-from threading import Lock
+from threading import Lock, RLock
 from typing import Any, Dict, List, Optional
+
 try:
     from dotenv import load_dotenv
     # Load .env from kuber-recon/.env or root .env
@@ -78,7 +79,7 @@ class WebhookIdempotencyStore:
     DB_FILE = Path(__file__).parent / "kuber_idempotency.db"
 
     def __init__(self) -> None:
-        self._lock = Lock()
+        self._lock = RLock()
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
