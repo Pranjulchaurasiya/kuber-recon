@@ -88,7 +88,7 @@ def test_concurrent_cas_double_release_prevention(client):
         json={
             "buyer_agent_id": "agent_buyer_01",
             "seller_agent_id": "agent_seller_data_01",
-            "seller_account_id": "acc_seller_01",
+            "seller_account_id": "acc_mock_seller_01",
             "amount_paise": 100000,
             "expected_record_count": 1,
         },
@@ -147,7 +147,7 @@ def test_anti_collusion_rejected_when_maker_is_checker(client):
         json={
             "buyer_agent_id": "agent_buyer_colluder",
             "seller_agent_id": "agent_seller_data_01",
-            "seller_account_id": "acc_seller_01",
+            "seller_account_id": "acc_mock_seller_01",
             "amount_paise": 100000,
             "expected_record_count": 1,
         },
@@ -197,7 +197,7 @@ def test_liveness_sweep_auto_resolves_expired_contract(client):
         json={
             "buyer_agent_id": "agent_buyer_01",
             "seller_agent_id": "agent_seller_01",
-            "seller_account_id": "acc_seller_01",
+            "seller_account_id": "acc_mock_seller_01",
             "amount_paise": 50000,
             "expected_record_count": 1,
             "ttl_seconds": 60,

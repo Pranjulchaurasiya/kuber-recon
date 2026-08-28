@@ -23,7 +23,7 @@
 ## 🔒 Security & Finality Constraints
 
 ### 1. Hardware Security Module (HSM) Custody & Private Key Boundary
-- **Current Demo Implementation:** The frontend sandbox imports a sample RFC 8410 PKCS#8 Ed25519 key derived from a demo seed (`kuber_cfo_autonomous_verifier_sec_key_v1`) to demonstrate zero-knowledge client-side asymmetric signing, canonical payload serialization, and public key pinning without requiring physical YubiKeys or cloud KMS setup during evaluation.
+- **Current Demo Implementation:** The frontend sandbox imports a sample RFC 8410 PKCS#8 Ed25519 key derived from a demo seed (`kuber_cfo_autonomous_verifier_sec_key_v1`) to demonstrate client-side RFC 8032 Ed25519 asymmetric signing, canonical payload serialization, and public key pinning without requiring physical YubiKeys or cloud KMS setup during evaluation.
 - **Threat Vector (Client-Side Key Extraction):** Any private key seed shipped in client-side JavaScript can be inspected and extracted by reverse-engineering the frontend bundle.
 - **Production Architecture:** In live production deployments:
   1. Private keys **must never reside in or be derivable from client-side bundles**.

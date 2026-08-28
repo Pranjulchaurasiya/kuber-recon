@@ -84,7 +84,7 @@ def test_apex_contract_creation(client):
         json={
             "buyer_agent_id": "agent_buyer_007",
             "seller_agent_id": "agent_seller_leads_01",
-            "seller_account_id": "acc_seller_linked_99",
+            "seller_account_id": "acc_mock_seller_99",
             "amount_paise": 2500000,  # ₹25,000.00
             "expected_record_count": 500,
             "ttl_seconds": 86400,
@@ -109,7 +109,7 @@ def test_apex_delivery_refusal_on_corrupted_gstin(client):
         json={
             "buyer_agent_id": "agent_buyer_007",
             "seller_agent_id": "agent_seller_data_01",
-            "seller_account_id": "acc_seller_linked_99",
+            "seller_account_id": "acc_mock_seller_99",
             "amount_paise": 2500000,
             "expected_record_count": 10,
         },
@@ -171,7 +171,7 @@ def test_apex_delivery_release_on_100pct_valid(client):
         json={
             "buyer_agent_id": "agent_buyer_007",
             "seller_agent_id": "agent_seller_good",
-            "seller_account_id": "acc_seller_linked_99",
+            "seller_account_id": "acc_mock_seller_99",
             "amount_paise": 2500000,
             "expected_record_count": 10,
         },
@@ -231,7 +231,7 @@ def test_apex_delivery_refused_on_missing_signature(client):
         json={
             "buyer_agent_id": "agent_buyer_007",
             "seller_agent_id": "agent_seller_data_01",
-            "seller_account_id": "acc_seller_linked_99",
+            "seller_account_id": "acc_mock_seller_99",
             "amount_paise": 2500000,
             "expected_record_count": 1,
         },
@@ -257,7 +257,7 @@ def test_apex_delivery_refused_on_unpinned_seller_key(client):
         json={
             "buyer_agent_id": "agent_buyer_007",
             "seller_agent_id": "agent_seller_data_01",
-            "seller_account_id": "acc_seller_linked_99",
+            "seller_account_id": "acc_mock_seller_99",
             "amount_paise": 2500000,
             "expected_record_count": 1,
         },
@@ -295,7 +295,7 @@ def test_apex_delivery_rejected_on_seller_identity_mismatch(client):
         json={
             "buyer_agent_id": "agent_buyer_007",
             "seller_agent_id": "agent_seller_data_01",
-            "seller_account_id": "acc_seller_linked_99",
+            "seller_account_id": "acc_mock_seller_99",
             "amount_paise": 2500000,
             "expected_record_count": 1,
         },
@@ -327,7 +327,7 @@ def test_apex_500_record_contract_enforcement(client):
         json={
             "buyer_agent_id": "agent_buyer_007",
             "seller_agent_id": "agent_seller_data_01",
-            "seller_account_id": "acc_seller_linked_99",
+            "seller_account_id": "acc_mock_seller_99",
             "amount_paise": 2500000,
             "expected_record_count": 500,
         },

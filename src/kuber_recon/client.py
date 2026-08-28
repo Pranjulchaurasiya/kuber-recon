@@ -66,8 +66,6 @@ class RazorpayClientAdapter:
             not self.is_live
             or os.getenv("RAZORPAY_SANDBOX", "false").lower() in ("true", "1", "yes")
             or account_id.startswith("acc_mock_")
-            or account_id.startswith("acc_seller_")
-            or account_id.startswith("acc_test_")
         )
 
         if is_sandbox_account:
@@ -115,7 +113,6 @@ class RazorpayClientAdapter:
             not self.is_live
             or os.getenv("RAZORPAY_SANDBOX", "false").lower() in ("true", "1", "yes")
             or transfer_id.startswith("trf_mock_")
-            or transfer_id.startswith("trf_test_")
         )
 
         if is_sandbox_transfer:

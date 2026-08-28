@@ -121,6 +121,18 @@ class WebhookIdempotencyStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS apex_contract_audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    contract_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    proof_hash TEXT,
+                    assertions_passed INTEGER,
+                    timestamp INTEGER NOT NULL
+                )
+                """
+            )
             # Migration check: add release_started_at and expected_record_count if missing
             try:
                 conn.execute("ALTER TABLE apex_contracts ADD COLUMN release_started_at INTEGER")
@@ -144,20 +156,61 @@ class WebhookIdempotencyStore:
 
     def save_contract(self, c: AssuranceContract) -> None:
         with self._lock, self._connect() as conn:
+            cur = conn.execute("SELECT contract_id FROM apex_contracts WHERE contract_id = ?", (c.contract_id,))
+            exists = cur.fetchone() is not None
+            if exists:
+                conn.execute(
+                    """
+                    UPDATE apex_contracts SET
+                        status = ?,
+                        transfer_id = COALESCE(?, transfer_id),
+                        webhook_event_id = COALESCE(?, webhook_event_id),
+                        on_hold = ?,
+                        on_hold_until = ?,
+                        assertions_passed = ?,
+                        refusal_reason = ?,
+                        proof_hash = ?,
+                        version = version + 1,
+                        release_started_at = COALESCE(?, release_started_at)
+                    WHERE contract_id = ?
+                    """,
+                    (
+                        c.status.value,
+                        c.transfer_id,
+                        c.webhook_event_id,
+                        1 if c.on_hold else 0,
+                        c.on_hold_until,
+                        1 if c.assertions_passed else 0,
+                        c.refusal_reason,
+                        c.proof_hash,
+                        c.release_started_at,
+                        c.contract_id,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO apex_contracts (
+                        contract_id, buyer_agent_id, seller_agent_id, seller_account_id,
+                        amount_paise, expected_record_count, status, payment_id, transfer_id, webhook_event_id, on_hold, on_hold_until,
+                        assertions_passed, refusal_reason, proof_hash, version, created_at, release_started_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        c.contract_id, c.buyer_agent_id, c.seller_agent_id, c.seller_account_id,
+                        c.amount_paise, c.expected_record_count, c.status.value, c.payment_id, c.transfer_id, c.webhook_event_id, 1 if c.on_hold else 0,
+                        c.on_hold_until, 1 if c.assertions_passed else 0, c.refusal_reason,
+                        c.proof_hash, c.version, c.created_at, c.release_started_at,
+                    ),
+                )
+            # Write immutable audit log entry
             conn.execute(
                 """
-                INSERT OR REPLACE INTO apex_contracts (
-                    contract_id, buyer_agent_id, seller_agent_id, seller_account_id,
-                    amount_paise, expected_record_count, status, payment_id, transfer_id, webhook_event_id, on_hold, on_hold_until,
-                    assertions_passed, refusal_reason, proof_hash, version, created_at, release_started_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO apex_contract_audit_log (
+                    contract_id, status, proof_hash, assertions_passed, timestamp
+                ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (
-                    c.contract_id, c.buyer_agent_id, c.seller_agent_id, c.seller_account_id,
-                    c.amount_paise, c.expected_record_count, c.status.value, c.payment_id, c.transfer_id, c.webhook_event_id, 1 if c.on_hold else 0,
-                    c.on_hold_until, 1 if c.assertions_passed else 0, c.refusal_reason,
-                    c.proof_hash, c.version, c.created_at, c.release_started_at,
-                ),
+                (c.contract_id, c.status.value, c.proof_hash or "", 1 if c.assertions_passed else 0, int(time.time())),
             )
 
     def get_contract(self, contract_id: str) -> Optional[Dict[str, Any]]:

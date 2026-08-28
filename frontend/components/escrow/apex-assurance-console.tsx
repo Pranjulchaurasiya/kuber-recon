@@ -119,7 +119,7 @@ export function ApexAssuranceConsole() {
         body: JSON.stringify({
           buyer_agent_id: 'agent_buyer_procurement_01',
           seller_agent_id: 'agent_seller_data_01',
-          seller_account_id: 'acc_seller_linked_001',
+          seller_account_id: 'acc_mock_seller_001',
           amount_paise: 2500000, // ₹25,000.00
           expected_record_count: 500,
           ttl_seconds: 86400,

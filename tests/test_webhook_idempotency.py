@@ -156,7 +156,7 @@ def test_integration_status_sandbox(client):
 def test_route_transfer_paise_contract(client):
     resp = client.post(
         "/api/razorpay/route-transfer",
-        json={"account_id": "acc_test_001", "amount_paise": 118000},
+        json={"account_id": "acc_mock_001", "amount_paise": 118000},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -168,7 +168,7 @@ def test_route_transfer_paise_contract(client):
 def test_route_transfer_rejects_zero_paise(client):
     resp = client.post(
         "/api/razorpay/route-transfer",
-        json={"account_id": "acc_test_001", "amount_paise": 0},
+        json={"account_id": "acc_mock_001", "amount_paise": 0},
     )
     assert resp.status_code == 422  # Pydantic validation: gt=0
 
