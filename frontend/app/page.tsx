@@ -73,14 +73,17 @@ export default function RootLandingPage() {
             {/* Header & Simulator Toggle */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
               <div className="text-left">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-gold" />
                   <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
                     APEX Settlement Gate Simulator
                   </span>
+                  <span className="rounded bg-accent px-2 py-0.5 font-mono text-[10px] uppercase font-semibold text-muted-foreground border border-border">
+                    Interactive concept preview
+                  </span>
                 </div>
                 <div className="font-mono text-xs text-muted-foreground mt-0.5">
-                  Route Contract: ₹25,000.00 (500 Supplier Records Invariant)
+                  Route Contract: ₹25,000.00 (500 Records: 497 Valid / 3 Invalid Canonical Scenario)
                 </div>
               </div>
 

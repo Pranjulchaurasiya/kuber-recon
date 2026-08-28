@@ -49,17 +49,15 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-border p-4">
+      <div className="border-t border-border p-4 space-y-2">
         <div className="flex items-center justify-between font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          <span>Merkle Root</span>
+          <span>Demo Merkle Root</span>
           <span className="text-gain font-semibold">Verified</span>
         </div>
-        <div className="mt-1 truncate font-mono text-xs text-foreground">0x8f3a…d41c</div>
-        <div className="mt-3 flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-gain animate-status-dot" />
-          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            Rail Active · 99.99% Sync
-          </span>
+        <div className="truncate font-mono text-xs text-foreground">0x8f3a…d41c</div>
+        <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+          <span>Assertions: 6</span>
+          <span className="text-gold">Audit Events: 4</span>
         </div>
       </div>
     </aside>

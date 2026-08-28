@@ -209,7 +209,9 @@ export function ApexAssuranceConsole() {
 
     const corruptedRecords = Array.from({ length: 500 }, (_, i) => ({
       supplier_name: `Supplier Alpha-${(i % 25) + 1}`,
-      gstin: i === 2 ? '27AAPCA1234F1Z9' : (i === 4 ? 'INVALID_GSTIN_99' : '27AAPFU0939F1ZV'),
+      gstin: (i === 2 || i === 4 || i === 7)
+        ? (i === 2 ? '27AAPCA1234F1Z9' : (i === 4 ? 'INVALID_GSTIN_99' : '27AAPFU0939F1Z0'))
+        : '27AAPFU0939F1ZV',
       invoice_number: `INV-2026-${String(i + 1).padStart(5, '0')}`,
       amount_paise: 5000,
     }))
@@ -232,7 +234,7 @@ export function ApexAssuranceConsole() {
       const data: AssertionResult = await res.json()
       setAssertion(data)
       setActiveStep(2)
-      addLog('APEX_ASSERTION', `🛑 HONEST REFUSAL: Mod-36 GSTIN failed on 2 records. Transfer remains on_hold: true.`, 'apex')
+      addLog('APEX_ASSERTION', `🛑 HONEST REFUSAL: Mod-36 GSTIN failed on 3 records (497 valid / 3 invalid). Transfer remains on_hold: true.`, 'apex')
       addLog('BUYER_AGENT', `🛡️ Protected: ₹25,000 liquidity preserved. Refusal cert generated.`, 'buyer')
       await refreshContractState(contract.contract_id)
     } catch {
