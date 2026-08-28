@@ -3,14 +3,16 @@
 > **Track 01: AI Growth & Agentic Commerce · Razorpay AI Buildathon 2026**  
 > **Delivery-Gated Seller Settlement for Agentic Commerce:** *Pre-Settlement Route Hold Gating (`on_hold: true`), Ed25519 Auth, Atomic CAS Hold Release, Single Authoritative Webhook.*
 
-[![Tests Passing](https://img.shields.io/badge/pytest-54%20passed-brightgreen)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-65%20passed-brightgreen)](tests/)
 [![Undecidable Handling](https://img.shields.io/badge/Planted%20Undecidables-4%2F4%20Isolated-blue)](tests/test_planted_undecidables.py)
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
 [![Razorpay Route Integration](https://img.shields.io/badge/Razorpay%20Route-Transfer%20Hold%20Gating-gold)](src/kuber_recon/server.py)
 [![Whitebox Pentest](https://img.shields.io/badge/Whitebox%20Audit-5%2F5%20Vectors%20Mitigated-purple)](tests/test_shannon_whitebox_audit.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ 🚀 Quickstart ](#-quickstart--local-reproduction) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-8-verified-engineering-invariants) • [ 🧪 54/54 Tests ](#-full-verified-test-suite-breakdown-54-items) • [ 📡 API Reference ](#-api-reference)
+[ 🚀 Quickstart ](#-quickstart--local-reproduction) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-8-verified-engineering-invariants) • [ 🧪 65/65 Tests ](#-full-verified-test-suite-breakdown-65-items) • [ 📡 API Reference ](#-api-reference)
+
+
 
 ---
 
@@ -115,7 +117,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-### 2. Execute Test Suite (54 / 54 Passing)
+### 2. Execute Test Suite (65 / 65 Passing)
 ```bash
 python -m pytest -p no:deepeval -p no:langsmith -v
 ```
@@ -151,10 +153,10 @@ npm run dev
 
 ---
 
-## 🧪 Full Verified Test Suite Breakdown (56 Total Test Functions)
+## 🧪 Full Verified Test Suite Breakdown (65 Total Test Functions)
 
 ```
-tests/test_apex_assurance.py              11 passed (including SQLite trigger immutability)
+tests/test_apex_assurance.py              17 passed (including SQLite trigger immutability, audit coverage, & CAS conflicts)
 tests/test_chaos_suite.py                  4 passed
 tests/test_concurrent_workers.py           4 passed
 tests/test_digital_twin_simulation.py      3 passed
@@ -163,11 +165,11 @@ tests/test_planted_undecidables.py         4 passed
 tests/test_production_integrations.py      5 passed
 tests/test_property_based_invariants.py    2 passed
 tests/test_shannon_whitebox_audit.py       5 passed
-tests/test_webhook_idempotency.py         10 passed, 1 skipped (live gateway signature)
+tests/test_webhook_idempotency.py         14 passed (including live secret config rejection & fixture security)
 tests/test_zero_float_policy.py            1 passed
 tests/test_zero_llm_in_math.py             1 passed
 ---------------------------------------------------
-Total: 55 passed, 1 skipped across 56 test functions in 12 test modules
+Total: 65 passed across 65 test functions in 12 test modules
 ```
 
 ---

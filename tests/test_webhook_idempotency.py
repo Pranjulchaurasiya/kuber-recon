@@ -15,11 +15,6 @@ Tests for the Razorpay webhook endpoint covering:
 import hashlib
 import hmac
 import json
-import os
-import sqlite3
-import tempfile
-import time
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -32,9 +27,11 @@ def _tmp_idempotency_db(tmp_path, monkeypatch):
     tmp_db = tmp_path / "test_idempotency.db"
     import kuber_recon.server as srv
     monkeypatch.setattr(srv.WebhookIdempotencyStore, "DB_FILE", tmp_db)
+    monkeypatch.setattr(srv.razorpay_adapter, "is_live", False)
     # Re-init the singleton store so it uses the new path
     srv.idempotency_store = srv.WebhookIdempotencyStore()
     yield
+
     # Cleanup is automatic via tmp_path fixture
 
 
@@ -44,14 +41,14 @@ def client():
     return TestClient(app)
 
 
-_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "whsec_kuber_demo_key_2026")
-
-
-def _make_signed_payload(body_dict: dict, event_id: str) -> tuple[bytes, str]:
+def _make_signed_payload(body_dict: dict, event_id: str, secret: str = None) -> tuple[bytes, str]:
     """Return (raw_body_bytes, hmac_signature) for a given payload dict."""
+    import kuber_recon.server as srv
     raw = json.dumps(body_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    sig = hmac.new(_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+    sec = secret or srv.get_webhook_secret()
+    sig = hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()
     return raw, sig
+
 
 
 _SAMPLE_EVENT = {
@@ -203,31 +200,38 @@ def test_intercept_rejects_float_in_amount_paise(client):
         assert resp.status_code == 422
 
 
-# ── 8. Sandbox test-payload endpoint disabled in live mode ────────────────────
+# ── 8. Sandbox fixture endpoint enabled in sandbox, disabled in live mode ────
 
-def test_test_payload_available_in_sandbox(client):
-    """In sandbox mode (no real keys), /api/webhook/test-payload must return 200."""
+def test_sandbox_fixture_available_in_sandbox(client):
+    """In sandbox mode (no real keys), /api/sandbox/webhook/fixture returns a signed fixture."""
     import kuber_recon.server as srv
     if srv.razorpay_adapter.is_live:
-        pytest.skip("Live mode active — test-payload endpoint is correctly disabled")
-    resp = client.get("/api/webhook/test-payload")
+        pytest.skip("Live mode active — fixture endpoint is correctly disabled")
+    resp = client.get("/api/sandbox/webhook/fixture?transfer_id=trf_pytest_fixture_001")
     assert resp.status_code == 200
     data = resp.json()
-    assert "raw_body" in data
+    assert "raw_payload" in data
     assert "x_razorpay_signature" in data
-    # Verify the returned signature is actually correct
-    raw = data["raw_body"].encode("utf-8")
-    expected_sig = hmac.new(_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+    raw = json.dumps(data["raw_payload"], separators=(",", ":")).encode("utf-8")
+    expected_sig = hmac.new(srv.get_webhook_secret().encode("utf-8"), raw, hashlib.sha256).hexdigest()
     assert expected_sig == data["x_razorpay_signature"]
+
+
+def test_sandbox_fixture_disabled_in_live_mode(client, monkeypatch):
+    """In live mode, /api/sandbox/webhook/fixture must be rejected with 403 Forbidden."""
+    import kuber_recon.server as srv
+    monkeypatch.setattr(srv.razorpay_adapter, "is_live", True)
+    resp = client.get("/api/sandbox/webhook/fixture?transfer_id=trf_live_001")
+    assert resp.status_code == 403
+    assert "disabled in live Test Mode" in resp.json()["detail"]
 
 
 # ── 9. Absent signature rejected in every mode ────────────────────────────────
 
 def test_webhook_absent_signature_rejected(client):
     """
-    X-Razorpay-Signature is now mandatory in every mode (including sandbox).
+    X-Razorpay-Signature is mandatory in every mode (including sandbox).
     A request without the header must receive 400, not 200.
-    The signed fixture from /api/webhook/test-payload is the correct path for sandbox.
     """
     raw, _ = _make_signed_payload(_SAMPLE_EVENT, "evt_nosig_009")
     resp = client.post(
@@ -235,11 +239,64 @@ def test_webhook_absent_signature_rejected(client):
         content=raw,
         headers={
             "Content-Type": "application/json",
-            # X-Razorpay-Signature deliberately omitted
             "X-Razorpay-Event-Id": "evt_nosig_009",
         },
     )
     assert resp.status_code == 400
     detail = resp.json()["detail"]
     assert "Missing" in detail or "signed" in detail.lower()
+
+
+# ── 10. Webhook secret missing in live mode triggers configuration error ───────
+
+def test_webhook_missing_secret_fails_in_live_mode(client, monkeypatch):
+    """
+    When live Razorpay credentials are configured but RAZORPAY_WEBHOOK_SECRET is unset,
+    inbound webhooks must fail with an explicit 500 configuration error rather than falling back.
+    """
+    import kuber_recon.server as srv
+    monkeypatch.setattr(srv.razorpay_adapter, "is_live", True)
+    monkeypatch.delenv("RAZORPAY_WEBHOOK_SECRET", raising=False)
+
+    raw, sig = _make_signed_payload(_SAMPLE_EVENT, "evt_live_missing_sec", secret="dummy_for_sender")
+    resp = client.post(
+        "/api/webhook/razorpay",
+        content=raw,
+        headers={
+            "Content-Type": "application/json",
+            "X-Razorpay-Signature": sig,
+            "X-Razorpay-Event-Id": "evt_live_missing_sec",
+        },
+    )
+    assert resp.status_code == 500
+    assert "RAZORPAY_WEBHOOK_SECRET is missing" in resp.json()["detail"]
+
+
+
+def test_webhook_configured_secret_passes_in_live_mode(client, monkeypatch):
+    """
+    When live Razorpay credentials and RAZORPAY_WEBHOOK_SECRET are configured,
+    inbound webhook HMAC is evaluated against the explicit live secret.
+    """
+    import kuber_recon.server as srv
+    live_secret = "whsec_live_production_test_secret_9988"
+    monkeypatch.setattr(srv.razorpay_adapter, "is_live", True)
+    monkeypatch.setenv("RAZORPAY_WEBHOOK_SECRET", live_secret)
+
+    raw = json.dumps(_SAMPLE_EVENT, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    sig = hmac.new(live_secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+
+    resp = client.post(
+        "/api/webhook/razorpay",
+        content=raw,
+        headers={
+            "Content-Type": "application/json",
+            "X-Razorpay-Signature": sig,
+            "X-Razorpay-Event-Id": "evt_live_valid_001",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "acknowledged"
+    assert resp.json()["signature_verified"] is True
+
 

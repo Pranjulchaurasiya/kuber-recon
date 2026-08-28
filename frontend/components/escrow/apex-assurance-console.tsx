@@ -5,15 +5,26 @@ import { getApiUrl } from '@/lib/api-client'
 import { paiseToInr } from '@/lib/kuber-data'
 import { CheckCircle2, XCircle, ShieldAlert, Lock, Unlock, ArrowRight, RefreshCw, Terminal, Cpu } from 'lucide-react'
 
+interface AuditEntry {
+  id: number
+  contract_id: string
+  status: string
+  proof_hash: string
+  assertions_passed: boolean
+  timestamp: number
+}
+
 interface ApexContract {
   contract_id: string
-  status: 'PENDING_CAPTURE' | 'HELD' | 'VERIFYING' | 'RELEASING' | 'RELEASED' | 'REFUSED' | 'EXPIRED'
+  status: 'PENDING_CAPTURE' | 'HELD' | 'VERIFYING' | 'RELEASING' | 'RELEASED' | 'REFUSED' | 'EXPIRED_HOLD' | 'RELEASE_PENDING_RECONCILIATION'
   amount_paise: number
   amount_inr: string
+  expected_record_count?: number
   transfer_id: string
   on_hold: boolean
   on_hold_until: number
   proof_hash: string
+  audit_trail?: AuditEntry[]
   message?: string
 }
 
@@ -24,6 +35,9 @@ interface AssertionResult {
   on_hold: boolean
   valid_records: number
   failed_records: number
+  total_delivered_paise: number
+  total_delivered_inr: string
+  seller_signature_verified: boolean
   violation_samples: string[]
   manifest_sha256: string
   refusal_certificate?: string
@@ -54,6 +68,9 @@ export function ApexAssuranceConsole() {
   const [assertion, setAssertion] = useState<AssertionResult | null>(null)
   const [release, setRelease] = useState<ReleaseResult | null>(null)
   const [activeStep, setActiveStep] = useState<number>(0)
+  const [auditTrail, setAuditTrail] = useState<AuditEntry[]>([])
+  const [pollingStatus, setPollingStatus] = useState<'idle' | 'waiting' | 'finalized' | 'timeout' | 'error'>('idle')
+
 
   useEffect(() => {
     fetch(`${getApiUrl()}/api/integration-status`)
@@ -228,15 +245,18 @@ export function ApexAssuranceConsole() {
     setLoading(false)
   }
 
+  const [pollingTimedOut, setPollingTimedOut] = useState(false)
+
   // ── Step 3: Release Route Hold ───────────────────────────────────────────────
   const handleReleaseHold = async () => {
     if (!contract) return
     setLoading(true)
+    setPollingTimedOut(false)
     try {
       const checkerId = 'cfo_autonomous_verifier'
 
-      // 1. Authenticated CFO Checker Keypair (Web Crypto RFC 8410 PKCS#8 Ed25519)
-      addLog('CFO_CHECKER_AGENT', `🔑 [Sandbox demo signer — not production key custody] Loading Ed25519 keypair for '${checkerId}' (RFC 8410 PKCS#8)...`, 'buyer')
+      // 1. Authenticated CFO Checker Keypair (Web Crypto RFC 8410 PKCS#8 Ed25519 Sandbox Demo Key)
+      addLog('CFO_CHECKER_AGENT', `🔑 [Sandbox Demo Signer — not hardware KMS/HSM custody] Loading Ed25519 keypair for '${checkerId}'...`, 'buyer')
       const seedBytes = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode('kuber_cfo_autonomous_verifier_sec_key_v1'))
       const pkcs8Prefix = new Uint8Array([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20])
       const pkcs8Key = new Uint8Array(pkcs8Prefix.length + seedBytes.byteLength)
@@ -333,12 +353,14 @@ export function ApexAssuranceConsole() {
           }
           if (attempts > 30) {
             clearInterval(pollInterval)
+            setPollingTimedOut(true)
+            addLog('APEX_GATEWAY', `⚠️ [Live Polling Timeout] No transfer.processed webhook received within 60s. Contract remains in RELEASING pending delivery.`, 'apex')
           }
         }, 2000)
       }
 
-    } catch {
-      addLog('APEX_ROUTER', 'Release execution failed.', 'apex')
+    } catch (err) {
+      addLog('APEX_ROUTER', `Release execution failed: ${err instanceof Error ? err.message : 'Unknown'}`, 'apex')
     }
     setLoading(false)
   }
@@ -438,12 +460,43 @@ export function ApexAssuranceConsole() {
           </p>
           {release && (
             <div className="mt-2 text-[10px] text-muted-foreground font-mono space-y-0.5 break-all">
+              <div>Transfer: {release.transfer_id}</div>
               <div>Fingerprint: {release.public_key_fingerprint}</div>
               <div>Sig: {release.signature_hex.substring(0, 32)}...</div>
+              {pollingTimedOut && (
+                <div className="mt-2 rounded bg-amber-500/10 border border-amber-500/30 p-2 text-[10px] text-amber-400">
+                  ⏱️ Live Webhook Polling Timed Out: The contract transitioned to <code>RELEASING</code> on-chain / in database. Awaiting authoritative webhook from Razorpay live gateway on <code>/api/webhook/razorpay</code>.
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Contract Invariants & Immutable Audit Trail */}
+      {contract && (
+        <div className="rounded-xl border border-border bg-panel/70 p-4 font-mono text-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-gold">CONTRACT: {contract.contract_id}</span>
+              <span className="text-muted-foreground">|</span>
+              <span className="text-muted-foreground">Transfer: {contract.transfer_id}</span>
+            </div>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span>Exact Amount: <strong className="text-gain">{contract.amount_paise.toLocaleString()} paise</strong> ({contract.amount_inr})</span>
+              <span>•</span>
+              <span>Invariant: <strong className="text-foreground">500 Records Exact</strong></span>
+              <span>•</span>
+              <span className="text-muted-foreground">Status: <strong className="text-gold">{activeStep === 3 ? 'RELEASED' : release ? 'RELEASING' : contract.status}</strong></span>
+            </div>
+          </div>
+          <div className="text-[11px] text-muted-foreground flex items-center justify-between">
+            <span>🛡️ Maker-Checker Custody: <em>"Sandbox demo signer — not production key custody."</em> (Pinned Identity Key: Ed25519)</span>
+            <span className="text-[10px] text-muted-foreground/80">SQLite Trigger Immutability: Active</span>
+          </div>
+        </div>
+      )}
+
 
       {/* Interactive 90-Second Demo Triggers */}
       {contract && (

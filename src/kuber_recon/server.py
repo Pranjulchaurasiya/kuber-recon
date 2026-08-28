@@ -19,6 +19,7 @@ Endpoints:
   GET  /api/apex/contracts/{id}     — Query live contract status & audit trail
 """
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -28,8 +29,8 @@ import sys
 import time
 from decimal import Decimal
 from pathlib import Path
-from threading import Lock, RLock
-from typing import Any, Dict, List, Optional
+from threading import RLock
+from typing import Any
 
 try:
     from dotenv import load_dotenv
@@ -42,31 +43,31 @@ except ImportError:
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import traceback
+
 try:
     from fastapi import FastAPI, Header, HTTPException, Request, status
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
     from pydantic import BaseModel, Field
+
 except ImportError:
     print("[ERROR] FastAPI not installed. Run: pip install fastapi uvicorn")
     raise
 
-from kuber_recon.actions import ActionGuardrailEngine
 from kuber_recon.assurance import (
-    AssuranceContract,
-    AssertionResult,
-    ContractStatus,
-    DeliveryManifest,
-    DeterministicAssertionEngine,
     MAX_DIRECT_PAYLOAD_BYTES,
+    AssuranceContract,
+    ContractStatus,
+    DeterministicAssertionEngine,
 )
 from kuber_recon.client import RazorpayClientAdapter
 from kuber_recon.engine import AmbiguousMatchError, KnuthExactCoverSolver, ReconciliationEngine
 from kuber_recon.escrow import KuberSovereignEscrowEngine
-from kuber_recon.security import SoftwareEd25519Custodian, SignatureCertificate
 from kuber_recon.generator import ChaosDataGenerator
+from kuber_recon.security import SoftwareEd25519Custodian
 from kuber_recon.simulation import FinancialDigitalTwin
 from kuber_recon.types import paise_to_inr_decimal
-
 
 # ── SQLite-Backed Durable Idempotency & Contract Store ────────────────────────
 
@@ -154,14 +155,11 @@ class WebhookIdempotencyStore:
                 """
             )
             # Migration check: add release_started_at and expected_record_count if missing
-            try:
+            with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE apex_contracts ADD COLUMN release_started_at INTEGER")
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE apex_contracts ADD COLUMN expected_record_count INTEGER")
-            except Exception:
-                pass
+
 
     def try_insert(self, event_id: str) -> bool:
         with self._lock, self._connect() as conn:
@@ -174,40 +172,142 @@ class WebhookIdempotencyStore:
             except sqlite3.IntegrityError:
                 return False
 
-    def save_contract(self, c: AssuranceContract) -> None:
+    def transition_contract_state(
+        self,
+        contract_id: str,
+        expected_status: str | list[str] | None,
+        target_status: str,
+        expected_version: int | None = None,
+        *,
+        transfer_id: str | None = None,
+        webhook_event_id: str | None = None,
+        on_hold: bool | None = None,
+        on_hold_until: int | None = None,
+        assertions_passed: bool | None = None,
+        refusal_reason: str | None = None,
+        proof_hash: str | None = None,
+        release_started_at: int | None = None,
+        expected_record_count: int | None = None,
+    ) -> bool:
+        """
+        Centralized, CAS-protected state transition for apex_contracts.
+        Guarantees atomic append to apex_contract_audit_log in the same transaction.
+        All lifecycle mutations (HELD, VERIFYING, REFUSED, RELEASING, RELEASED,
+        RELEASE_PENDING_RECONCILIATION, EXPIRED_HOLD) must use this function.
+        Validates expected_status and expected_version, performs conditional CAS update,
+        increments version exactly once, and rolls back both operations on failure.
+        """
+        now = int(time.time())
         with self._lock, self._connect() as conn:
-            cur = conn.execute("SELECT contract_id FROM apex_contracts WHERE contract_id = ?", (c.contract_id,))
-            exists = cur.fetchone() is not None
-            if exists:
-                conn.execute(
-                    """
-                    UPDATE apex_contracts SET
-                        status = ?,
-                        transfer_id = COALESCE(?, transfer_id),
-                        webhook_event_id = COALESCE(?, webhook_event_id),
-                        on_hold = ?,
-                        on_hold_until = ?,
-                        assertions_passed = ?,
-                        refusal_reason = ?,
-                        proof_hash = ?,
-                        version = version + 1,
-                        release_started_at = COALESCE(?, release_started_at)
-                    WHERE contract_id = ?
-                    """,
-                    (
-                        c.status.value,
-                        c.transfer_id,
-                        c.webhook_event_id,
-                        1 if c.on_hold else 0,
-                        c.on_hold_until,
-                        1 if c.assertions_passed else 0,
-                        c.refusal_reason,
-                        c.proof_hash,
-                        c.release_started_at,
-                        c.contract_id,
-                    ),
+            cur = conn.execute(
+                "SELECT version, status, proof_hash, assertions_passed, on_hold FROM apex_contracts WHERE contract_id = ?",
+                (contract_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return False
+            curr_ver, curr_status, curr_proof, curr_assertions, curr_on_hold = row
+
+            if expected_version is not None and curr_ver != expected_version:
+                return False
+
+            if expected_status is not None:
+                if isinstance(expected_status, (list, tuple, set)):
+                    if curr_status not in expected_status:
+                        return False
+                else:
+                    if curr_status != expected_status:
+                        return False
+
+            set_clauses = ["status = ?", "version = version + 1"]
+            params: list[Any] = [target_status]
+
+            if transfer_id is not None:
+                set_clauses.append("transfer_id = ?")
+                params.append(transfer_id)
+            if webhook_event_id is not None:
+                set_clauses.append("webhook_event_id = ?")
+                params.append(webhook_event_id)
+            if on_hold is not None:
+                set_clauses.append("on_hold = ?")
+                params.append(1 if on_hold else 0)
+            if on_hold_until is not None:
+                set_clauses.append("on_hold_until = ?")
+                params.append(on_hold_until)
+            if assertions_passed is not None:
+                set_clauses.append("assertions_passed = ?")
+                params.append(1 if assertions_passed else 0)
+            if refusal_reason is not None:
+                set_clauses.append("refusal_reason = ?")
+                params.append(refusal_reason)
+            if proof_hash is not None:
+                set_clauses.append("proof_hash = ?")
+                params.append(proof_hash)
+            if release_started_at is not None:
+                set_clauses.append("release_started_at = ?")
+                params.append(release_started_at)
+            if expected_record_count is not None:
+                set_clauses.append("expected_record_count = ?")
+                params.append(expected_record_count)
+
+            where_clauses = ["contract_id = ?"]
+            params.append(contract_id)
+            if expected_version is not None:
+                where_clauses.append("version = ?")
+                params.append(expected_version)
+            if expected_status is not None:
+                if isinstance(expected_status, (list, tuple, set)):
+                    placeholders = ",".join("?" for _ in expected_status)
+                    where_clauses.append(f"status IN ({placeholders})")
+                    params.extend(expected_status)
+                else:
+                    where_clauses.append("status = ?")
+                    params.append(expected_status)
+
+            update_sql = f"UPDATE apex_contracts SET {', '.join(set_clauses)} WHERE {' AND '.join(where_clauses)}"
+            update_cur = conn.execute(update_sql, tuple(params))
+            if update_cur.rowcount == 0:
+                return False
+
+            final_proof = proof_hash if proof_hash is not None else curr_proof
+            final_assertions = (1 if assertions_passed else 0) if assertions_passed is not None else curr_assertions
+
+            # Append immutable audit entry
+            conn.execute(
+                """
+                INSERT INTO apex_contract_audit_log (
+                    contract_id, status, proof_hash, assertions_passed, timestamp
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (contract_id, target_status, final_proof or "", final_assertions, now),
+            )
+            return True
+
+    def save_contract(self, c: AssuranceContract) -> None:
+        """Create a new contract or update an existing contract with audit logging."""
+        with self._lock, self._connect() as conn:
+            cur = conn.execute("SELECT contract_id, version FROM apex_contracts WHERE contract_id = ?", (c.contract_id,))
+            row = cur.fetchone()
+            if row:
+                # If updating existing contract, route through transition_contract_state
+                curr_ver = row[1]
+                self.transition_contract_state(
+                    contract_id=c.contract_id,
+                    expected_status=None,
+                    target_status=c.status.value,
+                    expected_version=curr_ver,
+                    transfer_id=c.transfer_id,
+                    webhook_event_id=c.webhook_event_id,
+                    on_hold=c.on_hold,
+                    on_hold_until=c.on_hold_until,
+                    assertions_passed=c.assertions_passed,
+                    refusal_reason=c.refusal_reason,
+                    proof_hash=c.proof_hash,
+                    release_started_at=c.release_started_at,
+                    expected_record_count=c.expected_record_count,
                 )
             else:
+                now = int(time.time())
                 conn.execute(
                     """
                     INSERT INTO apex_contracts (
@@ -223,17 +323,17 @@ class WebhookIdempotencyStore:
                         c.proof_hash, c.version, c.created_at, c.release_started_at,
                     ),
                 )
-            # Write immutable audit log entry
-            conn.execute(
-                """
-                INSERT INTO apex_contract_audit_log (
-                    contract_id, status, proof_hash, assertions_passed, timestamp
-                ) VALUES (?, ?, ?, ?, ?)
-                """,
-                (c.contract_id, c.status.value, c.proof_hash or "", 1 if c.assertions_passed else 0, int(time.time())),
-            )
+                # Initial immutable audit log entry for contract creation (HELD)
+                conn.execute(
+                    """
+                    INSERT INTO apex_contract_audit_log (
+                        contract_id, status, proof_hash, assertions_passed, timestamp
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (c.contract_id, c.status.value, c.proof_hash or "", 1 if c.assertions_passed else 0, now),
+                )
 
-    def get_contract(self, contract_id: str) -> Optional[Dict[str, Any]]:
+    def get_contract(self, contract_id: str) -> dict[str, Any] | None:
         with self._lock, self._connect() as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.execute("SELECT * FROM apex_contracts WHERE contract_id = ?", (contract_id,))
@@ -245,37 +345,43 @@ class WebhookIdempotencyStore:
             d["assertions_passed"] = bool(d.get("assertions_passed", 0))
             return d
 
+    def get_audit_trail(self, contract_id: str) -> list[dict[str, Any]]:
+        with self._lock, self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute(
+                "SELECT id, contract_id, status, proof_hash, assertions_passed, timestamp FROM apex_contract_audit_log WHERE contract_id = ? ORDER BY id ASC",
+                (contract_id,)
+            )
+            return [dict(r) for r in cur.fetchall()]
+
     def cas_release_contract(self, contract_id: str, expected_version: int, new_proof_hash: str) -> bool:
         """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state and start release clock."""
         now = int(time.time())
-        with self._lock, self._connect() as conn:
-            cur = conn.execute(
-                """
-                UPDATE apex_contracts
-                SET status = 'RELEASING', release_started_at = ?, version = version + 1, proof_hash = ?
-                WHERE contract_id = ? AND version = ? AND on_hold = 1 AND assertions_passed = 1
-                """,
-                (now, new_proof_hash, contract_id, expected_version),
-            )
-            return cur.rowcount > 0
+        return self.transition_contract_state(
+            contract_id=contract_id,
+            expected_status=["HELD", "VERIFYING"],
+            target_status="RELEASING",
+            expected_version=expected_version,
+            proof_hash=new_proof_hash,
+            release_started_at=now,
+            on_hold=True,
+            assertions_passed=True,
+        )
 
     def cas_finalize_release(self, contract_id: str, webhook_event_id: str) -> bool:
-        """Finalize RELEASED state upon webhook confirmation."""
-        with self._lock, self._connect() as conn:
-            cur = conn.execute(
-                """
-                UPDATE apex_contracts
-                SET status = 'RELEASED', on_hold = 0, version = version + 1, webhook_event_id = ?
-                WHERE contract_id = ? AND status = 'RELEASING'
-                """,
-                (webhook_event_id, contract_id),
-            )
-            return cur.rowcount > 0
+        """Finalize RELEASED state upon authoritative webhook confirmation."""
+        return self.transition_contract_state(
+            contract_id=contract_id,
+            expected_status="RELEASING",
+            target_status="RELEASED",
+            webhook_event_id=webhook_event_id,
+            on_hold=False,
+        )
 
-    def sweep_expired_contracts(self) -> List[str]:
+    def sweep_expired_contracts(self) -> list[str]:
         """Liveness sweep: force-resolves contracts where on_hold_until <= now with CAS race protection."""
         now = int(time.time())
-        expired_ids: List[str] = []
+        expired_ids: list[str] = []
         with self._lock, self._connect() as conn:
             cur = conn.execute(
                 """
@@ -285,20 +391,20 @@ class WebhookIdempotencyStore:
                 (now,),
             )
             rows = cur.fetchall()
-            for cid, ver in rows:
-                update_cur = conn.execute(
-                    """
-                    UPDATE apex_contracts
-                    SET status = 'EXPIRED_HOLD', on_hold = 1, version = version + 1
-                    WHERE contract_id = ? AND version = ?
-                    """,
-                    (cid, ver),
-                )
-                if update_cur.rowcount > 0:
-                    expired_ids.append(cid)
 
-            # Sweep stuck RELEASING contracts to RELEASE_PENDING_RECONCILIATION based on release_started_at (timeout > 5 mins)
-            timeout_threshold = now - 300
+        for cid, ver in rows:
+            if self.transition_contract_state(
+                contract_id=cid,
+                expected_status=["HELD", "VERIFYING", "REFUSED"],
+                target_status="EXPIRED_HOLD",
+                expected_version=ver,
+                on_hold=True,
+            ):
+                expired_ids.append(cid)
+
+        # Sweep stuck RELEASING contracts to RELEASE_PENDING_RECONCILIATION based on release_started_at (timeout > 5 mins)
+        timeout_threshold = now - 300
+        with self._lock, self._connect() as conn:
             cur = conn.execute(
                 """
                 SELECT contract_id, version FROM apex_contracts
@@ -306,15 +412,16 @@ class WebhookIdempotencyStore:
                 """,
                 (timeout_threshold,),
             )
-            for cid, ver in cur.fetchall():
-                conn.execute(
-                    """
-                    UPDATE apex_contracts
-                    SET status = 'RELEASE_PENDING_RECONCILIATION', version = version + 1
-                    WHERE contract_id = ? AND version = ?
-                    """,
-                    (cid, ver),
-                )
+            releasing_rows = cur.fetchall()
+
+        for cid, ver in releasing_rows:
+            self.transition_contract_state(
+                contract_id=cid,
+                expected_status="RELEASING",
+                target_status="RELEASE_PENDING_RECONCILIATION",
+                expected_version=ver,
+                on_hold=True,
+            )
 
         return expired_ids
 
@@ -335,8 +442,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import traceback
-from fastapi.responses import JSONResponse
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -349,7 +455,24 @@ escrow_engine = KuberSovereignEscrowEngine()
 razorpay_adapter = RazorpayClientAdapter()
 idempotency_store = WebhookIdempotencyStore()
 
-_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "whsec_kuber_demo_key_2026")
+DEMO_SANDBOX_WEBHOOK_SECRET = "whsec_sandbox_demo_only_2026"
+
+def get_webhook_secret() -> str:
+    """
+    Resolve webhook secret based on operational mode:
+    - In Live/Test mode (Razorpay API credentials present), RAZORPAY_WEBHOOK_SECRET must be set.
+    - In Zero-Key Sandbox mode, falls back to explicit DEMO_SANDBOX_WEBHOOK_SECRET.
+    """
+    if razorpay_adapter.is_live:
+        secret = os.getenv("RAZORPAY_WEBHOOK_SECRET")
+        if not secret:
+            raise HTTPException(
+                status_code=500,
+                detail="Webhook configuration error: RAZORPAY_WEBHOOK_SECRET is missing while live Razorpay credentials are active."
+            )
+        return secret
+    return os.getenv("RAZORPAY_WEBHOOK_SECRET") or DEMO_SANDBOX_WEBHOOK_SECRET
+
 _IS_SANDBOX = not razorpay_adapter.is_live
 
 
@@ -405,7 +528,7 @@ class AmbiguousRefusalResponse(BaseModel):
     target_paise: int
     target_inr: str
     candidate_subsets_found: int
-    subsets: List[List[str]]
+    subsets: list[list[str]]
     reason: str
     action_taken: str
     fmr_preserved: str
@@ -415,7 +538,7 @@ class AmbiguousRefusalResponse(BaseModel):
 class RouteTransferRequest(BaseModel):
     account_id: str = "acc_merchant_001"
     amount_paise: int = Field(..., gt=0, description="Transfer amount in integer paise (no floats)")
-    notes: Optional[Dict[str, str]] = None
+    notes: dict[str, str] | None = None
 
 
 class RouteTransferResponse(BaseModel):
@@ -457,7 +580,7 @@ class CreateContractRequest(BaseModel):
 class DeliverContractRequest(BaseModel):
     contract_id: str
     seller_agent_id: str
-    payload_records: List[Dict[str, Any]] = Field(..., description="Direct batch of delivered records")
+    payload_records: list[dict[str, Any]] = Field(..., description="Direct batch of delivered records")
     manifest_signature: str = Field(..., description="RFC 8032 Ed25519 seller manifest signature")
     seller_public_key_hex: str = Field(..., description="RFC 8032 Ed25519 seller public key hex")
 
@@ -659,7 +782,8 @@ def get_sandbox_webhook_fixture(transfer_id: str = "trf_sandbox_demo_001"):
         "created_at": int(time.time()),
     }
     raw_body = json.dumps(body_dict, separators=(",", ":")).encode("utf-8")
-    sig = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
+    secret = get_webhook_secret()
+    sig = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
     return {
         "x_razorpay_signature": sig,
@@ -671,18 +795,19 @@ def get_sandbox_webhook_fixture(transfer_id: str = "trf_sandbox_demo_001"):
 @app.post("/api/webhook/razorpay")
 async def razorpay_webhook_listener(
     request: Request,
-    x_razorpay_signature: Optional[str] = Header(None, alias="X-Razorpay-Signature"),
-    x_razorpay_event_id: Optional[str] = Header(None, alias="X-Razorpay-Event-Id"),
+    x_razorpay_signature: str | None = Header(None, alias="X-Razorpay-Signature"),
+    x_razorpay_event_id: str | None = Header(None, alias="X-Razorpay-Event-Id"),
 ):
     t0 = time.perf_counter()
     raw_body = await request.body()
+    secret = get_webhook_secret()
 
     if not x_razorpay_signature:
         raise HTTPException(
             status_code=400,
             detail="Missing X-Razorpay-Signature header. All webhook requests must be signed.",
         )
-    expected = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, x_razorpay_signature):
         raise HTTPException(
             status_code=400,
@@ -705,15 +830,27 @@ async def razorpay_webhook_listener(
         payload = {}
 
     event = payload.get("event", "unknown")
-    
+
     if event in ("transfer.processed", "settlement.processed"):
         try:
-            transfer_id = payload["payload"]["transfer"]["entity"]["id"]
+            transfer_entity = payload["payload"]["transfer"]["entity"]
+            transfer_id = transfer_entity["id"]
+            notes = transfer_entity.get("notes") or {}
+            apex_contract_id = notes.get("apex_contract_id")
         except KeyError:
             pass
         else:
             with idempotency_store._lock, idempotency_store._connect() as conn:
-                cur = conn.execute("SELECT contract_id FROM apex_contracts WHERE transfer_id = ? AND status = 'RELEASING'", (transfer_id,))
+                if apex_contract_id:
+                    cur = conn.execute(
+                        "SELECT contract_id FROM apex_contracts WHERE contract_id = ? AND transfer_id = ? AND status = 'RELEASING'",
+                        (apex_contract_id, transfer_id),
+                    )
+                else:
+                    cur = conn.execute(
+                        "SELECT contract_id FROM apex_contracts WHERE transfer_id = ? AND status = 'RELEASING'",
+                        (transfer_id,),
+                    )
                 row = cur.fetchone()
                 if row:
                     idempotency_store.cas_finalize_release(row[0], event_id)
@@ -820,33 +957,27 @@ def apex_deliver_payload(req: DeliverContractRequest):
         seller_public_key_hex=req.seller_public_key_hex,
     )
 
-    # Update contract status in SQLite
-    new_status = ContractStatus.VERIFYING if assertion_res.passed else ContractStatus.REFUSED
+    # Update contract status in SQLite via centralized transition function
+    target_status = ContractStatus.VERIFYING.value if assertion_res.passed else ContractStatus.REFUSED.value
     refusal_reason = assertion_res.refusal_certificate if not assertion_res.passed else None
 
-    contract = AssuranceContract(
-        contract_id=contract_data["contract_id"],
-        buyer_agent_id=contract_data["buyer_agent_id"],
-        seller_agent_id=contract_data["seller_agent_id"],
-        seller_account_id=contract_data["seller_account_id"],
-        amount_paise=contract_data["amount_paise"],
-        expected_record_count=contract_data["expected_record_count"],
-        status=new_status,
-        transfer_id=contract_data["transfer_id"],
-        on_hold=True,  # Remains on hold until explicit release
-        on_hold_until=contract_data["on_hold_until"],
+    idempotency_store.transition_contract_state(
+        contract_id=req.contract_id,
+        expected_status=["HELD", "VERIFYING", "REFUSED"],
+        target_status=target_status,
+        expected_version=contract_data["version"],
         assertions_passed=assertion_res.passed,
         refusal_reason=refusal_reason,
-        verified_at=int(time.time()),
         proof_hash=assertion_res.manifest_sha256,
+        on_hold=True,
     )
-    idempotency_store.save_contract(contract)
+
 
     result_payload = {
-        "contract_id": contract.contract_id,
+        "contract_id": req.contract_id,
         "assertions_passed": assertion_res.passed,
-        "status": contract.status.value,
-        "on_hold": contract.on_hold,
+        "status": target_status,
+        "on_hold": True,
         "valid_records": assertion_res.valid_records,
         "failed_records": assertion_res.failed_records,
         "total_delivered_paise": assertion_res.total_delivered_paise,
@@ -857,6 +988,7 @@ def apex_deliver_payload(req: DeliverContractRequest):
         "refusal_certificate": assertion_res.refusal_certificate,
         "action_taken": "Settlement remains on_hold: true" if not assertion_res.passed else "Ready for settlement release.",
     }
+
 
     if not assertion_res.passed:
         return JSONResponse(
@@ -935,14 +1067,17 @@ def apex_release_settlement(req: ReleaseContractRequest):
     transfer_id = contract_data["transfer_id"] or f"trf_{req.contract_id[-6:]}"
     pubkey_fingerprint = f"0x{req.public_key_hex[:16]}...{req.public_key_hex[-8:]}"
     try:
-        release_res = razorpay_adapter.modify_transfer_hold(transfer_id, on_hold=False)
-    except Exception as e:
-        # Revert/Update to RELEASE_PENDING_RECONCILIATION
-        with idempotency_store._lock, idempotency_store._connect() as conn:
-            conn.execute(
-                "UPDATE apex_contracts SET status = 'RELEASE_PENDING_RECONCILIATION', version = version + 1 WHERE contract_id = ?",
-                (req.contract_id,)
-            )
+        razorpay_adapter.modify_transfer_hold(transfer_id, on_hold=False)
+    except Exception:
+
+        # Transition to RELEASE_PENDING_RECONCILIATION with audit log
+        idempotency_store.transition_contract_state(
+            contract_id=req.contract_id,
+            expected_status="RELEASING",
+            target_status="RELEASE_PENDING_RECONCILIATION",
+            on_hold=True,
+        )
+
         return {
             "contract_id": req.contract_id,
             "status": "RELEASE_PENDING_RECONCILIATION",
@@ -998,6 +1133,7 @@ def apex_get_contract(contract_id: str):
     if not contract_data:
         raise HTTPException(status_code=404, detail="Contract not found.")
     contract_data["amount_inr"] = _fmt_paise(contract_data["amount_paise"])
+    contract_data["audit_trail"] = idempotency_store.get_audit_trail(contract_id)
     return contract_data
 
 
