@@ -399,3 +399,31 @@ def test_apex_payload_exceeding_bounds_rejected(client):
     assert resp.status_code == 413
     assert "memory bounds" in resp.json()["detail"]
 
+
+# ── 8. SQLite Engine-Level Append-Only Trigger Verification ────────────────────
+
+def test_audit_log_database_triggers_prevent_tampering():
+    import sqlite3
+    import pytest
+    from kuber_recon.server import WebhookIdempotencyStore
+
+    store = WebhookIdempotencyStore()
+    with store._lock, store._connect() as conn:
+        conn.execute(
+            "INSERT INTO apex_contract_audit_log (contract_id, status, proof_hash, assertions_passed, timestamp) VALUES (?, ?, ?, ?, ?)",
+            ("cnt_trigger_test_001", "HELD", "proof_hash_initial", 0, 1000),
+        )
+        cur = conn.execute("SELECT id FROM apex_contract_audit_log WHERE contract_id = 'cnt_trigger_test_001'")
+        row = cur.fetchone()
+        assert row is not None
+        row_id = row[0]
+
+        # 1. Direct UPDATE must be aborted by SQLite trigger
+        with pytest.raises(sqlite3.DatabaseError, match="apex_contract_audit_log is append-only"):
+            conn.execute("UPDATE apex_contract_audit_log SET status = 'TAMPERED' WHERE id = ?", (row_id,))
+
+        # 2. Direct DELETE must be aborted by SQLite trigger
+        with pytest.raises(sqlite3.DatabaseError, match="apex_contract_audit_log is append-only"):
+            conn.execute("DELETE FROM apex_contract_audit_log WHERE id = ?", (row_id,))
+
+
