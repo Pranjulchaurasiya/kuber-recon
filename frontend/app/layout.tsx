@@ -18,10 +18,11 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'KuberRecon — Autonomous Financial Integrity OS',
+  title: 'APEX Assurance — Delivery-Gated Settlement for Agentic Commerce',
   description:
-    'Autonomous Financial Integrity Operating System. Every rupee tracked to its statutory root. Zero tax lost, zero math guessed. Built on the Razorpay rail.',
+    'Razorpay Route locks the settlement; APEX releases it only when delivery proof passes. Powered by the KuberRecon deterministic verification kernel.',
 }
+
 
 export const viewport: Viewport = {
   colorScheme: 'dark light',

@@ -32,31 +32,31 @@ export function Topbar() {
 
         {/* Mobile brand mark */}
         <div className="flex items-center gap-2 md:hidden">
-          <span className="font-mono text-xs font-bold text-gold">KUBER</span>
+          <span className="font-mono text-xs font-bold text-gold">APEX</span>
         </div>
 
         {/* Breadcrumb */}
         <div className="flex min-w-0 items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-gold">
             {current.code}
           </span>
           <span className="text-muted-foreground/40">/</span>
-          <h1 className="truncate text-sm font-medium text-foreground">{current.label}</h1>
+          <h1 className="truncate text-sm font-semibold text-foreground">{current.label}</h1>
         </div>
 
         {/* Right controls */}
         <div className="ml-auto flex items-center gap-3">
           {/* Live rail status */}
           <div className="hidden items-center gap-2 rounded-full border border-border bg-panel px-3 py-1.5 sm:flex">
-            <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-gain" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-gain animate-status-dot" />
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               Live · Razorpay Rail
             </span>
           </div>
 
           {/* FMR display */}
           <div className="hidden text-right md:block">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               FMR
             </div>
             <div className="font-mono text-sm font-semibold text-gain">0.000</div>
@@ -66,7 +66,7 @@ export function Topbar() {
           <ThemeToggle />
 
           {/* CFO badge */}
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gold/40 bg-gold/10 font-mono text-[11px] font-semibold text-gold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gold/40 bg-gold/10 font-mono text-xs font-bold text-gold">
             CFO
           </div>
         </div>
