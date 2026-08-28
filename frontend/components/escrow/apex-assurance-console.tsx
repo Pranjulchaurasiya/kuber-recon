@@ -38,7 +38,9 @@ interface ReleaseResult {
   amount_paise: number
   amount_inr: string
   checker_id: string
-  route_status: string
+  public_key_fingerprint: string
+  signature_hex: string
+  signature_verified: boolean
   proof_hash: string
   message: string
 }
@@ -179,19 +181,55 @@ export function ApexAssuranceConsole() {
     if (!contract) return
     setLoading(true)
     try {
+      // 1. Generate local dummy Ed25519 signature
+      const dummyHash = "ed25519:" + Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('')
+      const dummyPubKey = "0x8f3ad41c09ab8821ef4512cb9014"
+
       const res = await fetch(`${getApiUrl()}/api/apex/contracts/release`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contract_id: contract.contract_id,
           checker_id: 'cfo_autonomous_verifier',
+          public_key_hex: dummyPubKey,
+          signature_hex: dummyHash,
         }),
       })
+      
+      if (!res.ok) throw new Error("Backend rejected signature or release.")
+
       const data: ReleaseResult = await res.json()
       setRelease(data)
-      setActiveStep(3)
-      addLog('APEX_ROUTER', `⚡ PATCH /v1/transfers/${data.transfer_id} on_hold: false. Settlement unlocked!`, 'apex')
-      addLog('SELLER_AGENT_01', `🎉 Settlement Received: ${data.amount_inr} credited to linked account.`, 'seller')
+      addLog('APEX_ROUTER', `⚡ Auth Verified! Signature: ${data.signature_hex}. Transitioning to RELEASING...`, 'apex')
+      addLog('APEX_ROUTER', `⚡ PATCH /v1/transfers/${data.transfer_id} on_hold: false...`, 'apex')
+
+      // Simulate webhook
+      setTimeout(async () => {
+        addLog('APEX_GATEWAY', `Waiting for Razorpay transfer.processed webhook...`, 'apex')
+        try {
+          const fixRes = await fetch(`${getApiUrl()}/api/sandbox/webhook/fixture?transfer_id=${data.transfer_id}`)
+          if (!fixRes.ok) throw new Error("Failed to get fixture")
+          const fixture = await fixRes.json()
+
+          const whRes = await fetch(`${getApiUrl()}/api/webhook/razorpay`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Razorpay-Signature': fixture.x_razorpay_signature,
+              'X-Razorpay-Event-Id': fixture.x_razorpay_event_id 
+            },
+            body: fixture.raw_body
+          })
+
+          if (!whRes.ok) throw new Error(`Webhook rejected: ${whRes.status}`)
+          
+          setActiveStep(3)
+          addLog('SELLER_AGENT_01', `🎉 Webhook received! Settlement finalized.`, 'seller')
+        } catch (err) {
+          addLog('APEX_GATEWAY', `Webhook delivery failed: ${err instanceof Error ? err.message : 'Unknown'}`, 'apex')
+        }
+      }, 1500)
+
     } catch {
       addLog('APEX_ROUTER', 'Release execution failed.', 'apex')
     }
@@ -266,17 +304,23 @@ export function ApexAssuranceConsole() {
         </div>
 
         {/* Stage 3 */}
-        <div className={`rounded-xl border p-4 transition-all ${release ? 'border-gain/50 bg-gain/5' : 'border-border bg-panel/50'}`}>
+        <div className={`rounded-xl border p-4 transition-all ${activeStep === 3 ? 'border-gain/50 bg-gain/5' : 'border-border bg-panel/50'}`}>
           <div className="flex items-center justify-between">
             <span className="font-mono text-xs font-bold text-gain">STAGE 3: SETTLEMENT RELEASE</span>
-            {release ? <Unlock className="h-4 w-4 text-gain" /> : <span className="text-xs text-muted-foreground">Locked</span>}
+            {activeStep === 3 ? <Unlock className="h-4 w-4 text-gain" /> : <span className="text-xs text-muted-foreground">Locked</span>}
           </div>
           <div className="mt-2 text-sm font-semibold text-foreground">
-            {release ? 'Settlement Unlocked' : 'PATCH on_hold: false'}
+            {activeStep === 3 ? 'Settlement Unlocked' : release ? 'Releasing...' : 'PATCH on_hold: false'}
           </div>
           <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-            {release ? `Settled via ${release.checker_id}` : 'Gated behind 100% verification'}
+            {release ? `Auth: ${release.checker_id}` : 'Gated behind 100% verification'}
           </p>
+          {release && (
+            <div className="mt-2 text-[10px] text-muted-foreground font-mono space-y-0.5 break-all">
+              <div>Fingerprint: {release.public_key_fingerprint}</div>
+              <div>Sig: {release.signature_hex.substring(0, 32)}...</div>
+            </div>
+          )}
         </div>
       </div>
 

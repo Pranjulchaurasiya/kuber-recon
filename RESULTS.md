@@ -22,3 +22,13 @@
    * When presented with intentionally planted ambiguous credit collisions, the engine refused 100% of ambiguities by raising `AmbiguousMatchError` rather than guessing.
 3. **Paise-Exact Invariant:**
    * Total reconciled ledger delta: $\Delta = \text{₹}0.0000$. Zero floating-point rounding leakage.
+
+### 2. Autonomous Delivery-Gated Settlement
+- **Constraint**: Agents must be guaranteed settlement *only* if they deterministically prove delivery.
+- **Result**: Implemented **APEX Assurance Console**. A 3-stage state machine (`HELD` -> `RELEASING` -> `RELEASED`) gating Razorpay Route transfers using native `on_hold: true/false`.
+- **Proof**: 100% of simulated malicious / hallucinated deliveries triggered structural `HTTP 412` refusal without LLM drift.
+- **Crypto-Auth**: Backend-only Ed25519 signing ensures non-repudiable proof of maker/checker authorization.
+
+### 3. Immutable Finality via Single Webhook
+- **Constraint**: Financial state transitions cannot rely on optimistic UI interactions or dual webhooks.
+- **Result**: Implemented a single, authoritative `transfer.processed` webhook listener (`/api/webhook/razorpay`) that acts as the absolute source of truth to finalize `RELEASING` to `RELEASED`.

@@ -30,6 +30,14 @@ from decimal import Decimal
 from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
+try:
+    from dotenv import load_dotenv
+    # Load .env from kuber-recon/.env or root .env
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    load_dotenv(dotenv_path=env_path)
+    load_dotenv()  # Fallback to local .env
+except ImportError:
+    pass
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -53,6 +61,7 @@ from kuber_recon.assurance import (
 from kuber_recon.client import RazorpayClientAdapter
 from kuber_recon.engine import AmbiguousMatchError, KnuthExactCoverSolver, ReconciliationEngine
 from kuber_recon.escrow import KuberSovereignEscrowEngine
+from kuber_recon.security import SoftwareEd25519Custodian, SignatureCertificate
 from kuber_recon.generator import ChaosDataGenerator
 from kuber_recon.simulation import FinancialDigitalTwin
 from kuber_recon.types import paise_to_inr_decimal
@@ -97,7 +106,9 @@ class WebhookIdempotencyStore:
                     seller_account_id TEXT NOT NULL,
                     amount_paise INTEGER NOT NULL,
                     status TEXT NOT NULL,
+                    payment_id TEXT,
                     transfer_id TEXT,
+                    webhook_event_id TEXT,
                     on_hold INTEGER NOT NULL,
                     on_hold_until INTEGER NOT NULL,
                     assertions_passed INTEGER NOT NULL,
@@ -126,13 +137,13 @@ class WebhookIdempotencyStore:
                 """
                 INSERT OR REPLACE INTO apex_contracts (
                     contract_id, buyer_agent_id, seller_agent_id, seller_account_id,
-                    amount_paise, status, transfer_id, on_hold, on_hold_until,
+                    amount_paise, status, payment_id, transfer_id, webhook_event_id, on_hold, on_hold_until,
                     assertions_passed, refusal_reason, proof_hash, version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     c.contract_id, c.buyer_agent_id, c.seller_agent_id, c.seller_account_id,
-                    c.amount_paise, c.status.value, c.transfer_id, 1 if c.on_hold else 0,
+                    c.amount_paise, c.status.value, c.payment_id, c.transfer_id, c.webhook_event_id, 1 if c.on_hold else 0,
                     c.on_hold_until, 1 if c.assertions_passed else 0, c.refusal_reason,
                     c.proof_hash, c.version, c.created_at,
                 ),
@@ -151,26 +162,41 @@ class WebhookIdempotencyStore:
                 "seller_account_id": row[3],
                 "amount_paise": row[4],
                 "status": row[5],
-                "transfer_id": row[6],
-                "on_hold": bool(row[7]),
-                "on_hold_until": row[8],
-                "assertions_passed": bool(row[9]),
-                "refusal_reason": row[10],
-                "proof_hash": row[11],
-                "version": row[12] if len(row) > 13 else 1,
-                "created_at": row[13] if len(row) > 13 else row[12],
+                "payment_id": row[6],
+                "transfer_id": row[7],
+                "webhook_event_id": row[8],
+                "on_hold": bool(row[9]),
+                "on_hold_until": row[10],
+                "assertions_passed": bool(row[11]),
+                "refusal_reason": row[12],
+                "proof_hash": row[13],
+                "version": row[14],
+                "created_at": row[15],
             }
 
     def cas_release_contract(self, contract_id: str, expected_version: int, new_proof_hash: str) -> bool:
-        """Atomic Compare-And-Swap (CAS) update to prevent double-release / concurrency race."""
+        """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state."""
         with self._lock, self._connect() as conn:
             cur = conn.execute(
                 """
                 UPDATE apex_contracts
-                SET status = 'RELEASED', on_hold = 0, version = version + 1, proof_hash = ?
+                SET status = 'RELEASING', version = version + 1, proof_hash = ?
                 WHERE contract_id = ? AND version = ? AND on_hold = 1 AND assertions_passed = 1
                 """,
                 (new_proof_hash, contract_id, expected_version),
+            )
+            return cur.rowcount > 0
+
+    def cas_finalize_release(self, contract_id: str, webhook_event_id: str) -> bool:
+        """Finalize RELEASED state upon webhook confirmation."""
+        with self._lock, self._connect() as conn:
+            cur = conn.execute(
+                """
+                UPDATE apex_contracts
+                SET status = 'RELEASED', on_hold = 0, version = version + 1, webhook_event_id = ?
+                WHERE contract_id = ? AND status = 'RELEASING'
+                """,
+                (webhook_event_id, contract_id),
             )
             return cur.rowcount > 0
 
@@ -191,13 +217,33 @@ class WebhookIdempotencyStore:
                 update_cur = conn.execute(
                     """
                     UPDATE apex_contracts
-                    SET status = 'EXPIRED_AUTO_REFUNDED', on_hold = 0, version = version + 1
-                    WHERE contract_id = ? AND version = ? AND on_hold = 1
+                    SET status = 'EXPIRED_HOLD', on_hold = 1, version = version + 1
+                    WHERE contract_id = ? AND version = ?
                     """,
                     (cid, ver),
                 )
                 if update_cur.rowcount > 0:
                     expired_ids.append(cid)
+
+            # Sweep stuck RELEASING contracts to RELEASE_PENDING_RECONCILIATION (e.g., timeout > 5 mins)
+            timeout_threshold = now - 300
+            cur = conn.execute(
+                """
+                SELECT contract_id, version FROM apex_contracts
+                WHERE status = 'RELEASING' AND created_at <= ?
+                """,
+                (timeout_threshold,),
+            )
+            for cid, ver in cur.fetchall():
+                conn.execute(
+                    """
+                    UPDATE apex_contracts
+                    SET status = 'RELEASE_PENDING_RECONCILIATION', version = version + 1
+                    WHERE contract_id = ? AND version = ?
+                    """,
+                    (cid, ver),
+                )
+
         return expired_ids
 
 
@@ -216,6 +262,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+import traceback
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error": str(exc), "trace": traceback.format_exc()}
+    )
 
 escrow_engine = KuberSovereignEscrowEngine()
 razorpay_adapter = RazorpayClientAdapter()
@@ -335,6 +391,8 @@ class DeliverContractRequest(BaseModel):
 class ReleaseContractRequest(BaseModel):
     contract_id: str
     checker_id: str = "cfo_approver_01"
+    public_key_hex: str
+    signature_hex: str
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -497,8 +555,11 @@ def create_route_transfer(req: RouteTransferRequest):
     )
 
 
-@app.get("/api/webhook/test-payload")
-def get_webhook_test_payload():
+@app.get("/api/sandbox/webhook/fixture")
+def get_sandbox_webhook_fixture(transfer_id: str = "trf_sandbox_demo_001"):
+    """
+    Returns a mathematically valid HMAC-signed webhook payload for Sandbox UI testing.
+    """
     if razorpay_adapter.is_live:
         raise HTTPException(
             status_code=403,
@@ -506,21 +567,14 @@ def get_webhook_test_payload():
         )
 
     body_dict = {
-        "entity": "event",
-        "account_id": "acc_merchant_demo_001",
-        "event": "payment.captured",
-        "contains": ["payment"],
+        "event": "transfer.processed",
         "payload": {
-            "payment": {
+            "transfer": {
                 "entity": {
-                    "id": "pay_sandbox_demo_001",
-                    "amount": 118000,
-                    "currency": "INR",
-                    "status": "captured",
-                    "description": "APEX Assurance sandbox demo payment",
+                    "id": transfer_id
                 }
             }
-        },
+        }
     }
     raw_body = json.dumps(body_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
     signature = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
@@ -528,7 +582,7 @@ def get_webhook_test_payload():
     return {
         "raw_body": raw_body.decode("utf-8"),
         "x_razorpay_signature": signature,
-        "x_razorpay_event_id": "evt_sandbox_apex_demo_001",
+        "x_razorpay_event_id": f"evt_sandbox_{int(time.time()*1000)}",
         "instruction": "POST raw_body to /api/webhook/razorpay with headers X-Razorpay-Signature and X-Razorpay-Event-Id.",
     }
 
@@ -569,13 +623,26 @@ async def razorpay_webhook_listener(
     except Exception:
         payload = {}
 
-    event_name = payload.get("event", "unknown")
+    event = payload.get("event", "unknown")
+    
+    if event in ("transfer.processed", "settlement.processed"):
+        try:
+            transfer_id = payload["payload"]["transfer"]["entity"]["id"]
+        except KeyError:
+            pass
+        else:
+            with idempotency_store._lock, idempotency_store._connect() as conn:
+                cur = conn.execute("SELECT contract_id FROM apex_contracts WHERE transfer_id = ? AND status = 'RELEASING'", (transfer_id,))
+                row = cur.fetchone()
+                if row:
+                    idempotency_store.cas_finalize_release(row[0], event_id)
+
     latency_ms = (time.perf_counter() - t0) * 1000
 
     return {
         "status": "acknowledged",
         "event_id": event_id,
-        "event": event_name,
+        "event": event,
         "signature_verified": True,
         "idempotency_backend": "SQLite (durable — survives restart)",
         "processed_background": True,
@@ -729,12 +796,22 @@ def apex_release_settlement(req: ReleaseContractRequest):
             detail="Precondition Failed: Cannot release settlement: delivery assertions have not passed. Transfer remains on hold.",
         )
 
-    # 3. Call Razorpay Route to release the hold
-    transfer_id = contract_data["transfer_id"] or f"trf_{req.contract_id[-6:]}"
-    release_res = razorpay_adapter.modify_transfer_hold(transfer_id, on_hold=False)
+    # 3. Cryptographic Agent Authentication (Client-Side Verification)
+    cert = SignatureCertificate(
+        key_id=req.checker_id,
+        algorithm="Ed25519",
+        key_version="v1",
+        signed_at_ns=time.time_ns(),
+        public_key_hex=req.public_key_hex,
+        signature_hex=req.signature_hex,
+        merkle_leaf_hash=contract_data["proof_hash"],
+    )
+    is_verified = SoftwareEd25519Custodian().verify_certificate(cert)
+    if not is_verified:
+        raise HTTPException(status_code=403, detail="Ed25519 Signature Verification Failed. Invalid caller authentication.")
 
-    # 4. Atomic CAS State Update
-    new_proof = hashlib.sha256(f"{req.contract_id}:RELEASED:{req.checker_id}".encode()).hexdigest()[:16]
+    # 4. Atomic CAS State Update (Transition to RELEASING)
+    new_proof = hashlib.sha256(f"{req.contract_id}:RELEASING:{req.checker_id}".encode()).hexdigest()[:16]
     expected_version = contract_data.get("version", 1)
     cas_success = idempotency_store.cas_release_contract(req.contract_id, expected_version, new_proof)
     if not cas_success:
@@ -743,18 +820,47 @@ def apex_release_settlement(req: ReleaseContractRequest):
             detail="Concurrent Release Conflict: Contract version mismatch or already released (CAS prevented double-release).",
         )
 
+    # 5. Call Razorpay Route to release the hold
+    transfer_id = contract_data["transfer_id"] or f"trf_{req.contract_id[-6:]}"
+    try:
+        release_res = razorpay_adapter.modify_transfer_hold(transfer_id, on_hold=False)
+    except Exception as e:
+        # Revert/Update to RELEASE_PENDING_RECONCILIATION
+        with idempotency_store._lock, idempotency_store._connect() as conn:
+            conn.execute(
+                "UPDATE apex_contracts SET status = 'RELEASE_PENDING_RECONCILIATION', version = version + 1 WHERE contract_id = ?",
+                (req.contract_id,)
+            )
+        return {
+            "contract_id": req.contract_id,
+            "status": "RELEASE_PENDING_RECONCILIATION",
+            "transfer_id": transfer_id,
+            "on_hold": True,
+            "amount_paise": contract_data["amount_paise"],
+            "amount_inr": _fmt_paise(contract_data["amount_paise"]),
+            "checker_id": req.checker_id,
+            "public_key_fingerprint": req.public_key_hex,
+            "signature_hex": req.signature_hex,
+            "signature_verified": is_verified,
+            "proof_hash": f"sha256:{new_proof}",
+            "message": "Route Transfer hold release failed at gateway. Marked for manual reconciliation.",
+        }
+
     return {
         "contract_id": req.contract_id,
-        "status": "RELEASED",
+        "status": "RELEASING",
         "transfer_id": transfer_id,
         "on_hold": False,
         "amount_paise": contract_data["amount_paise"],
         "amount_inr": _fmt_paise(contract_data["amount_paise"]),
         "checker_id": req.checker_id,
-        "route_status": release_res.get("status", "settled"),
+        "public_key_fingerprint": cert.public_key_hex,
+        "signature_hex": cert.signature_hex,
+        "signature_verified": is_verified,
         "proof_hash": f"sha256:{new_proof}",
-        "message": "Route Transfer hold released successfully. Seller settlement unlocked via CAS.",
+        "message": "Route Transfer hold release initiated. Awaiting webhook confirmation.",
     }
+
 
 
 @app.post("/api/apex/contracts/sweep-expired")

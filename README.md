@@ -1,7 +1,7 @@
 # 🏛️ KuberRecon (कुबेर मिलान)
 
-> **Track 04: AI Finance Controller · Razorpay AI Buildathon 2026**  
-> **Autonomous Financial Integrity & Pre-Settlement Route Assurance Engine:** *Pre-Settlement Route Hold Gating (`on_hold: true`), Paise-Exact Combinatorial Settlement Engine (Donald Knuth DLX), Dual-Agent Delivery Assurance, Atomic CAS Hold Release & White-Box Pentest Defense.*
+> **Track 01: AI Growth & Agentic Commerce · Razorpay AI Buildathon 2026**  
+> **Delivery-Gated Seller Settlement for Agentic Commerce:** *Pre-Settlement Route Hold Gating (`on_hold: true`), Ed25519 Auth, Atomic CAS Hold Release, Single Authoritative Webhook.*
 
 [![Tests Passing](https://img.shields.io/badge/pytest-51%20passed-brightgreen)](tests/)
 [![Undecidable Handling](https://img.shields.io/badge/Planted%20Undecidables-4%2F4%20Isolated-blue)](tests/test_planted_undecidables.py)
@@ -36,10 +36,11 @@ In autonomous multi-agent commerce, payment gateways authorize spending at trans
 ├───────────────────┬───────────────────────────────┬────────────────────────────────────┤
 │ 1. CONTRACT HOLD  │ 2. DETERMINISTIC VERIFICATION │ 3. ATOMIC CAS ROUTE RELEASE        │
 ├───────────────────┼───────────────────────────────┼────────────────────────────────────┤
-│ Buyer Agent signs │ Seller delivers B2B payload.  │ Maker-Checker gate verified.       │
-│ spend contract.   │ KuberRecon runs Mod-36 GSTIN  │ Atomic CAS: WHERE version = ?      │
-│ Razorpay Route:   │ check, line item exactness,   │ Razorpay Route: on_hold -> false.  │
-│ on_hold = true.   │ bounds. If corrupted -> 412.  │ 5 racing checkers -> 1 OK, 4 409s. │
+│ Buyer Agent signs │ Seller delivers B2B payload.  │ Maker-Checker gate & Ed25519 Auth. │
+│ spend contract.   │ KuberRecon runs Mod-36 GSTIN  │ Atomic CAS transitions to RELEASING│
+│ Razorpay Route:   │ check, line item exactness.   │ Razorpay Route: on_hold -> false.  │
+│ on_hold = true.   │ If corrupted -> Refused.      │ Webhook `transfer.processed` seals │
+│ (Test Mode)       │ Payload bytes hashed & signed.│ the state to RELEASED.             │
 └───────────────────┴───────────────────────────────┴────────────────────────────────────┘
 ```
 
@@ -68,10 +69,10 @@ In autonomous multi-agent commerce, payment gateways authorize spending at trans
 │                                                                                        │
 │  [ CONCURRENCY & SETTLEMENT ESCROW LAYER ]                                             │
 │  ├── SQLite WAL Concurrency: PRAGMA busy_timeout = 5000                                │
-│  ├── Optimistic Concurrency CAS: UPDATE ... WHERE version = ? AND on_hold = 1         │
-│  ├── Maker-Checker Separation of Duties: checker_id not in {buyer_id, seller_id} -> 403│
-│  ├── Nodal Liveness Sweep (/sweep-expired): Force-Resolution to EXPIRED_AUTO_REFUNDED  │
-│  └── Razorpay Route Adapter: Native Transfer Hold & Patch Gating                       │
+│  ├── Backend-only Ed25519 Authentication (Hardware-backed Simulation)                  │
+│  ├── Optimistic Concurrency CAS: State transitions HELD -> RELEASING -> RELEASED       │
+│  ├── Nodal Liveness Sweep (/sweep-expired): Resolves expired to EXPIRED_HOLD           │
+│  └── Single Authoritative Webhook (/api/webhook/razorpay) for Finalization             │
 │                                                                                        │
 │  [ SECURITY AUDIT & VERIFICATION HARNESS ]                                             │
 │  ├── AST Static Import Linter: Scans 6 financial files, failing on any LLM imports    │
@@ -92,10 +93,10 @@ In autonomous multi-agent commerce, payment gateways authorize spending at trans
 | **2** | **Zero-LLM in Financial Math** | AST static import linter scanning `engine.py`, `tax.py`, `actions.py`, `types.py`, `assurance.py`, `escrow.py`. | [`test_zero_llm_in_math.py`](tests/test_zero_llm_in_math.py) |
 | **3** | **Conservation of Money** | Hypothesis property testing: `Gross = Principal + GST` and `Net_Payout = Gross - TDS_194O - MDR - GST_on_MDR`, Delta = 0 paise. | [`test_property_based_invariants.py`](tests/test_property_based_invariants.py) |
 | **4** | **Planted Undecidable Isolation** | Multi-subset collisions and rounding anomalies trigger `AmbiguousMatchError` -> Routed to Exception Drawer. | [`test_planted_undecidables.py`](tests/test_planted_undecidables.py) |
-| **5** | **Algorithmic DoS Mitigation** | Knuth DLX recursion capped at `max_nodes = 10000` & `timeout_ms = 500`. Meet-in-the-Middle bounded at N <= 24. | [`engine.py`](src/kuber_recon/engine.py) |
+| **5** | **Cryptographic Agent Auth** | Backend-only Ed25519 signature validation ensures UI cannot forge releases. | [`security.py`](src/kuber_recon/security.py) |
 | **6** | **Atomic CAS Hold Release** | Optimistic locking via SQL `version = version + 1 WHERE version = ?`. Eliminates double-release lost updates. | [`test_concurrent_workers.py`](tests/test_concurrent_workers.py) |
-| **7** | **Maker-Checker Separation** | Structural refusal when `checker_id == buyer_id` or `seller_id` (returns HTTP 403 Forbidden). | [`server.py`](src/kuber_recon/server.py) |
-| **8** | **Nodal Liveness Sweep** | Automated TTL sweep resolving expired contracts to `EXPIRED_AUTO_REFUNDED` via CAS. | [`server.py`](src/kuber_recon/server.py) |
+| **7** | **Single Webhook Truth** | `/api/webhook/razorpay` strictly finalizes `RELEASING` -> `RELEASED` via `transfer.processed`. | [`server.py`](src/kuber_recon/server.py) |
+| **8** | **Nodal Liveness Sweep** | Automated TTL sweep resolving expired contracts to manual refund review `EXPIRED_HOLD`. | [`server.py`](src/kuber_recon/server.py) |
 
 ---
 
@@ -142,11 +143,11 @@ npm run dev
 | Endpoint | Method | Purpose | Key Invariant |
 |---|---|---|---|
 | `/api/reconcile` | `POST` | Execute B2B batch reconciliation | Knuth DLX Exact-Cover, Ambiguous Match Isolation |
-| `/api/webhooks/razorpay` | `POST` | Razorpay webhook ingestion | HMAC SHA-256 Signature Verification |
+| `/api/webhook/razorpay` | `POST` | Razorpay webhook ingestion | Single authoritative source for `transfer.processed` |
 | `/api/apex/contracts/create` | `POST` | Create dual-agent assurance contract | Pre-settlement Razorpay Route `on_hold: true` |
-| `/api/apex/contracts/deliver` | `POST` | Deliver B2B payload for verification | Mod-36 GSTIN checksum; returns HTTP 412 on corruption |
-| `/api/apex/contracts/release` | `POST` | Release escrowed settlement hold | Maker-Checker separation + atomic CAS hold release |
-| `/api/apex/contracts/sweep-expired` | `POST` | Trigger nodal escrow liveness sweep | CAS-protected auto-refund for expired holds |
+| `/api/apex/contracts/deliver` | `POST` | Deliver B2B payload for verification | Hashed canonical JSON bytes for signature proof |
+| `/api/apex/contracts/release` | `POST` | Release escrowed settlement hold | Ed25519 verification + CAS transition to `RELEASING` |
+| `/api/apex/contracts/sweep-expired` | `POST` | Trigger nodal escrow liveness sweep | CAS-protected transition to `EXPIRED_HOLD` |
 
 ---
 

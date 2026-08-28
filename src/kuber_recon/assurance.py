@@ -25,9 +25,12 @@ class ContractStatus(str, Enum):
     PENDING_CAPTURE = "PENDING_CAPTURE"
     HELD = "HELD"
     VERIFYING = "VERIFYING"
+    RELEASE_READY = "RELEASE_READY"
+    RELEASING = "RELEASING"
     RELEASED = "RELEASED"
+    RELEASE_PENDING_RECONCILIATION = "RELEASE_PENDING_RECONCILIATION"
     REFUSED = "REFUSED"
-    EXPIRED = "EXPIRED"
+    EXPIRED_HOLD = "EXPIRED_HOLD"
 
 
 class DeliveryManifest(BaseModel):
@@ -50,7 +53,9 @@ class AssuranceContract(BaseModel):
     amount_paise: int = Field(..., gt=0, description="Contract amount in integer paise")
     currency: str = "INR"
     status: ContractStatus = ContractStatus.HELD
+    payment_id: Optional[str] = None
     transfer_id: Optional[str] = None
+    webhook_event_id: Optional[str] = None
     on_hold: bool = True
     on_hold_until: int      # Unix timestamp TTL
     created_at: int = Field(default_factory=lambda: int(time.time()))
@@ -156,9 +161,9 @@ class DeterministicAssertionEngine:
         latency_ms = (time.perf_counter() - t0) * 1000
         passed = (failed_count == 0 and valid_count == len(records) and len(records) > 0)
 
-        # Compute deterministic SHA-256 of execution result
-        audit_raw = f"{len(records)}:{valid_count}:{failed_count}:{passed}"
-        manifest_sha256 = "sha256:" + hashlib.sha256(audit_raw.encode()).hexdigest()[:16]
+        # Compute deterministic SHA-256 of canonical payload
+        canonical_bytes = json.dumps(records, separators=(',', ':'), sort_keys=True).encode('utf-8')
+        manifest_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()[:16]
 
         refusal_cert = None
         if not passed:

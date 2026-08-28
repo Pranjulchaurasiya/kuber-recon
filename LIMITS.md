@@ -20,6 +20,22 @@
 
 ---
 
+## 🔒 Security & Finality Constraints
+
+### 1. Hardware Security Module (HSM) Custody
+- **Current Implementation:** Backend simulates hardware-backed HSM responses by constructing in-memory Ed25519 key pairs.
+- **Production Requirement:** Requires integration with AWS KMS, Google Cloud KMS, or a dedicated Hardware Security Module to securely sign invariants.
+
+### 2. Asynchronous Razorpay Test Mode Webhooks
+- **Current Implementation:** The `/api/webhook/razorpay` endpoint serves as the single source of truth for finalizing `RELEASING` to `RELEASED`.
+- **Production Requirement:** Webhooks in production must strictly validate `X-Razorpay-Signature` HMACs.
+
+### 3. Idempotency TTL and Manual Refund Reconciliation
+- **Current Implementation:** A background sweep identifies expired locks and transitions them to `EXPIRED_HOLD`.
+- **Production Requirement:** Auto-refunds on timeouts are risky in B2B. `EXPIRED_HOLD` must queue into a manual dispute resolution dashboard for a human controller or arbitration script to process.
+
+---
+
 ## ⚡ Mathematical & Combinatorial Thresholds
 
 1. **Donald Knuth Algorithm X Dense Tail ($N > 36$):**

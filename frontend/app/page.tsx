@@ -1,64 +1,13 @@
-import { Panel, SectionLabel, StatTile, StatusDot, Pill } from '@/components/kuber/primitives'
-import { SettlementIntervention } from '@/components/kuber/settlement-intervention'
-import { systemStats, railHealth, inr } from '@/lib/kuber-data'
+import { Panel, SectionLabel, Pill } from '@/components/kuber/primitives'
+import { ApexAssuranceConsole } from '@/components/escrow/apex-assurance-console'
 
 export default function CommandCenter() {
   return (
     <div className="mx-auto max-w-[1480px] px-5 py-6 md:px-8 md:py-8">
-      <SettlementIntervention />
+      <ApexAssuranceConsole />
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile
-          label="Protected today"
-          value={inr(systemStats.protectedToday, { compact: true })}
-          hint="Escrow-guarded before payout"
-          accent="gold"
-        />
-        <StatTile
-          label="Tax loss prevented"
-          value={inr(systemStats.taxLossPrevented, { compact: true })}
-          hint="Rolling 30-day statutory recovery"
-          accent="gain"
-        />
-        <StatTile
-          label="Orders processed"
-          value={systemStats.ordersProcessed.toLocaleString('en-IN')}
-          hint="Split at T=0 across the rail"
-        />
-        <StatTile
-          label="Escrow held now"
-          value={inr(systemStats.escrowHeld, { compact: true })}
-          hint={`Resolves GSTR-2B · ${systemStats.gstr2bResolveDay}th`}
-        />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Panel className="lg:col-span-1">
-          <SectionLabel right={<Pill tone="gain">4 rails</Pill>}>Rail Health</SectionLabel>
-          <ul className="flex flex-col divide-y divide-border">
-            {railHealth.map((h) => (
-              <li key={h.label} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-3">
-                  <StatusDot status={h.status} />
-                  <span className="text-sm">{h.label}</span>
-                </div>
-                <span
-                  className={`font-mono text-xs ${
-                    h.status === 'ok'
-                      ? 'text-gain'
-                      : h.status === 'warn'
-                        ? 'text-warn'
-                        : 'text-danger'
-                  }`}
-                >
-                  {h.value}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-
-        <Panel className="lg:col-span-2" flush>
+      <div className="mt-8 grid grid-cols-1 gap-4">
+        <Panel flush>
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Evidence rails
@@ -89,7 +38,7 @@ export default function CommandCenter() {
                 </div>
                 <span className="text-sm font-medium">{item.label}</span>
                 <span className="text-xs leading-relaxed text-muted-foreground">
-                  {moduleBlurbs[item.href]}
+                  {item.description}
                 </span>
                 <span className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70 transition-colors group-hover:text-gold">
                   <span className="h-px w-5 bg-current" /> Open rail
