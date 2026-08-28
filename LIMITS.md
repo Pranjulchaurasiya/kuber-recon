@@ -22,17 +22,21 @@
 
 ## 🔒 Security & Finality Constraints
 
-### 1. Hardware Security Module (HSM) Custody
-- **Current Implementation:** Backend simulates hardware-backed HSM responses by constructing in-memory Ed25519 key pairs.
-- **Production Requirement:** Requires integration with AWS KMS, Google Cloud KMS, or a dedicated Hardware Security Module to securely sign invariants.
+### 1. Hardware Security Module (HSM) Custody & Private Key Boundary
+- **Current Demo Implementation:** The frontend sandbox imports a sample RFC 8410 PKCS#8 Ed25519 key derived from a demo seed (`kuber_cfo_autonomous_verifier_sec_key_v1`) to demonstrate zero-knowledge client-side asymmetric signing, canonical payload serialization, and public key pinning without requiring physical YubiKeys or cloud KMS setup during evaluation.
+- **Threat Vector (Client-Side Key Extraction):** Any private key seed shipped in client-side JavaScript can be inspected and extracted by reverse-engineering the frontend bundle.
+- **Production Architecture:** In live production deployments:
+  1. Private keys **must never reside in or be derivable from client-side bundles**.
+  2. The CFO / Arbiter signing key is isolated in an **AWS KMS Asymmetric Signing Key (ECC_NIST_P256 / Ed25519)** or **FIPS 140-2 Level 3 CloudHSM**.
+  3. The browser uses **WebAuthn / FIDO2 hardware tokens** (Touch ID, YubiKey) or authenticated OAuth2/mTLS bearer tokens to send an authorized release instruction to the backend, which proxies the signing request to KMS.
 
 ### 2. Asynchronous Razorpay Test Mode Webhooks
-- **Current Implementation:** The `/api/webhook/razorpay` endpoint serves as the single source of truth for finalizing `RELEASING` to `RELEASED`.
-- **Production Requirement:** Webhooks in production must strictly validate `X-Razorpay-Signature` HMACs.
+- **Current Implementation:** The `/api/webhook/razorpay` endpoint serves as the single source of truth for finalizing `RELEASING` to `RELEASED`, verifying valid HMAC signatures against the webhook secret.
+- **Production Requirement:** Webhooks in production must strictly validate `X-Razorpay-Signature` HMACs and reject unsigned payloads.
 
 ### 3. Idempotency TTL and Manual Refund Reconciliation
 - **Current Implementation:** A background sweep identifies expired locks and transitions them to `EXPIRED_HOLD`.
-- **Production Requirement:** Auto-refunds on timeouts are risky in B2B. `EXPIRED_HOLD` must queue into a manual dispute resolution dashboard for a human controller or arbitration script to process.
+- **Production Requirement:** Auto-refunds on timeouts are risky in B2B commerce. `EXPIRED_HOLD` must queue into a manual dispute resolution dashboard for a human controller or arbitration script to process.
 
 ---
 

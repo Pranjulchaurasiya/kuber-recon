@@ -186,7 +186,7 @@ export function ApexAssuranceConsole() {
       const checkerId = 'cfo_autonomous_verifier'
 
       // 1. Authenticated CFO Checker Keypair (Web Crypto RFC 8410 PKCS#8 Ed25519)
-      addLog('CFO_CHECKER_AGENT', `🔑 Loading authenticated Ed25519 keypair for '${checkerId}' (PKCS#8 RFC 8410)...`, 'buyer')
+      addLog('CFO_CHECKER_AGENT', `🔑 [Sandbox HSM Custodian] Loading Ed25519 keypair for '${checkerId}' (RFC 8410 PKCS#8 — Prod: AWS KMS/FIDO2)...`, 'buyer')
       const seedBytes = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode('kuber_cfo_autonomous_verifier_sec_key_v1'))
       const pkcs8Prefix = new Uint8Array([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20])
       const pkcs8Key = new Uint8Array(pkcs8Prefix.length + seedBytes.byteLength)
