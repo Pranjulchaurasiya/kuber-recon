@@ -133,6 +133,25 @@ class WebhookIdempotencyStore:
                 )
                 """
             )
+            # Enforce append-only immutability at SQLite engine level
+            conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS abort_audit_log_update
+                BEFORE UPDATE ON apex_contract_audit_log
+                BEGIN
+                    SELECT RAISE(ABORT, 'apex_contract_audit_log is append-only: mutations prohibited');
+                END;
+                """
+            )
+            conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS abort_audit_log_delete
+                BEFORE DELETE ON apex_contract_audit_log
+                BEGIN
+                    SELECT RAISE(ABORT, 'apex_contract_audit_log is append-only: deletions prohibited');
+                END;
+                """
+            )
             # Migration check: add release_started_at and expected_record_count if missing
             try:
                 conn.execute("ALTER TABLE apex_contracts ADD COLUMN release_started_at INTEGER")

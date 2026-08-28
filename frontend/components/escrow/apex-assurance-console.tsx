@@ -266,12 +266,11 @@ export function ApexAssuranceConsole() {
 
       const data: ReleaseResult = await res.json()
       setRelease(data)
-      addLog('APEX_ROUTER', `🔐 Ed25519 Verified (${data.algorithm || 'RFC 8032'}) | Key: ${data.public_key_fingerprint} | Sig: ${data.signature_hex.slice(0, 24)}...`, 'apex')
-      addLog('APEX_ROUTER', `⚡ PATCH /v1/transfers/${data.transfer_id} on_hold: false... Transitioning to RELEASING`, 'apex')
+      addLog('APEX_ROUTER', `⚡ PATCH /v1/transfers/${data.transfer_id} on_hold: false... Transitioned to RELEASING (awaiting transfer.processed webhook)`, 'apex')
 
       // Simulate webhook
       setTimeout(async () => {
-        addLog('APEX_GATEWAY', `Waiting for Razorpay transfer.processed webhook...`, 'apex')
+        addLog('APEX_GATEWAY', `Awaiting authoritative Razorpay transfer.processed webhook...`, 'apex')
         try {
           const fixRes = await fetch(`${getApiUrl()}/api/sandbox/webhook/fixture?transfer_id=${data.transfer_id}`)
           if (!fixRes.ok) throw new Error("Failed to get fixture")
@@ -290,7 +289,8 @@ export function ApexAssuranceConsole() {
           if (!whRes.ok) throw new Error(`Webhook rejected: ${whRes.status}`)
           
           setActiveStep(3)
-          addLog('SELLER_AGENT_01', `🎉 Webhook received! Settlement finalized.`, 'seller')
+          addLog('APEX_GATEWAY', `📥 Ingested transfer.processed webhook (HMAC signature verified). Immutable contract state: RELEASED.`, 'apex')
+          addLog('SELLER_AGENT_01', `🎉 Webhook confirmed! Settlement finalized to RELEASED. Seller payout released.`, 'seller')
         } catch (err) {
           addLog('APEX_GATEWAY', `Webhook delivery failed: ${err instanceof Error ? err.message : 'Unknown'}`, 'apex')
         }
@@ -376,10 +376,10 @@ export function ApexAssuranceConsole() {
             {activeStep === 3 ? <Unlock className="h-4 w-4 text-gain" /> : <span className="text-xs text-muted-foreground">Locked</span>}
           </div>
           <div className="mt-2 text-sm font-semibold text-foreground">
-            {activeStep === 3 ? 'Settlement Unlocked' : release ? 'Releasing...' : 'PATCH on_hold: false'}
+            {activeStep === 3 ? 'RELEASED (Webhook Confirmed)' : release ? 'RELEASING (Pending Webhook)' : 'Gated behind 100% Invariants'}
           </div>
           <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-            {release ? `Auth: ${release.checker_id}` : 'Gated behind 100% verification'}
+            {activeStep === 3 ? 'Authoritative settlement finalized' : release ? `Auth: ${release.checker_id} (Awaiting webhook)` : 'Gated behind 100% verification'}
           </p>
           {release && (
             <div className="mt-2 text-[10px] text-muted-foreground font-mono space-y-0.5 break-all">
