@@ -42,7 +42,7 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from fastapi import FastAPI, Header, HTTPException, Request
+    from fastapi import FastAPI, Header, HTTPException, Request, status
     from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel, Field
 except ImportError:
@@ -377,7 +377,7 @@ class CreateContractRequest(BaseModel):
     seller_agent_id: str = "agent_seller_data_01"
     seller_account_id: str = "acc_seller_linked_001"
     amount_paise: int = Field(..., gt=0, description="Contract amount in integer paise")
-    expected_record_count: Optional[int] = Field(default=None, description="Enforced record count invariant")
+    expected_record_count: int = Field(..., gt=0, description="Enforced exact record count invariant")
     ttl_seconds: int = Field(86400, ge=60, description="Contract hold TTL in seconds (default 24h)")
 
 
@@ -385,8 +385,8 @@ class DeliverContractRequest(BaseModel):
     contract_id: str
     seller_agent_id: str
     payload_records: List[Dict[str, Any]] = Field(..., description="Direct batch of delivered records")
-    manifest_signature: Optional[str] = Field(None, description="RFC 8032 Ed25519 seller manifest signature")
-    seller_public_key_hex: Optional[str] = Field(None, description="RFC 8032 Ed25519 seller public key hex")
+    manifest_signature: str = Field(..., description="RFC 8032 Ed25519 seller manifest signature")
+    seller_public_key_hex: str = Field(..., description="RFC 8032 Ed25519 seller public key hex")
 
 
 class ReleaseContractRequest(BaseModel):
@@ -741,7 +741,7 @@ def apex_deliver_payload(req: DeliverContractRequest):
     assertion_res = DeterministicAssertionEngine.verify_payload_records(
         records=req.payload_records,
         expected_total_paise=contract_data["amount_paise"],
-        expected_record_count=contract_data.get("expected_record_count"),
+        expected_record_count=contract_data["expected_record_count"],
         seller_agent_id=req.seller_agent_id,
         manifest_signature=req.manifest_signature,
         seller_public_key_hex=req.seller_public_key_hex,
@@ -757,7 +757,7 @@ def apex_deliver_payload(req: DeliverContractRequest):
         seller_agent_id=contract_data["seller_agent_id"],
         seller_account_id=contract_data["seller_account_id"],
         amount_paise=contract_data["amount_paise"],
-        expected_record_count=contract_data.get("expected_record_count"),
+        expected_record_count=contract_data["expected_record_count"],
         status=new_status,
         transfer_id=contract_data["transfer_id"],
         on_hold=True,  # Remains on hold until explicit release
@@ -769,7 +769,7 @@ def apex_deliver_payload(req: DeliverContractRequest):
     )
     idempotency_store.save_contract(contract)
 
-    return {
+    result_payload = {
         "contract_id": contract.contract_id,
         "assertions_passed": assertion_res.passed,
         "status": contract.status.value,
@@ -784,6 +784,14 @@ def apex_deliver_payload(req: DeliverContractRequest):
         "refusal_certificate": assertion_res.refusal_certificate,
         "action_taken": "Settlement remains on_hold: true" if not assertion_res.passed else "Ready for settlement release.",
     }
+
+    if not assertion_res.passed:
+        return JSONResponse(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            content=result_payload,
+        )
+
+    return result_payload
 
 
 @app.post("/api/apex/contracts/release")
@@ -801,6 +809,7 @@ def apex_release_settlement(req: ReleaseContractRequest):
         return {
             "contract_id": req.contract_id,
             "status": "RELEASED",
+            "contract_status": "RELEASED",
             "transfer_id": contract_data["transfer_id"] or f"trf_{req.contract_id[-6:]}",
             "on_hold": False,
             "amount_paise": contract_data["amount_paise"],
@@ -864,6 +873,7 @@ def apex_release_settlement(req: ReleaseContractRequest):
         return {
             "contract_id": req.contract_id,
             "status": "RELEASE_PENDING_RECONCILIATION",
+            "contract_status": "RELEASE_PENDING_RECONCILIATION",
             "transfer_id": transfer_id,
             "on_hold": True,
             "amount_paise": contract_data["amount_paise"],
@@ -881,8 +891,9 @@ def apex_release_settlement(req: ReleaseContractRequest):
     return {
         "contract_id": req.contract_id,
         "status": "RELEASING",
+        "contract_status": "RELEASING",
         "transfer_id": transfer_id,
-        "on_hold": False,
+        "on_hold_modified": True,
         "amount_paise": contract_data["amount_paise"],
         "amount_inr": _fmt_paise(contract_data["amount_paise"]),
         "checker_id": req.checker_id,
@@ -890,11 +901,10 @@ def apex_release_settlement(req: ReleaseContractRequest):
         "public_key_hex": req.public_key_hex,
         "signature_hex": req.signature_hex,
         "signature_verified": True,
-        "algorithm": "Ed25519 (RFC 8032 - Client Verified)",
+        "algorithm": "RFC 8032 Ed25519",
         "proof_hash": f"sha256:{new_proof}",
-        "message": "Route Transfer hold release initiated. Awaiting webhook confirmation.",
+        "message": "Razorpay Route hold release triggered (PATCH on_hold: false). Contract transitioned to RELEASING, awaiting final transfer.processed webhook.",
     }
-
 
 
 @app.post("/api/apex/contracts/sweep-expired")
