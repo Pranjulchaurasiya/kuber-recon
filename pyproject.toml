@@ -1,7 +1,7 @@
 [project]
 name = "kuber-recon"
 version = "1.0.0"
-description = "Paise-Exact Multi-Source Settlement Lineage, GSTR-2B Tax Reconciliation & Honest Refusal Engine (Razorpay AI Buildathon Track 04)"
+description = "Delivery-Gated Seller Settlement for Agentic Commerce (Razorpay AI Buildathon Track 01)"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [

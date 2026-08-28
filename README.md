@@ -4,7 +4,7 @@
 > **Delivery-Gated Settlement for Agentic Commerce**
 > *Powered by the KuberRecon deterministic verification kernel.*
 
-[![Tests Passing](https://img.shields.io/badge/pytest-65%20passed-brightgreen)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-71%20passed-brightgreen)](tests/)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
 [![Razorpay Route Integration](https://img.shields.io/badge/Razorpay%20Route-Transfer%20Hold%20Gating-gold)](src/kuber_recon/server.py)
@@ -99,7 +99,7 @@ In autonomous agentic commerce, payment gateways authorize funds at transaction 
 
 ---
 
-## 🧪 Full Test Suite Breakdown (65 Items)
+## 🧪 Full Test Suite Breakdown (71 Items)
 
 ```bash
 $ python -m pytest -p no:deepeval -p no:langsmith tests/ -v
@@ -111,7 +111,7 @@ tests/test_chaos_suite.py                  4 passed (adversarial batches & stres
 tests/test_concurrent_workers.py           4 passed (webhook deduplication, CAS race protection)
 tests/test_digital_twin_simulation.py      3 passed (bank holiday freezes, TDS shocks)
 tests/test_escrow_sovereign.py             5 passed (statutory splits & partial refunds)
-tests/test_planted_undecidables.py         4 passed (ambiguity refusal & undecidable isolation)
+tests/test_planted_undecidables.py        10 passed (9 parameterized ambiguity traps + FMR formal proof)
 tests/test_production_integrations.py      5 passed (layer 1-5 integration harnesses)
 tests/test_property_based_invariants.py    2 passed (conservation of money & GSTIN fuzzing)
 tests/test_shannon_whitebox_audit.py       5 passed (BOLA, spend caps, state drift mitigation)
@@ -119,7 +119,7 @@ tests/test_webhook_idempotency.py         14 passed (HMAC signatures, secret enf
 tests/test_zero_float_policy.py            1 passed (AST scanning for float prohibition)
 tests/test_zero_llm_in_math.py             1 passed (AST scanning for zero LLM imports in math)
 --------------------------------------------------------------------------------------------------
-Total: 65 passed, 0 skipped, 0 failed across 12 test modules
+Total: 71 passed, 0 skipped, 0 failed across 12 test modules
 ```
 
 ---

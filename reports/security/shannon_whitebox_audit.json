@@ -1,6 +1,6 @@
 {
   "audit_tool": "Shannon White-Box Pentester (KeygraphHQ/shannon)",
-  "target_system": "KuberRecon (Track 04: AI Finance Controller)",
+  "target_system": "KuberRecon (Track 01: AI Growth & Agentic Commerce)",
   "benchmark_standard": "OWASP Top 10 + Financial Invariant Attack Matrix",
   "audit_timestamp": "2026-08-27T04:57:30Z",
   "summary": {

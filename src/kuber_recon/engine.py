@@ -2,7 +2,7 @@ r"""Donald Knuth's Algorithm X (Dancing Links) & Horowitz-Sahni Combinatorial So
 
 Features:
 1. Exact-Cover subset-sum backtracking in pure integer paise.
-2. Horowitz-Sahni Meet-in-the-Middle hash partitioning for dense tails ($N > 36$).
+2. Horowitz-Sahni Meet-in-the-Middle hash partitioning for dense tails ($N > 24$).
 3. Pisinger temporal time-window partitioning ($T \pm (2 + \text{Holidays})$).
 4. Honest Refusal State Machine: Emits `AmbiguousMatchError` on $|\text{Covers}| > 1 \implies$ FMR = 0.000.
 5. Deterministic Chronological FIFO line-item attribution.
@@ -11,6 +11,7 @@ Features:
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 import hashlib
+import time
 from typing import Dict, List, Optional, Set, Tuple
 from kuber_recon.tax import IndianTaxKernel
 from kuber_recon.types import BankNodalCredit, EvidenceTier, InvoiceRecord, ReconciledSettlementBlock, SettlementStatus
@@ -51,20 +52,33 @@ class KnuthExactCoverSolver:
         if not candidates or target_paise <= 0:
             return []
 
-        import time
+        # Fast prune candidates greater than target
+        valid_candidates = [(k, v) for k, v in candidates if 0 < v <= target_paise]
+        if not valid_candidates:
+            return []
+
+        # Direct 1-to-1 exact single item matches
+        singles = [[k] for k, v in valid_candidates if v == target_paise]
+        if len(singles) > 1:
+            return singles[:max_solutions]
+
         t_start = time.perf_counter()
         nodes_explored = 0
 
         # Sort candidates descending for branch-and-bound pruning
-        sorted_candidates = sorted(candidates, key=lambda x: x[1], reverse=True)
+        sorted_candidates = sorted(valid_candidates, key=lambda x: x[1], reverse=True)
         n = len(sorted_candidates)
 
         # Fast Horowitz-Sahni Meet-in-the-Middle optimization for dense tails
-        if n > 36:
-            return self._solve_meet_in_middle(target_paise, sorted_candidates, max_solutions)
+        if n > 24:
+            mim_solutions = self._solve_meet_in_middle(target_paise, sorted_candidates, max_solutions)
+            for s in singles:
+                if s not in mim_solutions:
+                    mim_solutions.insert(0, s)
+            return mim_solutions[:max_solutions]
 
-        # Standard Knuth backtracking with branch-and-bound prefix pruning
-        solutions: List[List[str]] = []
+        # Standard Knuth backtracking with branch-and-bound prefix/suffix pruning
+        solutions: List[List[str]] = list(singles)
         current_subset: List[str] = []
 
         # Precompute suffix sums for fast branch-and-bound pruning
@@ -72,11 +86,13 @@ class KnuthExactCoverSolver:
         for i in range(n - 1, -1, -1):
             suffix_sums[i] = suffix_sums[i + 1] + sorted_candidates[i][1]
 
+        if suffix_sums[0] < target_paise and not singles:
+            return []
+
         def backtrack(index: int, current_sum: int):
             nonlocal nodes_explored
             nodes_explored += 1
 
-            # Bounded Complexity Gates
             if nodes_explored > self.max_nodes:
                 raise SolverComplexityLimitError(
                     f"Complexity Bound Exceeded: {nodes_explored} nodes explored > limit {self.max_nodes}"
@@ -87,7 +103,8 @@ class KnuthExactCoverSolver:
                 )
 
             if current_sum == target_paise:
-                solutions.append(list(current_subset))
+                if current_subset and current_subset not in solutions:
+                    solutions.append(list(current_subset))
                 return
             if len(solutions) >= max_solutions or index >= n:
                 return
@@ -111,10 +128,9 @@ class KnuthExactCoverSolver:
         try:
             backtrack(0, 0)
         except SolverComplexityLimitError:
-            # On complexity explosion, return whatever exact solutions were already discovered
             pass
 
-        return solutions
+        return solutions[:max_solutions]
 
     def _solve_meet_in_middle(
         self,
@@ -123,11 +139,9 @@ class KnuthExactCoverSolver:
         max_solutions: int,
     ) -> List[List[str]]:
         """Horowitz-Sahni Meet-in-the-Middle Partitioning (O(2^(N/2))) with Complexity Gates."""
-        import time
         t_start = time.perf_counter()
         nodes_explored = 0
 
-        # Cap candidates to most significant 24 to prevent combinatorial explosion under DoS
         bounded_candidates = candidates[:24]
         mid = len(bounded_candidates) // 2
         left_half = bounded_candidates[:mid]
@@ -167,9 +181,11 @@ class KnuthExactCoverSolver:
                 complement = target_paise - current_sum
                 if complement in left_map:
                     for l_sub in left_map[complement]:
-                        solutions.append(l_sub + current_list)
-                        if len(solutions) >= max_solutions:
-                            return
+                        comb = l_sub + current_list
+                        if comb and comb not in solutions:
+                            solutions.append(comb)
+                            if len(solutions) >= max_solutions:
+                                return
                 return
             current_list.append(right_half[idx][0])
             match_right(idx + 1, current_sum + right_half[idx][1], current_list)
@@ -197,9 +213,9 @@ class ReconciliationEngine:
         reconciled_blocks: List[ReconciledSettlementBlock] = []
         exceptions: List[Tuple[BankNodalCredit, str]] = []
 
-        # 1. Precompute net deductions ONCE for all invoices
+        # 1. Precompute net deductions and index by date + amount
         inv_net_cache: Dict[str, Tuple[InvoiceRecord, int, int, int, int]] = {}
-        invoices_by_date: Dict[date, List[str]] = defaultdict(list)
+        by_date_amt: Dict[date, Dict[int, Set[str]]] = defaultdict(lambda: defaultdict(set))
 
         for inv in invoices:
             if not inv.is_settled:
@@ -208,11 +224,10 @@ class ReconciliationEngine:
                 )
                 effective_net = net_amt if net_amt > 0 else inv.amount_in_paise
                 inv_net_cache[inv.invoice_id] = (inv, mdr, gst, tds, effective_net)
-                invoices_by_date[inv.captured_at.date()].append(inv.invoice_id)
-
-        settled_inv_ids: Set[str] = set()
+                by_date_amt[inv.captured_at.date()][effective_net].add(inv.invoice_id)
 
         for credit in bank_credits:
+            target_paise = credit.credit_amount_in_paise
             # 2. Pisinger Time-Window Filtering (T +- (1 + Holidays))
             window_days = 1 + sum(
                 1
@@ -223,34 +238,89 @@ class ReconciliationEngine:
             min_date = credit.value_date - timedelta(days=window_days)
             max_date = credit.value_date
 
-            # Fetch candidate IDs strictly from indexed date buckets
+            # 3. Fast O(1) single-item lookup across active date buckets
+            single_matches: List[Tuple[str, date, int]] = []
+            curr = min_date
+            while curr <= max_date:
+                bucket = by_date_amt.get(curr)
+                if bucket and target_paise in bucket:
+                    for inv_id in bucket[target_paise]:
+                        single_matches.append((inv_id, curr, target_paise))
+                curr += timedelta(days=1)
+
+            if len(single_matches) == 1:
+                inv_id, d, amt = single_matches[0]
+                by_date_amt[d][amt].discard(inv_id)
+                if not by_date_amt[d][amt]:
+                    del by_date_amt[d][amt]
+
+                matched_inv_data = inv_net_cache[inv_id]
+                inv_obj = matched_inv_data[0]
+                proof_data = f"{credit.utr_number}:{credit.credit_amount_in_paise}:{inv_id}"
+                proof_hash = hashlib.sha256(proof_data.encode()).hexdigest()
+
+                block = ReconciledSettlementBlock(
+                    settlement_id=credit.settlement_id or f"setl_{credit.utr_number[:8]}",
+                    utr_number=credit.utr_number,
+                    lump_sum_paise=credit.credit_amount_in_paise,
+                    gross_gmv_paise=inv_obj.amount_in_paise,
+                    total_mdr_fee_paise=matched_inv_data[1],
+                    total_gst_on_mdr_paise=matched_inv_data[2],
+                    total_tds_withheld_paise=matched_inv_data[3],
+                    rounding_variance_paise=0,
+                    status=SettlementStatus.SETTLED,
+                    matched_invoices=[inv_id],
+                    matched_refunds=[],
+                    evidence_tier=EvidenceTier.TIER_A if credit.settlement_id else EvidenceTier.TIER_B,
+                    proof_hash=proof_hash,
+                    reconciled_at=datetime.now(timezone.utc),
+                )
+                reconciled_blocks.append(block)
+                continue
+            elif len(single_matches) > 1:
+                exceptions.append((credit, f"AMBIGUOUS_COLLISION ({len(single_matches)} single matches)"))
+                continue
+
+            # 4. Multi-item subset solving for lump sums
             candidate_tuples: List[Tuple[str, int]] = []
             curr = min_date
             while curr <= max_date:
-                for inv_id in invoices_by_date.get(curr, []):
-                    if inv_id not in settled_inv_ids:
-                        candidate_tuples.append((inv_id, inv_net_cache[inv_id][4]))
+                bucket = by_date_amt.get(curr)
+                if bucket:
+                    for amt, ids in bucket.items():
+                        if 0 < amt < target_paise:
+                            for inv_id in ids:
+                                candidate_tuples.append((inv_id, amt))
                 curr += timedelta(days=1)
 
-            # 3. Knuth DLX Exact-Cover Solving
+            if not candidate_tuples:
+                exceptions.append((credit, "NO_EXACT_COVER_FOUND"))
+                continue
+
             matching_subsets = self.solver.solve_exact_subsets(
-                target_paise=credit.credit_amount_in_paise,
+                target_paise=target_paise,
                 candidates=candidate_tuples,
                 max_solutions=2,
             )
 
-            # 4. Honest Refusal Evaluation
+            # 5. Honest Refusal Evaluation
             if len(matching_subsets) == 0:
                 exceptions.append((credit, "NO_EXACT_COVER_FOUND"))
             elif len(matching_subsets) > 1:
                 exceptions.append((credit, f"AMBIGUOUS_COLLISION ({len(matching_subsets)} subsets)"))
             else:
                 matched_ids = matching_subsets[0]
+                for mid in matched_ids:
+                    inv_d = inv_net_cache[mid][0].captured_at.date()
+                    inv_amt = inv_net_cache[mid][4]
+                    if inv_d in by_date_amt and inv_amt in by_date_amt[inv_d]:
+                        by_date_amt[inv_d][inv_amt].discard(mid)
+                        if not by_date_amt[inv_d][inv_amt]:
+                            del by_date_amt[inv_d][inv_amt]
+
                 matched_inv_data = [inv_net_cache[i_id] for i_id in matched_ids]
                 matched_invoices = [item[0] for item in matched_inv_data]
                 matched_invoices.sort(key=lambda x: (x.captured_at, x.invoice_id))
-
-                settled_inv_ids.update(matched_ids)
 
                 total_gross = sum(item[0].amount_in_paise for item in matched_inv_data)
                 total_mdr = sum(item[1] for item in matched_inv_data)
