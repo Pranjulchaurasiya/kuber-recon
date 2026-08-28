@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getApiUrl } from '@/lib/api-client'
 import { paiseToInr } from '@/lib/kuber-data'
 import { CheckCircle2, XCircle, ShieldAlert, Lock, Unlock, ArrowRight, RefreshCw, Terminal, Cpu } from 'lucide-react'
 
 interface ApexContract {
   contract_id: string
-  status: 'PENDING_CAPTURE' | 'HELD' | 'VERIFYING' | 'RELEASED' | 'REFUSED' | 'EXPIRED'
+  status: 'PENDING_CAPTURE' | 'HELD' | 'VERIFYING' | 'RELEASING' | 'RELEASED' | 'REFUSED' | 'EXPIRED'
   amount_paise: number
   amount_inr: string
   transfer_id: string
@@ -49,10 +49,24 @@ interface ReleaseResult {
 
 export function ApexAssuranceConsole() {
   const [loading, setLoading] = useState(false)
+  const [integrationMode, setIntegrationMode] = useState<'test_mode' | 'sandbox_simulation'>('sandbox_simulation')
   const [contract, setContract] = useState<ApexContract | null>(null)
   const [assertion, setAssertion] = useState<AssertionResult | null>(null)
   const [release, setRelease] = useState<ReleaseResult | null>(null)
   const [activeStep, setActiveStep] = useState<number>(0)
+
+  useEffect(() => {
+    fetch(`${getApiUrl()}/api/integration-status`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.mode === 'test_mode' || data.razorpay_api_live) {
+          setIntegrationMode('test_mode')
+        } else {
+          setIntegrationMode('sandbox_simulation')
+        }
+      })
+      .catch(() => setIntegrationMode('sandbox_simulation'))
+  }, [])
   const [agentLogs, setAgentLogs] = useState<Array<{ sender: string; msg: string; time: string; type: 'buyer' | 'apex' | 'seller' }>>([
     {
       sender: 'BUYER_AGENT_01',
@@ -268,33 +282,60 @@ export function ApexAssuranceConsole() {
       setRelease(data)
       addLog('APEX_ROUTER', `⚡ PATCH /v1/transfers/${data.transfer_id} on_hold: false... Transitioned to RELEASING (awaiting transfer.processed webhook)`, 'apex')
 
-      // Simulate webhook
-      setTimeout(async () => {
-        addLog('APEX_GATEWAY', `Awaiting authoritative Razorpay transfer.processed webhook...`, 'apex')
-        try {
-          const fixRes = await fetch(`${getApiUrl()}/api/sandbox/webhook/fixture?transfer_id=${data.transfer_id}`)
-          if (!fixRes.ok) throw new Error("Failed to get fixture")
-          const fixture = await fixRes.json()
+      if (integrationMode === 'sandbox_simulation') {
+        // Sandbox mode: use local cryptographic fixture simulation
+        addLog('APEX_GATEWAY', `[Sandbox Mode] Fetching local cryptographic fixture to simulate inbound webhook...`, 'apex')
+        setTimeout(async () => {
+          try {
+            const fixRes = await fetch(`${getApiUrl()}/api/sandbox/webhook/fixture?transfer_id=${data.transfer_id}`)
+            if (!fixRes.ok) throw new Error("Failed to get fixture")
+            const fixture = await fixRes.json()
 
-          const whRes = await fetch(`${getApiUrl()}/api/webhook/razorpay`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'X-Razorpay-Signature': fixture.x_razorpay_signature,
-              'X-Razorpay-Event-Id': fixture.x_razorpay_event_id 
-            },
-            body: JSON.stringify(fixture.raw_payload)
-          })
+            const whRes = await fetch(`${getApiUrl()}/api/webhook/razorpay`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'X-Razorpay-Signature': fixture.x_razorpay_signature,
+                'X-Razorpay-Event-Id': fixture.x_razorpay_event_id 
+              },
+              body: JSON.stringify(fixture.raw_payload)
+            })
 
-          if (!whRes.ok) throw new Error(`Webhook rejected: ${whRes.status}`)
-          
-          setActiveStep(3)
-          addLog('APEX_GATEWAY', `📥 Ingested transfer.processed webhook (HMAC signature verified). Immutable contract state: RELEASED.`, 'apex')
-          addLog('SELLER_AGENT_01', `🎉 Webhook confirmed! Settlement finalized to RELEASED. Seller payout released.`, 'seller')
-        } catch (err) {
-          addLog('APEX_GATEWAY', `Webhook delivery failed: ${err instanceof Error ? err.message : 'Unknown'}`, 'apex')
-        }
-      }, 1500)
+            if (!whRes.ok) throw new Error(`Webhook rejected: ${whRes.status}`)
+            
+            setActiveStep(3)
+            addLog('APEX_GATEWAY', `📥 Ingested transfer.processed webhook (HMAC signature verified). Immutable contract state: RELEASED.`, 'apex')
+            addLog('SELLER_AGENT_01', `🎉 Webhook confirmed! Settlement finalized to RELEASED. Seller payout released.`, 'seller')
+          } catch (err) {
+            addLog('APEX_GATEWAY', `Webhook delivery failed: ${err instanceof Error ? err.message : 'Unknown'}`, 'apex')
+          }
+        }, 1500)
+      } else {
+        // Real Test Mode: Await and poll for real Razorpay inbound webhook
+        addLog('APEX_GATEWAY', `[Razorpay Test Mode] Awaiting inbound transfer.processed webhook on /api/webhook/razorpay... (Polling contract status)`, 'apex')
+        
+        let attempts = 0
+        const pollInterval = setInterval(async () => {
+          attempts += 1
+          try {
+            const statusRes = await fetch(`${getApiUrl()}/api/apex/contracts/${contract.contract_id}`)
+            if (statusRes.ok) {
+              const contractStatus = await statusRes.json()
+              if (contractStatus.status === 'RELEASED') {
+                clearInterval(pollInterval)
+                setActiveStep(3)
+                addLog('APEX_GATEWAY', `📥 Authoritative Razorpay webhook confirmed! Transfer ${data.transfer_id} marked RELEASED.`, 'apex')
+                addLog('SELLER_AGENT_01', `🎉 Live Test Mode settlement finalized to RELEASED. Seller payout released.`, 'seller')
+              }
+            }
+          } catch {
+            // keep polling
+          }
+          if (attempts > 30) {
+            clearInterval(pollInterval)
+          }
+        }, 2000)
+      }
 
     } catch {
       addLog('APEX_ROUTER', 'Release execution failed.', 'apex')
@@ -304,12 +345,26 @@ export function ApexAssuranceConsole() {
 
   return (
     <div className="space-y-6">
-      {/* Hero Banner */}
+      {/* Hero Banner with Dynamic Mode Badge */}
       <div className="relative overflow-hidden rounded-xl border border-gold/30 bg-gradient-to-r from-panel via-background to-panel p-6 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-widest text-gold">
-              <Cpu className="h-4 w-4" /> Track 01: AI Growth & Agentic Commerce
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 font-mono text-xs font-bold uppercase tracking-widest text-gold">
+                <Cpu className="h-4 w-4" /> Track 01: AI Growth & Agentic Commerce
+              </div>
+              <span className="text-muted-foreground">•</span>
+              {integrationMode === 'test_mode' ? (
+                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Razorpay Test Mode · Live Gateway
+                </span>
+              ) : (
+                <span className="rounded bg-gold/10 border border-gold/30 px-2 py-0.5 font-mono text-[10px] font-bold text-gold flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
+                  Zero-Key Sandbox Simulation
+                </span>
+              )}
             </div>
             <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">
               APEX Assurance — Delivery-Gated Settlement
