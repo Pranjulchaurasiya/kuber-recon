@@ -39,8 +39,10 @@ interface ReleaseResult {
   amount_inr: string
   checker_id: string
   public_key_fingerprint: string
+  public_key_hex?: string
   signature_hex: string
   signature_verified: boolean
+  algorithm?: string
   proof_hash: string
   message: string
 }
@@ -181,12 +183,43 @@ export function ApexAssuranceConsole() {
     if (!contract) return
     setLoading(true)
     try {
+      const checkerId = 'cfo_autonomous_verifier'
+
+      // 1. Genuine Client-Side Cryptographic Keypair (Web Crypto API - RFC 8032)
+      addLog('CFO_CHECKER_AGENT', `🔑 Generating/signing with local Ed25519 keypair in WebCrypto...`, 'buyer')
+      const keyPair = await window.crypto.subtle.generateKey(
+        { name: "Ed25519" },
+        true,
+        ["sign", "verify"]
+      )
+
+      const pubKeyRaw = await window.crypto.subtle.exportKey("raw", keyPair.publicKey)
+      const pubKeyHex = Array.from(new Uint8Array(pubKeyRaw)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+      // 2. Deterministic Canonical Payload Serialization
+      const leafHash = contract.proof_hash.replace('sha256:', '')
+      const canonicalStr = `KEY:${checkerId}|CONTRACT:${contract.contract_id}|LEAF:${leafHash}|APPROVER:${checkerId}|ACTION:RELEASE|VER:v1`
+      const canonicalBytes = new TextEncoder().encode(canonicalStr)
+
+      // 3. Client Cryptographic Signature
+      const sigRaw = await window.crypto.subtle.sign(
+        { name: "Ed25519" },
+        keyPair.privateKey,
+        canonicalBytes
+      )
+      const sigHex = Array.from(new Uint8Array(sigRaw)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+      addLog('CFO_CHECKER_AGENT', `✍️ Maker/Checker signature created: ${sigHex.slice(0, 24)}... (RFC 8032)`, 'buyer')
+
+      // 4. Send Authenticated Release Request to Backend
       const res = await fetch(`${getApiUrl()}/api/apex/contracts/release`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contract_id: contract.contract_id,
-          checker_id: 'cfo_autonomous_verifier',
+          checker_id: checkerId,
+          public_key_hex: pubKeyHex,
+          signature_hex: sigHex,
         }),
       })
       

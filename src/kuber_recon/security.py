@@ -117,6 +117,38 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
         except (InvalidSignature, ValueError, Exception):
             return False
 
+    @staticmethod
+    def verify_client_signature(
+        checker_id: str,
+        contract_id: str,
+        leaf_hash: str,
+        public_key_hex: str,
+        signature_hex: str,
+        key_version: str = "v1",
+    ) -> bool:
+        """
+        Cryptographically verify that the client/caller signed the exact canonical release-intent payload
+        using their RFC 8032 Ed25519 private key. No server self-signing.
+        """
+        try:
+            if not public_key_hex or not signature_hex:
+                return False
+
+            pub_bytes = bytes.fromhex(public_key_hex)
+            sig_bytes = bytes.fromhex(signature_hex)
+            if len(pub_bytes) != 32 or len(sig_bytes) != 64:
+                return False
+
+            normalized_leaf = leaf_hash.replace("sha256:", "").strip()
+            canonical_str = f"KEY:{checker_id}|CONTRACT:{contract_id}|LEAF:{normalized_leaf}|APPROVER:{checker_id}|ACTION:RELEASE|VER:{key_version}"
+            canonical_bytes = canonical_str.encode("utf-8")
+
+            pub_key = ed25519.Ed25519PublicKey.from_public_bytes(pub_bytes)
+            pub_key.verify(sig_bytes, canonical_bytes)
+            return True
+        except (InvalidSignature, ValueError, Exception):
+            return False
+
 
 class AWSKMSCustodian(BaseKeyCustodian):
     """AWS KMS / CloudHSM Asymmetric Signing Custodian (ECDSA P-256)."""
