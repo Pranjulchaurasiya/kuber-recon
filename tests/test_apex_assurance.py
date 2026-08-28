@@ -103,7 +103,7 @@ def test_apex_contract_creation(client):
 # ── 3. Malicious / Corrupted Delivery -> Honest Refusal ───────────────────────
 
 def test_apex_delivery_refusal_on_corrupted_gstin(client):
-    # Step 1: Create contract
+    # Step 1: Create contract with mandatory expected_record_count
     c_resp = client.post(
         "/api/apex/contracts/create",
         json={
@@ -111,8 +111,10 @@ def test_apex_delivery_refusal_on_corrupted_gstin(client):
             "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_linked_99",
             "amount_paise": 2500000,
+            "expected_record_count": 10,
         },
     )
+    assert c_resp.status_code == 200
     contract_id = c_resp.json()["contract_id"]
 
     # Step 2: Deliver 10 records, but 2 have corrupted GSTINs
@@ -136,7 +138,7 @@ def test_apex_delivery_refusal_on_corrupted_gstin(client):
             "seller_public_key_hex": pub,
         },
     )
-    assert d_resp.status_code == 200
+    assert d_resp.status_code == 412
     data = d_resp.json()
     assert data["assertions_passed"] is False
     assert data["status"] == "REFUSED"
@@ -163,7 +165,7 @@ def test_apex_delivery_refusal_on_corrupted_gstin(client):
 # ── 4. 100% Clean Delivery -> Verified Release ────────────────────────────────
 
 def test_apex_delivery_release_on_100pct_valid(client):
-    # Step 1: Create contract
+    # Step 1: Create contract with mandatory expected_record_count
     c_resp = client.post(
         "/api/apex/contracts/create",
         json={
@@ -171,8 +173,10 @@ def test_apex_delivery_release_on_100pct_valid(client):
             "seller_agent_id": "agent_seller_good",
             "seller_account_id": "acc_seller_linked_99",
             "amount_paise": 2500000,
+            "expected_record_count": 10,
         },
     )
+    assert c_resp.status_code == 200
     contract_id = c_resp.json()["contract_id"]
 
     # Step 2: Deliver 10 clean valid records matching exact contract amount ₹25,000 (250,000 paise x 10)
@@ -214,8 +218,8 @@ def test_apex_delivery_release_on_100pct_valid(client):
     assert r_resp.status_code == 200
     r_data = r_resp.json()
     assert r_data["status"] == "RELEASING"
+    assert r_data["contract_status"] == "RELEASING"
     assert r_data["signature_verified"] is True
-    assert r_data["on_hold"] is False
     assert r_data["amount_paise"] == 2500000
 
 
@@ -229,6 +233,7 @@ def test_apex_delivery_refused_on_missing_signature(client):
             "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_linked_99",
             "amount_paise": 2500000,
+            "expected_record_count": 1,
         },
     )
     cid = c_resp.json()["contract_id"]
@@ -240,14 +245,10 @@ def test_apex_delivery_refused_on_missing_signature(client):
             "contract_id": cid,
             "seller_agent_id": "agent_seller_data_01",
             "payload_records": records,
-            # No signature or public key provided
+            # No signature or public key provided -> Rejected with HTTP 422 Unprocessable Entity
         },
     )
-    assert d_resp.status_code == 200
-    data = d_resp.json()
-    assert data["assertions_passed"] is False
-    assert data["seller_signature_verified"] is False
-    assert any("Mandatory Seller Ed25519 Signature Missing" in v for v in data["violation_samples"])
+    assert d_resp.status_code == 422
 
 
 def test_apex_delivery_refused_on_unpinned_seller_key(client):
@@ -258,6 +259,7 @@ def test_apex_delivery_refused_on_unpinned_seller_key(client):
             "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_linked_99",
             "amount_paise": 2500000,
+            "expected_record_count": 1,
         },
     )
     cid = c_resp.json()["contract_id"]
@@ -280,7 +282,7 @@ def test_apex_delivery_refused_on_unpinned_seller_key(client):
             "seller_public_key_hex": pub,
         },
     )
-    assert d_resp.status_code == 200
+    assert d_resp.status_code == 412
     data = d_resp.json()
     assert data["assertions_passed"] is False
     assert data["seller_signature_verified"] is False
@@ -295,10 +297,12 @@ def test_apex_delivery_rejected_on_seller_identity_mismatch(client):
             "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_linked_99",
             "amount_paise": 2500000,
+            "expected_record_count": 1,
         },
     )
     cid = c_resp.json()["contract_id"]
     records = [{"supplier_name": "S1", "gstin": "27AAPFU0939F1ZV", "invoice_number": "INV-1", "amount_paise": 2500000}]
+    pub, sig = _sign_seller_manifest(records, "agent_seller_good")
 
     d_resp = client.post(
         "/api/apex/contracts/deliver",
@@ -306,6 +310,8 @@ def test_apex_delivery_rejected_on_seller_identity_mismatch(client):
             "contract_id": cid,
             "seller_agent_id": "agent_seller_good",  # Mismatch with contract seller_agent_id
             "payload_records": records,
+            "manifest_signature": sig,
+            "seller_public_key_hex": pub,
         },
     )
     assert d_resp.status_code == 403
@@ -328,7 +334,7 @@ def test_apex_500_record_contract_enforcement(client):
     )
     cid = c_resp.json()["contract_id"]
 
-    # Delivery of only 5 records (even if money matches) MUST be refused due to record count invariant
+    # Delivery of only 5 records (even if money matches) MUST be refused due to record count invariant (412)
     partial_records = [
         {"supplier_name": f"Supplier {i}", "gstin": "27AAPFU0939F1ZV", "invoice_number": f"INV-{i}", "amount_paise": 500000}
         for i in range(5)
@@ -344,7 +350,7 @@ def test_apex_500_record_contract_enforcement(client):
             "seller_public_key_hex": pub_p,
         },
     )
-    assert d_partial.status_code == 200
+    assert d_partial.status_code == 412
     assert d_partial.json()["assertions_passed"] is False
     assert any("Contract Record Count Mismatch" in v for v in d_partial.json()["violation_samples"])
 
@@ -386,6 +392,8 @@ def test_apex_payload_exceeding_bounds_rejected(client):
             "contract_id": "apex_cnt_large",
             "seller_agent_id": "agent_seller_large",
             "payload_records": large_records,
+            "manifest_signature": "a" * 128,
+            "seller_public_key_hex": "b" * 64,
         },
     )
     assert resp.status_code == 413

@@ -151,7 +151,7 @@ npm run dev
 
 ---
 
-## 🧪 Full Verified Test Suite Breakdown (54 Items)
+## 🧪 Full Verified Test Suite Breakdown (55 Total Test Functions)
 
 ```
 tests/test_apex_assurance.py              10 passed
@@ -163,11 +163,11 @@ tests/test_planted_undecidables.py         4 passed
 tests/test_production_integrations.py      5 passed
 tests/test_property_based_invariants.py    2 passed
 tests/test_shannon_whitebox_audit.py       5 passed
-tests/test_webhook_idempotency.py         10 passed
+tests/test_webhook_idempotency.py         10 passed, 1 skipped (live gateway signature)
 tests/test_zero_float_policy.py            1 passed
 tests/test_zero_llm_in_math.py             1 passed
 ---------------------------------------------------
-Total: 54 passed across 12 test modules
+Total: 54 passed, 1 skipped across 55 test functions in 12 test modules
 ```
 
 ---

@@ -41,7 +41,7 @@ class DeliveryManifest(BaseModel):
     payload_sha256: str
     schema_version: str = "1.0.0"
     delivery_timestamp: int = Field(default_factory=lambda: int(time.time()))
-    signature_ed25519: Optional[str] = None
+    signature_ed25519: str = Field(..., description="Mandatory RFC 8032 Ed25519 signature over payload manifest")
 
 
 class AssuranceContract(BaseModel):
@@ -53,7 +53,7 @@ class AssuranceContract(BaseModel):
     amount_paise: int = Field(..., gt=0, description="Contract amount in integer paise")
     currency: str = "INR"
     status: ContractStatus = ContractStatus.HELD
-    expected_record_count: Optional[int] = Field(default=None, description="Enforced record count invariant")
+    expected_record_count: int = Field(..., gt=0, description="Enforced exact record count invariant")
     payment_id: Optional[str] = None
     transfer_id: Optional[str] = None
     webhook_event_id: Optional[str] = None
@@ -136,12 +136,12 @@ class DeterministicAssertionEngine:
     @staticmethod
     def verify_payload_records(
         records: List[Dict[str, Any]],
+        expected_total_paise: int,
+        expected_record_count: int,
+        seller_agent_id: str,
+        manifest_signature: str,
+        seller_public_key_hex: str,
         expected_schema_keys: Optional[List[str]] = None,
-        expected_total_paise: Optional[int] = None,
-        expected_record_count: Optional[int] = None,
-        seller_agent_id: Optional[str] = None,
-        manifest_signature: Optional[str] = None,
-        seller_public_key_hex: Optional[str] = None,
     ) -> AssertionResult:
         t0 = time.perf_counter()
         expected_keys = expected_schema_keys or ["supplier_name", "gstin", "invoice_number", "amount_paise"]

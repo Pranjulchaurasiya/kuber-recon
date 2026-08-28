@@ -90,6 +90,7 @@ def test_concurrent_cas_double_release_prevention(client):
             "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_01",
             "amount_paise": 100000,
+            "expected_record_count": 1,
         },
     )
     cid = c_resp.json()["contract_id"]
@@ -148,6 +149,7 @@ def test_anti_collusion_rejected_when_maker_is_checker(client):
             "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_01",
             "amount_paise": 100000,
+            "expected_record_count": 1,
         },
     )
     cid = c_resp.json()["contract_id"]
@@ -197,6 +199,7 @@ def test_liveness_sweep_auto_resolves_expired_contract(client):
             "seller_agent_id": "agent_seller_01",
             "seller_account_id": "acc_seller_01",
             "amount_paise": 50000,
+            "expected_record_count": 1,
             "ttl_seconds": 60,
         },
     )
