@@ -42,6 +42,10 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
 ignore = ["E501"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/kuber_recon"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 asyncio_mode = "auto"
