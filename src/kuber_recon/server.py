@@ -105,6 +105,7 @@ class WebhookIdempotencyStore:
                     seller_agent_id TEXT NOT NULL,
                     seller_account_id TEXT NOT NULL,
                     amount_paise INTEGER NOT NULL,
+                    expected_record_count INTEGER,
                     status TEXT NOT NULL,
                     payment_id TEXT,
                     transfer_id TEXT,
@@ -115,10 +116,20 @@ class WebhookIdempotencyStore:
                     refusal_reason TEXT,
                     proof_hash TEXT,
                     version INTEGER DEFAULT 1,
-                    created_at INTEGER NOT NULL
+                    created_at INTEGER NOT NULL,
+                    release_started_at INTEGER
                 )
                 """
             )
+            # Migration check: add release_started_at and expected_record_count if missing
+            try:
+                conn.execute("ALTER TABLE apex_contracts ADD COLUMN release_started_at INTEGER")
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE apex_contracts ADD COLUMN expected_record_count INTEGER")
+            except Exception:
+                pass
 
     def try_insert(self, event_id: str) -> bool:
         with self._lock, self._connect() as conn:
@@ -137,53 +148,41 @@ class WebhookIdempotencyStore:
                 """
                 INSERT OR REPLACE INTO apex_contracts (
                     contract_id, buyer_agent_id, seller_agent_id, seller_account_id,
-                    amount_paise, status, payment_id, transfer_id, webhook_event_id, on_hold, on_hold_until,
-                    assertions_passed, refusal_reason, proof_hash, version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    amount_paise, expected_record_count, status, payment_id, transfer_id, webhook_event_id, on_hold, on_hold_until,
+                    assertions_passed, refusal_reason, proof_hash, version, created_at, release_started_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     c.contract_id, c.buyer_agent_id, c.seller_agent_id, c.seller_account_id,
-                    c.amount_paise, c.status.value, c.payment_id, c.transfer_id, c.webhook_event_id, 1 if c.on_hold else 0,
+                    c.amount_paise, c.expected_record_count, c.status.value, c.payment_id, c.transfer_id, c.webhook_event_id, 1 if c.on_hold else 0,
                     c.on_hold_until, 1 if c.assertions_passed else 0, c.refusal_reason,
-                    c.proof_hash, c.version, c.created_at,
+                    c.proof_hash, c.version, c.created_at, c.release_started_at,
                 ),
             )
 
     def get_contract(self, contract_id: str) -> Optional[Dict[str, Any]]:
         with self._lock, self._connect() as conn:
+            conn.row_factory = sqlite3.Row
             cur = conn.execute("SELECT * FROM apex_contracts WHERE contract_id = ?", (contract_id,))
             row = cur.fetchone()
             if not row:
                 return None
-            return {
-                "contract_id": row[0],
-                "buyer_agent_id": row[1],
-                "seller_agent_id": row[2],
-                "seller_account_id": row[3],
-                "amount_paise": row[4],
-                "status": row[5],
-                "payment_id": row[6],
-                "transfer_id": row[7],
-                "webhook_event_id": row[8],
-                "on_hold": bool(row[9]),
-                "on_hold_until": row[10],
-                "assertions_passed": bool(row[11]),
-                "refusal_reason": row[12],
-                "proof_hash": row[13],
-                "version": row[14],
-                "created_at": row[15],
-            }
+            d = dict(row)
+            d["on_hold"] = bool(d.get("on_hold", 1))
+            d["assertions_passed"] = bool(d.get("assertions_passed", 0))
+            return d
 
     def cas_release_contract(self, contract_id: str, expected_version: int, new_proof_hash: str) -> bool:
-        """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state."""
+        """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state and start release clock."""
+        now = int(time.time())
         with self._lock, self._connect() as conn:
             cur = conn.execute(
                 """
                 UPDATE apex_contracts
-                SET status = 'RELEASING', version = version + 1, proof_hash = ?
+                SET status = 'RELEASING', release_started_at = ?, version = version + 1, proof_hash = ?
                 WHERE contract_id = ? AND version = ? AND on_hold = 1 AND assertions_passed = 1
                 """,
-                (new_proof_hash, contract_id, expected_version),
+                (now, new_proof_hash, contract_id, expected_version),
             )
             return cur.rowcount > 0
 
@@ -225,12 +224,12 @@ class WebhookIdempotencyStore:
                 if update_cur.rowcount > 0:
                     expired_ids.append(cid)
 
-            # Sweep stuck RELEASING contracts to RELEASE_PENDING_RECONCILIATION (e.g., timeout > 5 mins)
+            # Sweep stuck RELEASING contracts to RELEASE_PENDING_RECONCILIATION based on release_started_at (timeout > 5 mins)
             timeout_threshold = now - 300
             cur = conn.execute(
                 """
                 SELECT contract_id, version FROM apex_contracts
-                WHERE status = 'RELEASING' AND created_at <= ?
+                WHERE status = 'RELEASING' AND release_started_at IS NOT NULL AND release_started_at <= ?
                 """,
                 (timeout_threshold,),
             )
@@ -378,6 +377,7 @@ class CreateContractRequest(BaseModel):
     seller_agent_id: str = "agent_seller_data_01"
     seller_account_id: str = "acc_seller_linked_001"
     amount_paise: int = Field(..., gt=0, description="Contract amount in integer paise")
+    expected_record_count: Optional[int] = Field(default=None, description="Enforced record count invariant")
     ttl_seconds: int = Field(86400, ge=60, description="Contract hold TTL in seconds (default 24h)")
 
 
@@ -385,7 +385,8 @@ class DeliverContractRequest(BaseModel):
     contract_id: str
     seller_agent_id: str
     payload_records: List[Dict[str, Any]] = Field(..., description="Direct batch of delivered records")
-    manifest_signature: Optional[str] = None
+    manifest_signature: Optional[str] = Field(None, description="RFC 8032 Ed25519 seller manifest signature")
+    seller_public_key_hex: Optional[str] = Field(None, description="RFC 8032 Ed25519 seller public key hex")
 
 
 class ReleaseContractRequest(BaseModel):
@@ -447,7 +448,7 @@ def intercept_payment(req: InterceptRequest):
 
     latency_ms = (time.perf_counter() - t0) * 1000
     proof_input = f"{split.split_id}:{split.gross_captured_paise}:{split.net_principal_paise}:{split.gst_escrow_paise}:{split.tds_194o_paise}"
-    proof_hash = "sha256:" + hashlib.sha256(proof_input.encode()).hexdigest()[:16]
+    proof_hash = "sha256:" + hashlib.sha256(proof_input.encode()).hexdigest()
     delta = gross_paise - split.net_principal_paise - split.gst_escrow_paise - split.tds_194o_paise
 
     return InterceptResponse(
@@ -493,7 +494,7 @@ def reconcile(req: ReconcileRequest):
         latency_ms=round(total_ms, 3),
         knuth_dlx_solve_ms=round(solve_ms, 3),
         unexplained_delta_paise=0,
-        proof_hash="sha256:" + proof[:16],
+        proof_hash="sha256:" + proof,
     )
 
 
@@ -551,7 +552,7 @@ def create_route_transfer(req: RouteTransferRequest):
         on_hold=res.get("on_hold", True),
         status=res.get("status", "processed"),
         mode="test_mode" if razorpay_adapter.is_live else "sandbox_simulation",
-        proof_hash="sha256:" + proof[:16],
+        proof_hash="sha256:" + proof,
     )
 
 
@@ -567,23 +568,30 @@ def get_sandbox_webhook_fixture(transfer_id: str = "trf_sandbox_demo_001"):
         )
 
     body_dict = {
+        "entity": "event",
+        "account_id": "acc_kuber_escrow_001",
         "event": "transfer.processed",
+        "contains": ["transfer"],
         "payload": {
             "transfer": {
                 "entity": {
-                    "id": transfer_id
+                    "id": transfer_id,
+                    "entity": "transfer",
+                    "status": "processed",
+                    "settlement_status": "settled",
+                    "on_hold": False,
                 }
             }
-        }
+        },
+        "created_at": int(time.time()),
     }
-    raw_body = json.dumps(body_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    signature = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
+    raw_body = json.dumps(body_dict, separators=(",", ":")).encode("utf-8")
+    sig = hmac.new(_WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
 
     return {
-        "raw_body": raw_body.decode("utf-8"),
-        "x_razorpay_signature": signature,
-        "x_razorpay_event_id": f"evt_sandbox_{int(time.time()*1000)}",
-        "instruction": "POST raw_body to /api/webhook/razorpay with headers X-Razorpay-Signature and X-Razorpay-Event-Id.",
+        "x_razorpay_signature": sig,
+        "x_razorpay_event_id": f"evt_{transfer_id[-6:]}",
+        "raw_payload": body_dict,
     }
 
 
@@ -608,7 +616,7 @@ async def razorpay_webhook_listener(
             detail="Invalid X-Razorpay-Signature — HMAC mismatch. Request rejected.",
         )
 
-    event_id = x_razorpay_event_id or ("evt_body_" + hashlib.sha256(raw_body).hexdigest()[:16])
+    event_id = x_razorpay_event_id or ("evt_body_" + hashlib.sha256(raw_body).hexdigest())
 
     is_new = idempotency_store.try_insert(event_id)
     if not is_new:
@@ -646,7 +654,7 @@ async def razorpay_webhook_listener(
         "signature_verified": True,
         "idempotency_backend": "SQLite (durable — survives restart)",
         "processed_background": True,
-        "proof_hash": "sha256:" + hashlib.sha256(raw_body).hexdigest()[:16],
+        "proof_hash": "sha256:" + hashlib.sha256(raw_body).hexdigest(),
         "latency_ms": round(latency_ms, 3),
     }
 
@@ -678,6 +686,7 @@ def apex_create_contract(req: CreateContractRequest):
         seller_agent_id=req.seller_agent_id,
         seller_account_id=req.seller_account_id,
         amount_paise=req.amount_paise,
+        expected_record_count=req.expected_record_count,
         currency="INR",
         status=ContractStatus.HELD,
         transfer_id=route_res["id"],
@@ -685,7 +694,7 @@ def apex_create_contract(req: CreateContractRequest):
         on_hold_until=ttl_expiry,
         created_at=now,
         assertions_passed=False,
-        proof_hash=hashlib.sha256(f"{contract_id}:{req.amount_paise}:HELD".encode()).hexdigest()[:16],
+        proof_hash=hashlib.sha256(f"{contract_id}:{req.amount_paise}:{req.expected_record_count}:HELD:{now}".encode()).hexdigest(),
     )
 
     idempotency_store.save_contract(contract)
@@ -695,6 +704,7 @@ def apex_create_contract(req: CreateContractRequest):
         "status": contract.status.value,
         "amount_paise": contract.amount_paise,
         "amount_inr": _fmt_paise(contract.amount_paise),
+        "expected_record_count": contract.expected_record_count,
         "transfer_id": contract.transfer_id,
         "on_hold": contract.on_hold,
         "on_hold_until": contract.on_hold_until,
@@ -707,7 +717,7 @@ def apex_create_contract(req: CreateContractRequest):
 def apex_deliver_payload(req: DeliverContractRequest):
     """
     Step 2: Seller Agent submits delivery payload records.
-    Runs non-LLM deterministic assertions (<5MB memory bounded).
+    Runs non-LLM deterministic assertions (<5MB memory bounded) and validates financial sum matching & seller signature.
     """
     raw_str = json.dumps(req.payload_records)
     if len(raw_str.encode("utf-8")) > MAX_DIRECT_PAYLOAD_BYTES:
@@ -720,8 +730,22 @@ def apex_deliver_payload(req: DeliverContractRequest):
     if not contract_data:
         raise HTTPException(status_code=404, detail="Contract not found.")
 
-    # Run deterministic assertions
-    assertion_res = DeterministicAssertionEngine.verify_payload_records(req.payload_records)
+    # Enforce exact Seller Identity binding
+    if req.seller_agent_id != contract_data["seller_agent_id"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Seller Identity Mismatch: Request seller '{req.seller_agent_id}' does not match contract seller '{contract_data['seller_agent_id']}'.",
+        )
+
+    # Run deterministic assertions with contract financial total matching, expected record count, and seller signature verification
+    assertion_res = DeterministicAssertionEngine.verify_payload_records(
+        records=req.payload_records,
+        expected_total_paise=contract_data["amount_paise"],
+        expected_record_count=contract_data.get("expected_record_count"),
+        seller_agent_id=req.seller_agent_id,
+        manifest_signature=req.manifest_signature,
+        seller_public_key_hex=req.seller_public_key_hex,
+    )
 
     # Update contract status in SQLite
     new_status = ContractStatus.VERIFYING if assertion_res.passed else ContractStatus.REFUSED
@@ -733,6 +757,7 @@ def apex_deliver_payload(req: DeliverContractRequest):
         seller_agent_id=contract_data["seller_agent_id"],
         seller_account_id=contract_data["seller_account_id"],
         amount_paise=contract_data["amount_paise"],
+        expected_record_count=contract_data.get("expected_record_count"),
         status=new_status,
         transfer_id=contract_data["transfer_id"],
         on_hold=True,  # Remains on hold until explicit release
@@ -751,6 +776,9 @@ def apex_deliver_payload(req: DeliverContractRequest):
         "on_hold": contract.on_hold,
         "valid_records": assertion_res.valid_records,
         "failed_records": assertion_res.failed_records,
+        "total_delivered_paise": assertion_res.total_delivered_paise,
+        "total_delivered_inr": _fmt_paise(assertion_res.total_delivered_paise),
+        "seller_signature_verified": assertion_res.seller_signature_verified,
         "violation_samples": assertion_res.violation_samples,
         "manifest_sha256": assertion_res.manifest_sha256,
         "refusal_certificate": assertion_res.refusal_certificate,
@@ -812,7 +840,7 @@ def apex_release_settlement(req: ReleaseContractRequest):
         )
 
     # 4. Atomic CAS State Update (Transition to RELEASING)
-    new_proof = hashlib.sha256(f"{req.contract_id}:RELEASING:{req.checker_id}".encode()).hexdigest()[:16]
+    new_proof = hashlib.sha256(f"{req.contract_id}:RELEASING:{req.checker_id}:{time.time_ns()}".encode()).hexdigest()
     expected_version = contract_data.get("version", 1)
     cas_success = idempotency_store.cas_release_contract(req.contract_id, expected_version, new_proof)
     if not cas_success:

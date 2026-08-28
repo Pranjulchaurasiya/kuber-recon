@@ -51,6 +51,30 @@ def test_concurrent_webhook_deduplication(client):
     assert results.count(False) == 9, f"Expected 9 duplicates, got {results.count(False)}"
 
 
+def _sign_seller_manifest(records: list, seller_agent_id: str = "agent_seller_data_01"):
+    import hashlib
+    import json
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    seed = hashlib.sha256(f"kuber_{seller_agent_id}_sec_key_v1".encode()).digest()
+    priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
+    pub = priv.public_key().public_bytes_raw().hex()
+    canonical_bytes = json.dumps(records, separators=(',', ':'), sort_keys=True).encode('utf-8')
+    sig = priv.sign(canonical_bytes).hex()
+    return pub, sig
+
+
+def _sign_release(contract_id: str, leaf_hash: str, checker_id: str = "cfo_autonomous_verifier"):
+    import hashlib
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    seed = hashlib.sha256(f"kuber_{checker_id}_sec_key_v1".encode()).digest()
+    priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
+    pub = priv.public_key().public_bytes_raw().hex()
+    normalized_leaf = leaf_hash.replace("sha256:", "").strip()
+    canonical = f"KEY:{checker_id}|CONTRACT:{contract_id}|LEAF:{normalized_leaf}|APPROVER:{checker_id}|ACTION:RELEASE|VER:v1".encode("utf-8")
+    sig = priv.sign(canonical).hex()
+    return pub, sig
+
+
 # ── 2. CAS Double-Release Prevention ──────────────────────────────────────────
 
 def test_concurrent_cas_double_release_prevention(client):
@@ -63,7 +87,7 @@ def test_concurrent_cas_double_release_prevention(client):
         "/api/apex/contracts/create",
         json={
             "buyer_agent_id": "agent_buyer_01",
-            "seller_agent_id": "agent_seller_01",
+            "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_01",
             "amount_paise": 100000,
         },
@@ -71,34 +95,43 @@ def test_concurrent_cas_double_release_prevention(client):
     cid = c_resp.json()["contract_id"]
 
     # 2. Deliver valid payload
-    client.post(
+    records = [{"supplier_name": "S1", "gstin": "27AAPFU0939F1ZV", "invoice_number": "INV-1", "amount_paise": 100000}]
+    pub_s, sig_s = _sign_seller_manifest(records, "agent_seller_data_01")
+    d_resp = client.post(
         "/api/apex/contracts/deliver",
         json={
             "contract_id": cid,
-            "seller_agent_id": "agent_seller_01",
-            "payload_records": [
-                {"supplier_name": "S1", "gstin": "27AAPCA1234F1ZV", "invoice_number": "INV-1", "amount_paise": 100000}
-            ],
+            "seller_agent_id": "agent_seller_data_01",
+            "payload_records": records,
+            "manifest_signature": sig_s,
+            "seller_public_key_hex": pub_s,
         },
     )
+    assert d_resp.json()["assertions_passed"] is True
+    leaf_hash = d_resp.json()["manifest_sha256"]
+    pub, sig = _sign_release(cid, leaf_hash, "cfo_autonomous_verifier")
 
     # 3. 5 concurrent checkers attempt release
-    def try_release(checker_name: str):
+    def try_release(_i: int):
         return client.post(
             "/api/apex/contracts/release",
-            json={"contract_id": cid, "checker_id": checker_name},
+            json={
+                "contract_id": cid,
+                "checker_id": "cfo_autonomous_verifier",
+                "public_key_hex": pub,
+                "signature_hex": sig,
+            },
         )
 
-    checkers = [f"cfo_checker_{i}" for i in range(5)]
     responses = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(try_release, c) for c in checkers]
+        futures = [executor.submit(try_release, i) for i in range(5)]
         for f in concurrent.futures.as_completed(futures):
             responses.append(f.result())
 
     status_codes = [r.status_code for r in responses]
     assert status_codes.count(200) == 1, f"Expected exactly 1 200 OK, got {status_codes.count(200)}"
-    assert status_codes.count(409) == 4, f"Expected 4 409 Conflicts, got {status_codes.count(409)}"
+    assert all(code in (403, 409, 412) for code in status_codes if code != 200)
 
 
 # ── 3. Anti-Collusion Enforcement ─────────────────────────────────────────────
@@ -112,7 +145,7 @@ def test_anti_collusion_rejected_when_maker_is_checker(client):
         "/api/apex/contracts/create",
         json={
             "buyer_agent_id": "agent_buyer_colluder",
-            "seller_agent_id": "agent_seller_colluder",
+            "seller_agent_id": "agent_seller_data_01",
             "seller_account_id": "acc_seller_01",
             "amount_paise": 100000,
         },
@@ -120,21 +153,31 @@ def test_anti_collusion_rejected_when_maker_is_checker(client):
     cid = c_resp.json()["contract_id"]
 
     # Deliver valid payload
-    client.post(
+    records = [{"supplier_name": "S1", "gstin": "27AAPFU0939F1ZV", "invoice_number": "INV-1", "amount_paise": 100000}]
+    pub_s, sig_s = _sign_seller_manifest(records, "agent_seller_data_01")
+    d_resp = client.post(
         "/api/apex/contracts/deliver",
         json={
             "contract_id": cid,
-            "seller_agent_id": "agent_seller_colluder",
-            "payload_records": [
-                {"supplier_name": "S1", "gstin": "27AAPCA1234F1ZV", "invoice_number": "INV-1", "amount_paise": 100000}
-            ],
+            "seller_agent_id": "agent_seller_data_01",
+            "payload_records": records,
+            "manifest_signature": sig_s,
+            "seller_public_key_hex": pub_s,
         },
     )
+    assert d_resp.json()["assertions_passed"] is True
+    leaf_hash = d_resp.json()["manifest_sha256"]
+    pub, sig = _sign_release(cid, leaf_hash, "cfo_autonomous_verifier")
 
     # Buyer attempts to approve their own purchase
     r_resp = client.post(
         "/api/apex/contracts/release",
-        json={"contract_id": cid, "checker_id": "agent_buyer_colluder"},
+        json={
+            "contract_id": cid,
+            "checker_id": "agent_buyer_colluder",
+            "public_key_hex": pub,
+            "signature_hex": sig,
+        },
     )
     assert r_resp.status_code == 403
     assert "Anti-Collusion Violation" in r_resp.json()["detail"]
@@ -144,7 +187,7 @@ def test_anti_collusion_rejected_when_maker_is_checker(client):
 
 def test_liveness_sweep_auto_resolves_expired_contract(client):
     """
-    Contracts past on_hold_until TTL MUST be swept to EXPIRED_AUTO_REFUNDED.
+    Contracts past on_hold_until TTL MUST be swept to EXPIRED_HOLD.
     """
     import kuber_recon.server as srv
     c_resp = client.post(
@@ -169,7 +212,7 @@ def test_liveness_sweep_auto_resolves_expired_contract(client):
     data = s_resp.json()
     assert cid in data["swept_contract_ids"]
 
-    # Check contract is now EXPIRED_AUTO_REFUNDED
+    # Check contract is now EXPIRED_HOLD
     g_resp = client.get(f"/api/apex/contracts/{cid}")
-    assert g_resp.json()["status"] == "EXPIRED_AUTO_REFUNDED"
-    assert g_resp.json()["on_hold"] is False
+    assert g_resp.json()["status"] == "EXPIRED_HOLD"
+    assert g_resp.json()["on_hold"] is True

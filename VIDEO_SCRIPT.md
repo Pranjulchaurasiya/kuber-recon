@@ -22,11 +22,11 @@ Today, we are solving the Delivery-Gated Settlement problem for agentic commerce
 ### [0:50 - 1:15] Scenario B: The Release (Screen Recording: Trigger 100% Clean Delivery)
 **Action:** Click **"Scenario B: 100% Verified Clean Delivery"**.
 **Speaker:**
-"Now, the seller agent submits the correct, 100% verified payload. The invariants pass. 
-Our backend acts as an autonomous CFO, signing the Merkle root with an Ed25519 cryptographic key. It executes a secure CAS state transition, and we PATCH the Razorpay Route transfer to release the hold."
+"Now, the seller agent submits the correct, 100% verified payload. The Mod-36 GSTIN checksums and contract financial totals match to the exact paise.
+The authorized CFO verifier signs the canonical assertion payload using RFC 8032 Ed25519. The backend verifies the signature against pinned public keys, executes an atomic CAS state transition to RELEASING, and triggers Razorpay Route hold release."
 
 ### [1:15 - 1:30] The Finale (Screen Recording: Webhook & Close)
-**Action:** Click **"Execute Settlement Release"**. Show the logs confirming the webhook.
+**Action:** Click **"Execute Settlement Release"**. Show the live logs and single authoritative webhook confirmation.
 **Speaker:**
-"We wait for Razorpay's exact `transfer.processed` webhook to finalize the state. No race conditions. The seller gets paid.
-We didn't just build a wrapper; we built deterministic financial infrastructure for the autonomous economy."
+"We wait for Razorpay's exact `transfer.processed` webhook with HMAC verification to finalize the state to RELEASED. No race conditions. Zero float leakage. The seller gets paid.
+We didn't just build a wrapper; we built deterministic financial truth for agentic commerce on Razorpay Route."

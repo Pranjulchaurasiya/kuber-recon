@@ -80,6 +80,33 @@ export function ApexAssuranceConsole() {
     ])
   }
 
+  // Helper to sign seller payload manifest with pinned Ed25519 key (RFC 8032 via Web Crypto PKCS#8)
+  const signSellerPayload = async (records: any[], sellerAgentId: string = 'agent_seller_data_01') => {
+    const seedBytes = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`kuber_${sellerAgentId}_sec_key_v1`))
+    const pkcs8Prefix = new Uint8Array([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20])
+    const pkcs8Key = new Uint8Array(pkcs8Prefix.length + seedBytes.byteLength)
+    pkcs8Key.set(pkcs8Prefix, 0)
+    pkcs8Key.set(new Uint8Array(seedBytes), pkcs8Prefix.length)
+
+    const privateKey = await window.crypto.subtle.importKey('pkcs8', pkcs8Key, { name: 'Ed25519' }, true, ['sign'])
+    const pubKeyHex = '728103c318ef2dc044e9ea0ef64881a9a74466f016d604b6bbe539d91b092969'
+
+    // Canonical JSON serialization (matching Python json.dumps(..., separators=(',', ':'), sort_keys=True))
+    const sortedRecords = records.map(r => {
+      const keys = Object.keys(r).sort()
+      const sortedObj: any = {}
+      for (const k of keys) sortedObj[k] = r[k]
+      return sortedObj
+    })
+    const canonicalStr = JSON.stringify(sortedRecords)
+    const canonicalBytes = new TextEncoder().encode(canonicalStr)
+
+    const sigRaw = await window.crypto.subtle.sign({ name: 'Ed25519' }, privateKey, canonicalBytes)
+    const sigHex = Array.from(new Uint8Array(sigRaw)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+    return { pubKeyHex, sigHex }
+  }
+
   // ── Step 1: Create Contract & Lock Settlement ─────────────────────────────────
   const handleCreateContract = async () => {
     setLoading(true)
@@ -94,14 +121,15 @@ export function ApexAssuranceConsole() {
           seller_agent_id: 'agent_seller_data_01',
           seller_account_id: 'acc_seller_linked_001',
           amount_paise: 2500000, // ₹25,000.00
+          expected_record_count: 500,
           ttl_seconds: 86400,
         }),
       })
       const data: ApexContract = await res.json()
       setContract(data)
       setActiveStep(1)
-      addLog('APEX_ROUTER', `Razorpay Route Transfer Created: ${data.transfer_id} (on_hold: true). ₹25,000 locked.`, 'apex')
-      addLog('SELLER_AGENT_01', `Contract ${data.contract_id} detected. Preparing payload manifest for delivery.`, 'seller')
+      addLog('APEX_ROUTER', `Razorpay Route Transfer Created: ${data.transfer_id} (on_hold: true). ₹25,000 locked (500 records invariant).`, 'apex')
+      addLog('SELLER_AGENT_01', `Contract ${data.contract_id} detected. Preparing 500-record payload manifest for delivery.`, 'seller')
     } catch {
       addLog('APEX_ROUTER', 'Error contacting backend server.', 'apex')
     }
@@ -114,16 +142,18 @@ export function ApexAssuranceConsole() {
     setLoading(true)
     setRelease(null)
 
-    const corruptedRecords = [
-      { supplier_name: 'Alpha Logistics', gstin: '27AAPCA1234F1Z5', invoice_number: 'INV-101', amount_paise: 250000 },
-      { supplier_name: 'Beta Steels', gstin: '29BBBBB5678G2Z1', invoice_number: 'INV-102', amount_paise: 250000 },
-      { supplier_name: 'Gamma Tech (Corrupted)', gstin: '27AAPCA1234F1Z9', invoice_number: 'INV-103', amount_paise: 250000 }, // Corrupted Checksum
-      { supplier_name: 'Delta Corp (Malformed)', gstin: 'INVALID_GSTIN_99', invoice_number: 'INV-104', amount_paise: 250000 }, // Invalid Length
-    ]
+    // Generate 500 records with 2 corrupted Mod-36 GSTINs
+    const corruptedRecords = Array.from({ length: 500 }, (_, i) => ({
+      supplier_name: `Supplier Alpha-${(i % 25) + 1}`,
+      gstin: i === 2 ? '27AAPCA1234F1Z9' : (i === 4 ? 'INVALID_GSTIN_99' : '27AAPFU0939F1ZV'),
+      invoice_number: `INV-2026-${String(i + 1).padStart(5, '0')}`,
+      amount_paise: 5000,
+    }))
 
-    addLog('SELLER_AGENT_01', `Delivering batch of 4 records to APEX Assurance Kernel...`, 'seller')
+    addLog('SELLER_AGENT_01', `Delivering batch of 500 records (₹25,000.00) with Ed25519 manifest signature...`, 'seller')
 
     try {
+      const { pubKeyHex, sigHex } = await signSellerPayload(corruptedRecords, 'agent_seller_data_01')
       const res = await fetch(`${getApiUrl()}/api/apex/contracts/deliver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,12 +161,14 @@ export function ApexAssuranceConsole() {
           contract_id: contract.contract_id,
           seller_agent_id: 'agent_seller_data_01',
           payload_records: corruptedRecords,
+          manifest_signature: sigHex,
+          seller_public_key_hex: pubKeyHex,
         }),
       })
       const data: AssertionResult = await res.json()
       setAssertion(data)
       setActiveStep(2)
-      addLog('APEX_ASSERTION', `🛑 REFUSAL: 2 records failed Mod-36 checksums! Transfer REMAINS on_hold: true.`, 'apex')
+      addLog('APEX_ASSERTION', `🛑 REFUSAL: 2 of 500 records failed Mod-36 checksums! Transfer REMAINS on_hold: true.`, 'apex')
       addLog('BUYER_AGENT_01', `🛡️ Protected: ₹25,000.00 merchant liquidity preserved. Refusal cert generated.`, 'buyer')
     } catch {
       addLog('APEX_ASSERTION', 'Verification request failed.', 'apex')
@@ -149,16 +181,18 @@ export function ApexAssuranceConsole() {
     if (!contract) return
     setLoading(true)
 
-    const cleanRecords = [
-      { supplier_name: 'Alpha Logistics', gstin: '27AAPCA1234F1Z5', invoice_number: 'INV-101', amount_paise: 250000 },
-      { supplier_name: 'Beta Steels', gstin: '29BBBBB5678G2Z1', invoice_number: 'INV-102', amount_paise: 250000 },
-      { supplier_name: 'Zeta Infratech', gstin: '27AAPCA1234F1Z5', invoice_number: 'INV-103', amount_paise: 250000 },
-      { supplier_name: 'Omicron Labs', gstin: '29BBBBB5678G2Z1', invoice_number: 'INV-104', amount_paise: 250000 },
-    ]
+    // Generate 500 valid records (500 x ₹50.00 = ₹25,000.00 exact)
+    const cleanRecords = Array.from({ length: 500 }, (_, i) => ({
+      supplier_name: `Supplier Alpha-${(i % 25) + 1}`,
+      gstin: '27AAPFU0939F1ZV',
+      invoice_number: `INV-2026-${String(i + 1).padStart(5, '0')}`,
+      amount_paise: 5000,
+    }))
 
-    addLog('SELLER_AGENT_01', `Delivering 100% verified batch (4 records) + Ed25519 signature manifest.`, 'seller')
+    addLog('SELLER_AGENT_01', `Delivering verified batch (500 records = ₹25,000.00 exact match) + signed Ed25519 manifest.`, 'seller')
 
     try {
+      const { pubKeyHex, sigHex } = await signSellerPayload(cleanRecords, 'agent_seller_data_01')
       const res = await fetch(`${getApiUrl()}/api/apex/contracts/deliver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,12 +200,14 @@ export function ApexAssuranceConsole() {
           contract_id: contract.contract_id,
           seller_agent_id: 'agent_seller_data_01',
           payload_records: cleanRecords,
+          manifest_signature: sigHex,
+          seller_public_key_hex: pubKeyHex,
         }),
       })
       const data: AssertionResult = await res.json()
       setAssertion(data)
       setActiveStep(2)
-      addLog('APEX_ASSERTION', `✅ 100% Invariants Passed! 0 Errors. Ready for Route settlement release.`, 'apex')
+      addLog('APEX_ASSERTION', `✅ 100% Invariants Passed! 500/500 records verified (₹25,000.00 exact). Ed25519 Authenticated.`, 'apex')
     } catch {
       addLog('APEX_ASSERTION', 'Verification request failed.', 'apex')
     }
@@ -248,7 +284,7 @@ export function ApexAssuranceConsole() {
               'X-Razorpay-Signature': fixture.x_razorpay_signature,
               'X-Razorpay-Event-Id': fixture.x_razorpay_event_id 
             },
-            body: fixture.raw_body
+            body: JSON.stringify(fixture.raw_payload)
           })
 
           if (!whRes.ok) throw new Error(`Webhook rejected: ${whRes.status}`)

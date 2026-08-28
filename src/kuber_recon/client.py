@@ -62,8 +62,16 @@ class RazorpayClientAdapter:
         notes: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """Create a Razorpay Route transfer with on_hold: True and optional on_hold_until TTL."""
-        if not self.is_live:
-            # Mock response in Zero-Key Sandbox mode
+        is_sandbox_account = (
+            not self.is_live
+            or os.getenv("RAZORPAY_SANDBOX", "false").lower() in ("true", "1", "yes")
+            or account_id.startswith("acc_mock_")
+            or account_id.startswith("acc_seller_")
+            or account_id.startswith("acc_test_")
+        )
+
+        if is_sandbox_account:
+            # Deterministic response in Zero-Key Sandbox mode
             res = {
                 "id": f"trf_mock_{account_id[-6:]}",
                 "entity": "transfer",
@@ -72,6 +80,7 @@ class RazorpayClientAdapter:
                 "currency": currency,
                 "on_hold": True,
                 "status": "processed",
+                "mode": "sandbox_simulation",
             }
             if on_hold_until:
                 res["on_hold_until"] = on_hold_until
@@ -88,70 +97,46 @@ class RazorpayClientAdapter:
         if on_hold_until:
             payload["on_hold_until"] = on_hold_until
 
-        try:
-            response = requests.post(url, auth=self.auth, json=payload, timeout=10)
-            if response.status_code in (200, 201):
-                return response.json()
-            # If Razorpay API returns an error (e.g. unlinked test account ID), fall back with response info
-            res = {
-                "id": f"trf_live_{account_id[-6:]}",
-                "entity": "transfer",
-                "account": account_id,
-                "amount": amount_paise,
-                "currency": currency,
-                "on_hold": True,
-                "status": "processed",
-                "api_note": "Route API response handled (Linked Account fallback)",
-            }
-            if on_hold_until:
-                res["on_hold_until"] = on_hold_until
-            return res
-        except Exception as e:
-            return {
-                "id": f"trf_live_{account_id[-6:]}",
-                "entity": "transfer",
-                "account": account_id,
-                "amount": amount_paise,
-                "currency": currency,
-                "on_hold": True,
-                "status": "processed",
-                "error": str(e),
-            }
+        response = requests.post(url, auth=self.auth, json=payload, timeout=10)
+        if response.status_code in (200, 201):
+            return response.json()
+        
+        # In live mode, raise explicit error on Gateway API rejection
+        raise RuntimeError(
+            f"Razorpay Route Transfer Creation Failed (HTTP {response.status_code}): {response.text}"
+        )
 
     def modify_transfer_hold(self, transfer_id: str, on_hold: bool = False) -> Dict[str, Any]:
         """
         Modify the settlement hold status of a transfer.
         PATCH /v1/transfers/{transfer_id} with {"on_hold": false}
         """
-        if not self.is_live:
+        is_sandbox_transfer = (
+            not self.is_live
+            or os.getenv("RAZORPAY_SANDBOX", "false").lower() in ("true", "1", "yes")
+            or transfer_id.startswith("trf_mock_")
+            or transfer_id.startswith("trf_test_")
+        )
+
+        if is_sandbox_transfer:
             return {
                 "id": transfer_id,
                 "entity": "transfer",
                 "on_hold": on_hold,
                 "status": "settled" if not on_hold else "processed",
+                "mode": "sandbox_simulation",
             }
 
         url = f"{self.base_url}/transfers/{transfer_id}"
         payload = {"on_hold": on_hold}
-        try:
-            response = requests.patch(url, auth=self.auth, json=payload, timeout=10)
-            if response.status_code in (200, 201):
-                return response.json()
-            return {
-                "id": transfer_id,
-                "entity": "transfer",
-                "on_hold": on_hold,
-                "status": "settled" if not on_hold else "processed",
-                "api_note": "Route Hold PATCH handled",
-            }
-        except Exception as e:
-            return {
-                "id": transfer_id,
-                "entity": "transfer",
-                "on_hold": on_hold,
-                "status": "settled" if not on_hold else "processed",
-                "error": str(e),
-            }
+        response = requests.patch(url, auth=self.auth, json=payload, timeout=10)
+        if response.status_code in (200, 201):
+            return response.json()
+
+        # In live mode, raise explicit error on Gateway API rejection
+        raise RuntimeError(
+            f"Razorpay Route Hold Modification Failed (HTTP {response.status_code}): {response.text}"
+        )
 
     def release_route_hold(self, transfer_id: str) -> Dict[str, Any]:
         """Legacy helper for releasing an escrowed transfer."""

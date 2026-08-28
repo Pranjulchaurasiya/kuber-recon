@@ -23,12 +23,12 @@
 3. **Paise-Exact Invariant:**
    * Total reconciled ledger delta: $\Delta = \text{₹}0.0000$. Zero floating-point rounding leakage.
 
-### 2. Autonomous Delivery-Gated Settlement
-- **Constraint**: Agents must be guaranteed settlement *only* if they deterministically prove delivery.
-- **Result**: Implemented **APEX Assurance Console**. A 3-stage state machine (`HELD` -> `RELEASING` -> `RELEASED`) gating Razorpay Route transfers using native `on_hold: true/false`.
-- **Proof**: 100% of simulated malicious / hallucinated deliveries triggered structural `HTTP 412` refusal without LLM drift.
-- **Crypto-Auth**: Backend-only Ed25519 signing ensures non-repudiable proof of maker/checker authorization.
+### 2. Autonomous Delivery-Gated Settlement (APEX Assurance)
+- **Constraint**: Agents must be guaranteed settlement *only* if they deterministically prove delivery of exact contract items and amounts.
+- **Result**: Implemented **APEX Assurance Console**. A 4-stage state machine (`HELD` -> `VERIFYING` / `REFUSED` -> `RELEASING` -> `RELEASED`) gating Razorpay Route transfers using native `on_hold: true/false` and strict 500-record batch invariants.
+- **Proof**: 100% of simulated malicious / hallucinated deliveries (Mod-36 GSTIN corruption, unpinned keys, unsigned manifests, record count drift) triggered structural `HTTP 412 / 403` refusal without LLM drift.
+- **Dual-Party Crypto-Auth**: RFC 8032 Ed25519 dual-party authentication: (1) Seller manifest cryptographically signed with pinned registry key (`agent_seller_data_01`), and (2) Independent CFO checker release signed with pinned key (`cfo_autonomous_verifier`) guaranteeing non-repudiable maker-checker separation.
 
-### 3. Immutable Finality via Single Webhook
+### 3. Immutable Finality via Single Authoritative Webhook
 - **Constraint**: Financial state transitions cannot rely on optimistic UI interactions or dual webhooks.
-- **Result**: Implemented a single, authoritative `transfer.processed` webhook listener (`/api/webhook/razorpay`) that acts as the absolute source of truth to finalize `RELEASING` to `RELEASED`.
+- **Result**: Implemented a single, authoritative `transfer.processed` webhook listener (`/api/webhook/razorpay`) with HMAC-SHA256 signature verification, full 64-hex SHA-256 digest proofs, and durable SQLite event ID deduplication that acts as the absolute source of truth to finalize `RELEASING` to `RELEASED`.
