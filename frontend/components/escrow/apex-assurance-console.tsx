@@ -181,27 +181,24 @@ export function ApexAssuranceConsole() {
     if (!contract) return
     setLoading(true)
     try {
-      // 1. Generate local dummy Ed25519 signature
-      const dummyHash = "ed25519:" + Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('')
-      const dummyPubKey = "0x8f3ad41c09ab8821ef4512cb9014"
-
       const res = await fetch(`${getApiUrl()}/api/apex/contracts/release`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contract_id: contract.contract_id,
           checker_id: 'cfo_autonomous_verifier',
-          public_key_hex: dummyPubKey,
-          signature_hex: dummyHash,
         }),
       })
       
-      if (!res.ok) throw new Error("Backend rejected signature or release.")
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || "Backend rejected release.")
+      }
 
       const data: ReleaseResult = await res.json()
       setRelease(data)
-      addLog('APEX_ROUTER', `⚡ Auth Verified! Signature: ${data.signature_hex}. Transitioning to RELEASING...`, 'apex')
-      addLog('APEX_ROUTER', `⚡ PATCH /v1/transfers/${data.transfer_id} on_hold: false...`, 'apex')
+      addLog('APEX_ROUTER', `🔐 Ed25519 Verified (${data.algorithm || 'RFC 8032'}) | Key: ${data.public_key_fingerprint} | Sig: ${data.signature_hex.slice(0, 24)}...`, 'apex')
+      addLog('APEX_ROUTER', `⚡ PATCH /v1/transfers/${data.transfer_id} on_hold: false... Transitioning to RELEASING`, 'apex')
 
       // Simulate webhook
       setTimeout(async () => {

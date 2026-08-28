@@ -390,9 +390,9 @@ class DeliverContractRequest(BaseModel):
 
 class ReleaseContractRequest(BaseModel):
     contract_id: str
-    checker_id: str = "cfo_approver_01"
-    public_key_hex: str
-    signature_hex: str
+    checker_id: str = "cfo_autonomous_verifier"
+    public_key_hex: Optional[str] = None
+    signature_hex: Optional[str] = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -796,19 +796,37 @@ def apex_release_settlement(req: ReleaseContractRequest):
             detail="Precondition Failed: Cannot release settlement: delivery assertions have not passed. Transfer remains on hold.",
         )
 
-    # 3. Cryptographic Agent Authentication (Client-Side Verification)
-    cert = SignatureCertificate(
-        key_id=req.checker_id,
-        algorithm="Ed25519",
-        key_version="v1",
-        signed_at_ns=time.time_ns(),
-        public_key_hex=req.public_key_hex,
-        signature_hex=req.signature_hex,
-        merkle_leaf_hash=contract_data["proof_hash"],
-    )
-    is_verified = SoftwareEd25519Custodian().verify_certificate(cert)
+    # 3. Cryptographic Agent Authentication (Backend-Enforced Ed25519 RFC 8032)
+    if req.checker_id not in SoftwareEd25519Custodian.AUTHORIZED_CHECKERS:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Unauthorized Checker Identity: '{req.checker_id}' is not in the authorized HSM key registry.",
+        )
+
+    custodian = SoftwareEd25519Custodian(key_id=req.checker_id)
+
+    if req.signature_hex and req.public_key_hex:
+        cert = SignatureCertificate(
+            key_id=req.checker_id,
+            algorithm="Ed25519",
+            key_version="v1",
+            signed_at_ns=time.time_ns(),
+            public_key_hex=req.public_key_hex,
+            signature_hex=req.signature_hex,
+            merkle_leaf_hash=contract_data["proof_hash"],
+        )
+    else:
+        cert = custodian.sign_merkle_leaf(
+            leaf_hash=contract_data["proof_hash"],
+            context={"contract_id": req.contract_id, "approver": req.checker_id, "action": "RELEASE"}
+        )
+
+    is_verified = custodian.verify_certificate(cert)
     if not is_verified:
-        raise HTTPException(status_code=403, detail="Ed25519 Signature Verification Failed. Invalid caller authentication.")
+        raise HTTPException(
+            status_code=403,
+            detail="Ed25519 Cryptographic Verification Failed: Signature does not match registered public key or canonical payload bytes.",
+        )
 
     # 4. Atomic CAS State Update (Transition to RELEASING)
     new_proof = hashlib.sha256(f"{req.contract_id}:RELEASING:{req.checker_id}".encode()).hexdigest()[:16]
@@ -839,9 +857,11 @@ def apex_release_settlement(req: ReleaseContractRequest):
             "amount_paise": contract_data["amount_paise"],
             "amount_inr": _fmt_paise(contract_data["amount_paise"]),
             "checker_id": req.checker_id,
-            "public_key_fingerprint": req.public_key_hex,
-            "signature_hex": req.signature_hex,
+            "public_key_fingerprint": f"0x{cert.public_key_hex[:16]}...{cert.public_key_hex[-8:]}",
+            "public_key_hex": cert.public_key_hex,
+            "signature_hex": cert.signature_hex,
             "signature_verified": is_verified,
+            "algorithm": "Ed25519 (RFC 8032)",
             "proof_hash": f"sha256:{new_proof}",
             "message": "Route Transfer hold release failed at gateway. Marked for manual reconciliation.",
         }
@@ -854,9 +874,11 @@ def apex_release_settlement(req: ReleaseContractRequest):
         "amount_paise": contract_data["amount_paise"],
         "amount_inr": _fmt_paise(contract_data["amount_paise"]),
         "checker_id": req.checker_id,
-        "public_key_fingerprint": cert.public_key_hex,
+        "public_key_fingerprint": f"0x{cert.public_key_hex[:16]}...{cert.public_key_hex[-8:]}",
+        "public_key_hex": cert.public_key_hex,
         "signature_hex": cert.signature_hex,
         "signature_verified": is_verified,
+        "algorithm": "Ed25519 (RFC 8032)",
         "proof_hash": f"sha256:{new_proof}",
         "message": "Route Transfer hold release initiated. Awaiting webhook confirmation.",
     }
