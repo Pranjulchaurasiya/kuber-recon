@@ -30,7 +30,7 @@ import time
 from decimal import Decimal
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from typing import Any, Dict, List, Optional, Union
 
 try:
     from dotenv import load_dotenv
@@ -60,6 +60,13 @@ from kuber_recon.assurance import (
     AssuranceContract,
     ContractStatus,
     DeterministicAssertionEngine,
+)
+from kuber_recon.capital import (
+    ActiveFacilityExistsError,
+    CapitalFacilityManager,
+    CapitalOffer,
+    CapitalUnderwriter,
+    FacilityStatus,
 )
 from kuber_recon.client import RazorpayClientAdapter
 from kuber_recon.engine import AmbiguousMatchError, KnuthExactCoverSolver, ReconciliationEngine
@@ -1157,6 +1164,148 @@ def twin_simulate(req: TwinRequest):
     r["latency_ms"] = round(latency_ms, 3)
     r["computed_by"] = "FinancialDigitalTwin · Causal Inference Engine"
     return r
+
+
+# ── APEX Capital Working Capital & Split-Settlement Routes ───────────────────
+
+capital_underwriter = CapitalUnderwriter()
+capital_facility_manager = CapitalFacilityManager()
+
+
+class CapitalDrawdownRequest(BaseModel):
+    merchant_id: str = Field(default="merch_delhi_logistics_01")
+    requested_amount_paise: Optional[int] = Field(default=None)
+
+
+class CapitalSweepRequest(BaseModel):
+    facility_id: str
+    num_records: int = Field(default=20)
+
+
+@app.get("/api/capital/offer")
+def get_capital_offer(merchant_id: str = "merch_delhi_logistics_01"):
+    """Underwrite real-time working capital advance off verified delivered ledger truth."""
+    invoices, bank_credits, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=100)
+    blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
+    offer = capital_underwriter.generate_offer(merchant_id=merchant_id, reconciled_blocks=blocks, invoices=invoices)
+    
+    return {
+        "merchant_id": offer.merchant_id,
+        "verified_delivered_gmv_paise": offer.verified_delivered_gmv_paise,
+        "verified_delivered_gmv_inr": _fmt_paise(offer.verified_delivered_gmv_paise),
+        "settlement_reliability_index": str(offer.settlement_reliability_index),
+        "risk_tier": offer.risk_tier,
+        "max_eligible_advance_paise": offer.max_eligible_advance_paise,
+        "max_eligible_advance_inr": _fmt_paise(offer.max_eligible_advance_paise),
+        "offered_principal_paise": offer.offered_principal_paise,
+        "offered_principal_inr": _fmt_paise(offer.offered_principal_paise),
+        "factor_fee_paise": offer.factor_fee_paise,
+        "factor_fee_inr": _fmt_paise(offer.factor_fee_paise),
+        "total_repayment_paise": offer.total_repayment_paise,
+        "total_repayment_inr": _fmt_paise(offer.total_repayment_paise),
+        "sweep_rate": str(offer.sweep_rate),
+        "sweep_rate_pct": f"{int(offer.sweep_rate * 100)}%",
+        "underwritten_at": offer.underwritten_at.isoformat(),
+        "offer_expires_at": offer.offer_expires_at.isoformat(),
+        "explanation": offer.explanation,
+    }
+
+
+@app.post("/api/capital/drawdown")
+def disburse_capital_advance(req: CapitalDrawdownRequest):
+    """Execute 1-click working capital advance drawdown with simulated Razorpay Payout."""
+    invoices, bank_credits, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=100)
+    blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
+    offer = capital_underwriter.generate_offer(
+        merchant_id=req.merchant_id,
+        reconciled_blocks=blocks,
+        invoices=invoices,
+        requested_advance_paise=req.requested_amount_paise,
+    )
+    try:
+        facility = capital_facility_manager.disburse_advance(offer)
+    except ActiveFacilityExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    return {
+        "status": "DISBURSED",
+        "facility_id": facility.facility_id,
+        "merchant_id": facility.merchant_id,
+        "principal_paise": facility.principal_paise,
+        "principal_inr": _fmt_paise(facility.principal_paise),
+        "total_repayment_paise": facility.total_repayment_paise,
+        "remaining_balance_paise": facility.remaining_balance_paise,
+        "remaining_balance_inr": _fmt_paise(facility.remaining_balance_paise),
+        "sweep_rate_pct": f"{int(facility.sweep_rate * 100)}%",
+        "payout_transfer_id": facility.payout_transfer_id,
+        "disbursed_at": facility.disbursed_at.isoformat(),
+    }
+
+
+@app.get("/api/capital/facilities")
+def list_capital_facilities():
+    """List all working capital facilities and repayment audit logs."""
+    res = []
+    for fac in capital_facility_manager.facilities.values():
+        res.append({
+            "facility_id": fac.facility_id,
+            "merchant_id": fac.merchant_id,
+            "principal_inr": _fmt_paise(fac.principal_paise),
+            "factor_fee_inr": _fmt_paise(fac.factor_fee_paise),
+            "total_repayment_inr": _fmt_paise(fac.total_repayment_paise),
+            "remaining_balance_inr": _fmt_paise(fac.remaining_balance_paise),
+            "status": fac.status.value,
+            "sweep_rate_pct": f"{int(fac.sweep_rate * 100)}%",
+            "payout_transfer_id": fac.payout_transfer_id,
+            "repayment_sweeps_count": len(fac.repayment_events),
+            "repayment_events": [
+                {
+                    "sweep_id": ev.sweep_id,
+                    "utr": ev.settlement_utr,
+                    "gross_settlement_inr": _fmt_paise(ev.gross_settlement_paise),
+                    "sweep_deduction_inr": _fmt_paise(ev.sweep_deduction_paise),
+                    "net_merchant_payout_inr": _fmt_paise(ev.net_merchant_payout_paise),
+                    "remaining_balance_inr": _fmt_paise(ev.remaining_balance_paise),
+                    "applied_at": ev.applied_at.isoformat(),
+                }
+                for ev in fac.repayment_events
+            ],
+        })
+    return {"facilities": res}
+
+
+@app.post("/api/capital/reconcile-and-sweep")
+def reconcile_and_sweep(req: CapitalSweepRequest):
+    """Reconcile incoming bank settlement block and apply automated split recovery sweep."""
+    facility = capital_facility_manager.facilities.get(req.facility_id)
+    if not facility:
+        raise HTTPException(status_code=404, detail="Facility not found.")
+
+    invoices, bank_credits, _, _ = ChaosDataGenerator(seed=99).generate_suite(num_records=req.num_records)
+    blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
+    if not blocks:
+        raise HTTPException(status_code=400, detail="No reconcilable settlement blocks found.")
+
+    settlement_block = blocks[0]
+    fac, event = capital_facility_manager.process_settlement_sweep(req.facility_id, settlement_block)
+    
+    return {
+        "status": "SWEEP_APPLIED",
+        "facility_status": fac.status.value,
+        "settlement_utr": settlement_block.utr_number,
+        "gross_settlement_inr": _fmt_paise(event.gross_settlement_paise),
+        "sweep_deduction_inr": _fmt_paise(event.sweep_deduction_paise),
+        "net_merchant_payout_inr": _fmt_paise(event.net_merchant_payout_paise),
+        "remaining_balance_inr": _fmt_paise(event.remaining_balance_paise),
+        "is_fully_repaid": fac.status == FacilityStatus.REPAID,
+    }
+
+
+@app.post("/api/capital/reset")
+def reset_capital_facilities():
+    """Reset all capital facilities and clear active state for demonstration."""
+    capital_facility_manager.facilities.clear()
+    return {"status": "RESET_SUCCESS", "active_facilities": 0}
 
 
 if __name__ == "__main__":

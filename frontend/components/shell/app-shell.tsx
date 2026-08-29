@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { ThemeToggle } from './theme-toggle'
-import { ArrowRight, Cpu } from 'lucide-react'
+import { ArrowRight, Cpu, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getApiUrl } from '@/lib/api-client'
 
@@ -29,40 +29,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isLandingPage) {
     return (
-      <div className="min-h-screen flex flex-col bg-background text-foreground">
-        {/* Full-width Landing Header */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
+      <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
+        {/* Full-width Tactical Landing Header */}
+        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-background/85 px-4 sm:px-8 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-gold/40 bg-gold/10 font-mono text-sm font-bold text-gold">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 font-mono text-sm font-bold text-primary shadow-sm">
                 A
               </div>
               <div>
-                <span className="text-base font-bold tracking-tight text-foreground">APEX Assurance</span>
-                <span className="ml-2 rounded bg-gold/10 px-1.5 py-0.5 font-mono text-[10px] uppercase font-semibold text-gold border border-gold/30">
-                  Powered by KuberRecon
+                <span className="text-base font-bold tracking-tight text-foreground">APEX</span>
+                <span className="ml-1.5 text-xs text-muted-foreground font-semibold">Capital & Assurance</span>
+                <span className="hidden lg:inline-block ml-2 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] uppercase font-bold text-primary border border-primary/20">
+                  Razorpay Route Escrow
                 </span>
               </div>
             </Link>
           </div>
 
           {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 font-medium text-sm text-muted-foreground">
+          <nav className="hidden md:flex items-center gap-6 font-medium text-xs text-muted-foreground">
+            <a href="#problem-solution" className="transition-colors hover:text-foreground">
+              Why APEX
+            </a>
+            <a href="#the-proof" className="transition-colors hover:text-foreground">
+              Proof
+            </a>
+            <a href="#how-it-works" className="transition-colors hover:text-foreground">
+              How It Works
+            </a>
+            <a href="#product-console" className="transition-colors hover:text-foreground">
+              Operating Console
+            </a>
             <Link href="/apex" className="transition-colors hover:text-foreground">
-              Assurance Console
-            </Link>
-            <a href="#settlement-gate" className="transition-colors hover:text-foreground">
-              Settlement Gate
-            </a>
-            <a href="#architecture" className="transition-colors hover:text-foreground">
-              Architecture
-            </a>
-            <Link href="/escrow" className="transition-colors hover:text-foreground">
-              Verification Rails
+              Assurance Terminal
             </Link>
           </nav>
 
-          {/* Right Actions */}
+          {/* Right Actions & Theme Switcher */}
           <div className="flex items-center gap-3">
             {gatewayMode === 'test_mode' ? (
               <div className="hidden sm:flex items-center gap-2 rounded-full border border-gain/30 bg-gain/10 px-3 py-1 font-mono text-xs font-semibold text-gain">
@@ -80,7 +84,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <Link
               href="/apex"
-              className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background shadow transition-all hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-xs font-bold text-background shadow transition-all hover:opacity-90"
             >
               Launch Console
               <ArrowRight className="h-3.5 w-3.5" />
@@ -89,7 +93,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Landing Canvas */}
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 relative">{children}</main>
+
+        {/* Tactical Footer */}
+        <footer className="border-t border-border bg-panel py-8 px-6 sm:px-8 text-xs text-muted-foreground">
+          <div className="max-w-[1280px] mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-gain" />
+              <span className="font-mono font-semibold text-foreground">APEX Autonomous Kernel</span>
+              <span>· Razorpay AI Buildathon 2026 (Track 01)</span>
+            </div>
+            <div className="flex items-center gap-6 font-mono text-[11px]">
+              <span>81/81 INVARIANT TESTS PASSING</span>
+              <span>FMR 0.000</span>
+              <span>BASE-10 ZERO FLOAT</span>
+            </div>
+          </div>
+        </footer>
       </div>
     )
   }

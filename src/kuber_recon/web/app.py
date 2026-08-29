@@ -1,8 +1,8 @@
-"""Interactive Razorpay Blade Web Console for KuberRecon & KuberSovereign.
+"""Interactive Razorpay Blade Web Console for KuberRecon & APEX Escrow.
 
 Zero-external-dependency self-contained web dashboard featuring:
 1. Live Interactive Money Lineage DAG Tree Visualizer.
-2. KuberSovereign Pre-Settlement Escrow Simulation Drawer (`on_hold: true`).
+2. APEX Pre-Settlement Escrow Simulation Drawer (`on_hold: true`).
 3. Causal Financial Digital Twin "What-If" Stress-Test Console.
 4. One-Click Real-Time Chaos Benchmark Runner.
 """
@@ -254,7 +254,7 @@ Loading real-time DAG tree from Python Knuth DLX solver...
                         <div class="card-title">Live Escrow State Machine Ledger</div>
                     </div>
                     <div id="escrow-log" class="code-box">
-Ready to simulate KuberSovereign 2-Tier Phased Escrow. Click any button on the left to start.
+Ready to simulate APEX 2-Tier Phased Escrow. Click any button on the left to start.
                     </div>
                 </div>
             </div>
@@ -500,7 +500,7 @@ class WebConsoleHandler(http.server.BaseHTTPRequestHandler):
 def serve_web_console(port: int = 8080):
     """Start the embedded web console server."""
     with socketserver.TCPServer(("", port), WebConsoleHandler) as httpd:
-        print(f">> KuberRecon & KuberSovereign Web Console running at http://localhost:{port}")
+        print(f">> KuberRecon & APEX Web Console running at http://localhost:{port}")
         httpd.serve_forever()
 
 

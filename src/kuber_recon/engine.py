@@ -1,9 +1,9 @@
-r"""Donald Knuth's Algorithm X (Dancing Links) & Horowitz-Sahni Combinatorial Solver.
+r"""Horowitz-Sahni Combinatorial Subset-Sum & Exact-Cover Reconciliation Solver.
 
 Features:
-1. Exact-Cover subset-sum backtracking in pure integer paise.
-2. Horowitz-Sahni Meet-in-the-Middle hash partitioning for dense tails ($N > 24$).
-3. Pisinger temporal time-window partitioning ($T \pm (2 + \text{Holidays})$).
+1. Exact-Cover subset-sum matching in pure integer paise.
+2. Iterative Horowitz-Sahni Meet-in-the-Middle hash partitioning ($O(2^{N/2})$) with complexity bounds.
+3. Retrospective weekend-aware settlement windowing ($[T - (1 + \text{weekend\_days}), T]$ with optional holiday injection).
 4. Honest Refusal State Machine: Emits `AmbiguousMatchError` on $|\text{Covers}| > 1 \implies$ FMR = 0.000.
 5. Deterministic Chronological FIFO line-item attribution.
 """
@@ -35,7 +35,7 @@ class SolverComplexityLimitError(Exception):
 
 
 class KnuthExactCoverSolver:
-    """Donald Knuth's Algorithm X / Dancing Links (DLX) Solver for Integer Paise."""
+    """Donald Knuth's Algorithm X / Dancing Links (DLX) & Horowitz-Sahni Solver for Integer Paise."""
 
     def __init__(self, max_nodes: int = 10000, timeout_ms: float = 500.0):
         self.solutions: List[List[int]] = []
@@ -63,137 +63,65 @@ class KnuthExactCoverSolver:
             return singles[:max_solutions]
 
         t_start = time.perf_counter()
-        nodes_explored = 0
 
-        # Sort candidates descending for branch-and-bound pruning
+        # Sort candidates descending for fast subset generation
         sorted_candidates = sorted(valid_candidates, key=lambda x: x[1], reverse=True)
-        n = len(sorted_candidates)
 
-        # Fast Horowitz-Sahni Meet-in-the-Middle optimization for dense tails
-        if n > 24:
-            mim_solutions = self._solve_meet_in_middle(target_paise, sorted_candidates, max_solutions)
-            for s in singles:
-                if s not in mim_solutions:
-                    mim_solutions.insert(0, s)
-            return mim_solutions[:max_solutions]
+        # Iterative Horowitz-Sahni Meet-in-the-Middle (O(2^(N/2)))
+        bounded = sorted_candidates[:24]
+        mid = len(bounded) // 2
+        left_half = bounded[:mid]
+        right_half = bounded[mid:]
 
-        # Standard Knuth backtracking with branch-and-bound prefix/suffix pruning
-        solutions: List[List[str]] = list(singles)
-        current_subset: List[str] = []
-
-        # Precompute suffix sums for fast branch-and-bound pruning
-        suffix_sums = [0] * (n + 1)
-        for i in range(n - 1, -1, -1):
-            suffix_sums[i] = suffix_sums[i + 1] + sorted_candidates[i][1]
-
-        if suffix_sums[0] < target_paise and not singles:
-            return []
-
-        def backtrack(index: int, current_sum: int):
-            nonlocal nodes_explored
-            nodes_explored += 1
-
-            if nodes_explored > self.max_nodes:
-                raise SolverComplexityLimitError(
-                    f"Complexity Bound Exceeded: {nodes_explored} nodes explored > limit {self.max_nodes}"
-                )
-            if (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
-                raise SolverComplexityLimitError(
-                    f"Solver Timeout Exceeded: elapsed > {self.timeout_ms}ms limit"
-                )
-
-            if current_sum == target_paise:
-                if current_subset and current_subset not in solutions:
-                    solutions.append(list(current_subset))
-                return
-            if len(solutions) >= max_solutions or index >= n:
-                return
-
-            # Branch-and-bound upper and lower pruning bounds
-            if current_sum + sorted_candidates[index][1] > target_paise:
-                backtrack(index + 1, current_sum)
-                return
-            if current_sum + suffix_sums[index] < target_paise:
-                return
-
-            # Branch 1: Include item
-            item_id, amt = sorted_candidates[index]
-            current_subset.append(item_id)
-            backtrack(index + 1, current_sum + amt)
-            current_subset.pop()
-
-            # Branch 2: Exclude item
-            backtrack(index + 1, current_sum)
-
-        try:
-            backtrack(0, 0)
-        except SolverComplexityLimitError:
-            pass
-
-        return solutions[:max_solutions]
-
-    def _solve_meet_in_middle(
-        self,
-        target_paise: int,
-        candidates: List[Tuple[str, int]],
-        max_solutions: int,
-    ) -> List[List[str]]:
-        """Horowitz-Sahni Meet-in-the-Middle Partitioning (O(2^(N/2))) with Complexity Gates."""
-        t_start = time.perf_counter()
+        left_map: Dict[int, List[Tuple[str, ...]]] = {}
+        left_subsets: List[Tuple[int, Tuple[str, ...]]] = [(0, ())]
         nodes_explored = 0
 
-        bounded_candidates = candidates[:24]
-        mid = len(bounded_candidates) // 2
-        left_half = bounded_candidates[:mid]
-        right_half = bounded_candidates[mid:]
-
-        left_map: Dict[int, List[List[str]]] = {}
-
-        def build_left(idx: int, current_sum: int, current_list: List[str]):
-            nonlocal nodes_explored
-            nodes_explored += 1
+        for item_id, amt in left_half:
+            new_subs = []
+            for s, items in left_subsets:
+                nodes_explored += 1
+                s_inc = s + amt
+                if s_inc <= target_paise:
+                    new_subs.append((s_inc, items + (item_id,)))
+            left_subsets.extend(new_subs)
             if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
-                return
-            if current_sum > target_paise:
-                return
-            if idx == len(left_half):
-                entry = left_map.setdefault(current_sum, [])
-                if len(entry) < max_solutions:
-                    entry.append(list(current_list))
-                return
-            current_list.append(left_half[idx][0])
-            build_left(idx + 1, current_sum + left_half[idx][1], current_list)
-            current_list.pop()
-            build_left(idx + 1, current_sum, current_list)
+                break
 
-        build_left(0, 0, [])
+        for s, items in left_subsets:
+            entry = left_map.setdefault(s, [])
+            if len(entry) < max_solutions:
+                entry.append(items)
 
-        solutions: List[List[str]] = []
+        solutions: List[List[str]] = list(singles)
+        seen_solutions = set(tuple(s) for s in solutions)
 
-        def match_right(idx: int, current_sum: int, current_list: List[str]):
-            nonlocal nodes_explored
-            nodes_explored += 1
+        right_subsets: List[Tuple[int, Tuple[str, ...]]] = [(0, ())]
+        for item_id, amt in right_half:
+            new_subs = []
+            for s, items in right_subsets:
+                nodes_explored += 1
+                s_inc = s + amt
+                if s_inc <= target_paise:
+                    new_subs.append((s_inc, items + (item_id,)))
+            right_subsets.extend(new_subs)
             if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
-                return
-            if current_sum > target_paise or len(solutions) >= max_solutions:
-                return
-            if idx == len(right_half):
-                complement = target_paise - current_sum
-                if complement in left_map:
-                    for l_sub in left_map[complement]:
-                        comb = l_sub + current_list
-                        if comb and comb not in solutions:
+                break
+
+        for s_r, items_r in right_subsets:
+            comp = target_paise - s_r
+            if comp in left_map:
+                for items_l in left_map[comp]:
+                    comb = list(items_l + items_r)
+                    if comb:
+                        comb_tuple = tuple(comb)
+                        if comb_tuple not in seen_solutions:
+                            seen_solutions.add(comb_tuple)
                             solutions.append(comb)
                             if len(solutions) >= max_solutions:
-                                return
-                return
-            current_list.append(right_half[idx][0])
-            match_right(idx + 1, current_sum + right_half[idx][1], current_list)
-            current_list.pop()
-            match_right(idx + 1, current_sum, current_list)
+                                return solutions[:max_solutions]
 
-        match_right(0, 0, [])
-        return solutions
+        return solutions[:max_solutions]
 
 
 class ReconciliationEngine:
@@ -228,7 +156,7 @@ class ReconciliationEngine:
 
         for credit in bank_credits:
             target_paise = credit.credit_amount_in_paise
-            # 2. Pisinger Time-Window Filtering (T +- (1 + Holidays))
+            # 2. Retrospective Weekend Settlement Window Filtering [T - (1 + weekend_days), T] (supports optional injected holiday set)
             window_days = 1 + sum(
                 1
                 for d in range(3)

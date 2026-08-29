@@ -196,3 +196,8 @@ class KuberSovereignEscrowEngine:
                 "action": f"POST /v1/transfers/{split.route_transfer_id}/reversal (Auto-Refund)",
                 "tax_loss_prevented": f"Rs {split.gst_escrow_paise / 100:.2f} protected from supplier tax default.",
             }
+
+
+# Canonical internal alias: EscrowEngine maps to KuberSovereignEscrowEngine
+EscrowEngine = KuberSovereignEscrowEngine
+

@@ -1,7 +1,9 @@
+import Link from 'next/link'
 import { SplitEngine } from '@/components/escrow/split-engine'
 import { RazorpayRouteConsole } from '@/components/escrow/razorpay-console'
 import { Panel, SectionLabel, StatTile, Pill } from '@/components/kuber/primitives'
 import { escrowSplits, escrowBuckets, paiseToInr } from '@/lib/kuber-data'
+import { ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react'
 
 export default function EscrowPage() {
   const held = escrowSplits.filter((s) => s.onHold)
@@ -9,10 +11,23 @@ export default function EscrowPage() {
   const totalGross = escrowSplits.reduce((a, s) => a + s.gross, 0)
 
   return (
-    <div className="mx-auto max-w-[1400px] px-5 py-8">
-      <header className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto max-w-[1400px] px-5 py-8 space-y-6">
+      <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Pill tone="gold">Razorpay Route · T=0 Statutory Escrow</Pill>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Pill tone="gold">Razorpay Route · T=0 Statutory Escrow</Pill>
+            <div className="flex items-center gap-3 font-mono text-xs">
+              <Link href="/apex" className="text-muted-foreground hover:text-primary transition flex items-center gap-1">
+                <span>Assurance Radar</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+              <span className="text-muted-foreground/40">•</span>
+              <Link href="/ledger" className="text-muted-foreground hover:text-primary transition flex items-center gap-1">
+                <span>Merkle Ledger</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Gateway Escrow Rail</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
             Money is protected <span className="text-foreground">before</span> it leaves the merchant&apos;s
@@ -21,6 +36,29 @@ export default function EscrowPage() {
           </p>
         </div>
       </header>
+
+      {/* 🔴 P2: What This Proves Callout Banner */}
+      <div className="rounded-xl border border-border bg-panel p-4 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+          <div className="rounded-lg border border-border bg-background p-3.5 space-y-1.5">
+            <div className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
+              Traditional Payment Gateways:
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Disburse 100% of gross settlement directly to seller accounts. Tax compliance (TDS § 194-O, GST) is left as a post-settlement headache that triggers tax notices and cash leakage.
+            </p>
+          </div>
+          <div className="rounded-lg border border-gold/40 bg-gold/5 p-3.5 space-y-1.5">
+            <div className="font-bold text-gold uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              APEX Route Escrow Invariant:
+            </div>
+            <p className="text-foreground/90 leading-relaxed">
+              Splits every payment at T=0 directly via Razorpay Route Transfers with `on_hold: true`, holding statutory dues until verified delivery and GSTR-2B matching occurs.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Gross intake" value={paiseToInr(totalGross, { compact: true })} hint={`${escrowSplits.length} orders in window`} />

@@ -32,7 +32,7 @@ def test_simulate_vendor_gst_default_cascade(digital_twin_fixture):
 
     assert res.tax_at_risk_paise > 0
     assert res.simulated_net_settlement_paise < res.baseline_net_settlement_paise
-    assert "KuberSovereign Escrow" in res.recommended_hedging_action
+    assert "APEX Route Escrow" in res.recommended_hedging_action
 
 
 def test_simulate_regulatory_tds_hike_206ab(digital_twin_fixture):

@@ -47,14 +47,14 @@ export function Topbar() {
 
         {/* Mobile brand mark */}
         <div className="flex items-center gap-2 md:hidden">
-          <span className="font-mono text-xs font-bold text-gold">APEX</span>
+          <Link href="/" className="font-mono text-xs font-bold text-primary">APEX</Link>
         </div>
 
         {/* Breadcrumb */}
         <div className="flex min-w-0 items-center gap-2">
-          <span className="font-mono text-xs font-bold uppercase tracking-wider text-gold">
+          <Link href="/" className="font-mono text-xs font-bold uppercase tracking-wider text-primary hover:underline">
             {current.code}
-          </span>
+          </Link>
           <span className="text-muted-foreground/40">/</span>
           <h1 className="truncate text-sm font-semibold text-foreground">{current.label}</h1>
         </div>
@@ -82,13 +82,37 @@ export function Topbar() {
             <div className="font-mono text-sm font-semibold text-gain">0.000</div>
           </div>
 
-          {/* Theme toggle */}
+          {/* Standard Light / Dark Toggle */}
           <ThemeToggle />
 
           {/* CFO badge */}
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gold/40 bg-gold/10 font-mono text-xs font-bold text-gold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/40 bg-primary/10 font-mono text-xs font-bold text-primary">
             CFO
           </div>
+        </div>
+      </div>
+
+      {/* 🔴 P1: Live Inbound Webhook Telemetry Stream Ticker */}
+      <div className="flex items-center justify-between border-t border-border/80 bg-panel/70 px-4 py-1.5 font-mono text-[11px] backdrop-blur overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex h-2 w-2 rounded-full bg-gain animate-status-dot shrink-0" />
+          <span className="font-bold text-primary shrink-0 uppercase tracking-wider text-[10px]">
+            LIVE WEBHOOK STREAM
+          </span>
+          <span className="text-muted-foreground/40 shrink-0">•</span>
+          <div className="truncate text-foreground/90 transition-all duration-300">
+            <LiveWebhookTicker />
+          </div>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-3 shrink-0 pl-3">
+          <Link
+            href="/ledger"
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition"
+          >
+            <span>Merkle Block: #8492</span>
+            <span className="text-gain font-semibold">✓ Verified</span>
+          </Link>
         </div>
       </div>
 
@@ -110,10 +134,10 @@ export function Topbar() {
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className={`font-mono text-[10px] ${active ? 'text-gold' : 'text-muted-foreground'}`}>{item.code}</span>
+                  <span className={`font-mono text-[10px] ${active ? 'text-primary' : 'text-muted-foreground'}`}>{item.code}</span>
                   <span>{item.label}</span>
                 </div>
-                {active && <span className="h-1.5 w-1.5 rounded-full bg-gold" />}
+                {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
               </Link>
             )
           })}
@@ -122,3 +146,52 @@ export function Topbar() {
     </header>
   )
 }
+
+function LiveWebhookTicker() {
+  const events = [
+    {
+      badge: 'HMAC✓ 00:20:14',
+      text: 'razorpay.payment.captured · ₹59,764.78 · Route Transferred (on_hold: true)',
+      tone: 'text-gain',
+    },
+    {
+      badge: 'ED25519✓ 00:20:17',
+      text: 'gst.mod36_validation · GSTIN 29ABCDE1234F1Z5 MATCHED GSTR-2B',
+      tone: 'text-primary',
+    },
+    {
+      badge: 'KNUTH✓ 00:20:20',
+      text: 'exact_cover.solved · 4 Invoices · UTR HDFCN24942603 · FMR 0.000',
+      tone: 'text-gain',
+    },
+    {
+      badge: 'SWEEP✓ 00:20:23',
+      text: 'capital.reconcile_and_sweep · 12% Auto-Deduction · Balance ₹0.00',
+      tone: 'text-gold',
+    },
+    {
+      badge: 'CERT#c7a9f1',
+      text: 'rbi.digital_lending_norm · FLDG 0% Risk Transfer Compliant',
+      tone: 'text-primary',
+    },
+  ]
+
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % events.length)
+    }, 3500)
+    return () => clearInterval(timer)
+  }, [events.length])
+
+  const current = events[currentIndex]
+
+  return (
+    <span className="inline-flex items-center gap-1.5 font-mono">
+      <span className={`font-bold ${current.tone}`}>[{current.badge}]</span>
+      <span className="text-foreground">{current.text}</span>
+    </span>
+  )
+}
+

@@ -31,6 +31,7 @@
   --color-warn: var(--warn);
   --color-danger: var(--danger);
   --color-panel: var(--panel);
+  --color-panel-header: var(--panel-header);
 
   --font-sans: var(--font-geist-sans), 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
@@ -39,37 +40,37 @@
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   DARK MODE — Graphite & Charcoal Control Room Base
+   THEME 1: MISSION CONTROL (Default Dark - Tactical Slate & Emerald/Cyan)
 ═══════════════════════════════════════════════════════════════════ */
-:root {
+:root, [data-theme="mission-control"], html[data-theme="mission-control"] {
   color-scheme: dark;
 
-  --background: #0b0e17;
+  --background: #090d16;
   --foreground: #f1f5f9;
 
-  --panel: #111624;
-  --card: #111624;
+  --panel: #0f1626;
+  --panel-header: #141d33;
+  --card: #0f1626;
   --card-foreground: #f1f5f9;
-  --popover: #111624;
+  --popover: #0f1626;
   --popover-foreground: #f1f5f9;
 
-  --primary: #ffffff;
-  --primary-foreground: #0b0e17;
-  --secondary: #1a2236;
+  --primary: #38bdf8;
+  --primary-foreground: #090d16;
+  --secondary: #1a233a;
   --secondary-foreground: #f1f5f9;
-  --muted: #161c2d;
+  --muted: #141c2e;
   --muted-foreground: #94a3b8;
-  --accent: #192135;
-  --accent-foreground: #f8fafc;
+  --accent: #172138;
+  --accent-foreground: #38bdf8;
 
-  /* Sovereign Gold & Brand Accents */
   --gold: #f59e0b;
-  --gold-foreground: #0b0e17;
+  --gold-foreground: #090d16;
 
-  /* Functional status system */
   --gain: #10b981;
   --warn: #f59e0b;
   --danger: #f43f5e;
@@ -77,77 +78,322 @@
 
   --border: #1e293b;
   --input: #1e293b;
-  --ring: #f59e0b;
+  --ring: #38bdf8;
+  --glow-color: rgba(56, 189, 248, 0.18);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   LIGHT MODE — Clean Paper & Crisp Slate Contrast
+   THEME 2: RAZORPAY BLUE (Deep Electric Navy & Brand Cyan)
 ═══════════════════════════════════════════════════════════════════ */
-.light, :root:not(.dark) {
+[data-theme="razorpay-blue"], html[data-theme="razorpay-blue"] {
+  color-scheme: dark;
+
+  --background: #030a1a;
+  --foreground: #f8fafc;
+
+  --panel: #07132c;
+  --panel-header: #0c1c3f;
+  --card: #07132c;
+  --card-foreground: #f8fafc;
+  --popover: #07132c;
+  --popover-foreground: #f8fafc;
+
+  --primary: #3395ff;
+  --primary-foreground: #ffffff;
+  --secondary: #10234d;
+  --secondary-foreground: #f8fafc;
+  --muted: #0d1e42;
+  --muted-foreground: #93c5fd;
+  --accent: #132a5e;
+  --accent-foreground: #60a5fa;
+
+  --gold: #fbbf24;
+  --gold-foreground: #030a1a;
+
+  --gain: #00d284;
+  --warn: #fbbf24;
+  --danger: #ff4d4f;
+  --destructive: #ff4d4f;
+
+  --border: #17326c;
+  --input: #17326c;
+  --ring: #3395ff;
+  --glow-color: rgba(51, 149, 255, 0.22);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME 3: TERMINAL DARK (Monochrome Jet Black & Phosphor Green)
+═══════════════════════════════════════════════════════════════════ */
+[data-theme="terminal-dark"], html[data-theme="terminal-dark"] {
+  color-scheme: dark;
+
+  --background: #000000;
+  --foreground: #e6edf3;
+
+  --panel: #0a0a0a;
+  --panel-header: #121212;
+  --card: #0a0a0a;
+  --card-foreground: #e6edf3;
+  --popover: #0a0a0a;
+  --popover-foreground: #e6edf3;
+
+  --primary: #10b981;
+  --primary-foreground: #000000;
+  --secondary: #171717;
+  --secondary-foreground: #e6edf3;
+  --muted: #141414;
+  --muted-foreground: #8b949e;
+  --accent: #1c1c1c;
+  --accent-foreground: #10b981;
+
+  --gold: #eab308;
+  --gold-foreground: #000000;
+
+  --gain: #10b981;
+  --warn: #eab308;
+  --danger: #ef4444;
+  --destructive: #ef4444;
+
+  --border: #262626;
+  --input: #262626;
+  --ring: #10b981;
+  --glow-color: rgba(16, 185, 129, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME 4: BLUEPRINT (CAD Technical Navy & High-Contrast Wireframe)
+═══════════════════════════════════════════════════════════════════ */
+[data-theme="blueprint"], html[data-theme="blueprint"] {
+  color-scheme: dark;
+
+  --background: #051329;
+  --foreground: #e2f1ff;
+
+  --panel: #0a2145;
+  --panel-header: #0f2c59;
+  --card: #0a2145;
+  --card-foreground: #e2f1ff;
+  --popover: #0a2145;
+  --popover-foreground: #e2f1ff;
+
+  --primary: #38bdf8;
+  --primary-foreground: #051329;
+  --secondary: #13346b;
+  --secondary-foreground: #e2f1ff;
+  --muted: #0d2752;
+  --muted-foreground: #8ec5fc;
+  --accent: #173d7d;
+  --accent-foreground: #67e8f9;
+
+  --gold: #fcd34d;
+  --gold-foreground: #051329;
+
+  --gain: #34d399;
+  --warn: #fcd34d;
+  --danger: #f87171;
+  --destructive: #f87171;
+
+  --border: #1e498a;
+  --input: #1e498a;
+  --ring: #38bdf8;
+  --glow-color: rgba(56, 189, 248, 0.24);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME 5: VS CODE DARK (Classic Charcoal & Purple/Amber Accents)
+═══════════════════════════════════════════════════════════════════ */
+[data-theme="vscode-dark"], html[data-theme="vscode-dark"] {
+  color-scheme: dark;
+
+  --background: #181818;
+  --foreground: #d4d4d4;
+
+  --panel: #1f1f1f;
+  --panel-header: #252525;
+  --card: #1f1f1f;
+  --card-foreground: #d4d4d4;
+  --popover: #1f1f1f;
+  --popover-foreground: #d4d4d4;
+
+  --primary: #007acc;
+  --primary-foreground: #ffffff;
+  --secondary: #2d2d2d;
+  --secondary-foreground: #d4d4d4;
+  --muted: #252525;
+  --muted-foreground: #858585;
+  --accent: #37373d;
+  --accent-foreground: #ffffff;
+
+  --gold: #dcdcaa;
+  --gold-foreground: #181818;
+
+  --gain: #4ec9b0;
+  --warn: #ce9178;
+  --danger: #f14c4c;
+  --destructive: #f14c4c;
+
+  --border: #333333;
+  --input: #333333;
+  --ring: #007acc;
+  --glow-color: rgba(0, 122, 204, 0.22);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME 6: CRISP LIGHT (Clean Paper White, Crisp Borders & Deep Slate Text)
+═══════════════════════════════════════════════════════════════════ */
+[data-theme="light"], html[data-theme="light"], html.light {
   color-scheme: light;
 
   --background: #f8fafc;
-  --foreground: #0f172a;
+  --foreground: #090e17;
 
   --panel: #ffffff;
+  --panel-header: #f1f5f9;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #090e17;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  --popover-foreground: #090e17;
 
-  --primary: #0f172a;
+  --primary: #0284c7;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
+  --secondary-foreground: #090e17;
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
+  --muted-foreground: #475569;
+  --accent: #e2e8f0;
+  --accent-foreground: #0284c7;
 
-  /* Sovereign Gold & Brand Accents */
   --gold: #d97706;
   --gold-foreground: #ffffff;
 
-  /* Functional status system */
   --gain: #059669;
   --warn: #d97706;
-  --danger: #e11d48;
-  --destructive: #e11d48;
+  --danger: #dc2626;
+  --destructive: #dc2626;
 
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #d97706;
+  --border: #cbd5e1;
+  --input: #cbd5e1;
+  --ring: #0284c7;
+  --glow-color: rgba(2, 132, 199, 0.12);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   CLEAN COHERENT PRIMITIVES
+   SOP-OPERA STYLE TRANSITIONS & ANIMATIONS
 ═══════════════════════════════════════════════════════════════════ */
 
-/* Subtle Glass Panel */
-.glass-panel {
-  background-color: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+/* Fade-and-slide up transitions */
+@keyframes fade-slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* Monospace Financial Value */
+.animate-fade-up {
+  animation: fade-slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.12s; }
+.stagger-3 { animation-delay: 0.20s; }
+.stagger-4 { animation-delay: 0.28s; }
+.stagger-5 { animation-delay: 0.36s; }
+
+/* Interactive Hover Lift & Glow */
+.hover-glow {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.hover-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px var(--glow-color);
+  border-color: var(--primary);
+}
+
+/* Dynamic Aurora Background Effect */
+.aurora-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.aurora-glow {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1000px;
+  height: 600px;
+  background: radial-gradient(ellipse at center, var(--glow-color) 0%, rgba(0,0,0,0) 70%);
+  filter: blur(60px);
+  opacity: 0.8;
+}
+
+.grid-rings {
+  position: absolute;
+  top: 5%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1200px;
+  height: 800px;
+  background-image: 
+    radial-gradient(circle at center, transparent 30%, var(--border) 31%, transparent 32%),
+    radial-gradient(circle at center, transparent 55%, var(--border) 56%, transparent 57%),
+    radial-gradient(circle at center, transparent 80%, var(--border) 81%, transparent 82%);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Monospace Financial Values */
 .mono-num {
   font-family: var(--font-jetbrains-mono), monospace;
   font-variant-numeric: tabular-nums;
 }
 
-/* Pulse animation for active gateway indicator */
+/* Pulse animation for live indicators */
 @keyframes status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.95); }
 }
 .animate-status-dot {
   animation: status-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Circuit Beam Pulse Animation */
+@keyframes beam-flow {
+  0% { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-beam {
+  stroke-dasharray: 8, 8;
+  animation: beam-flow 2s linear infinite;
+}
+
+/* Custom Styled Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
 /* Smooth transitions */
 *, *::before, *::after {
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 svg *, [class*="animate-"] {

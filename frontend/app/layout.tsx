@@ -25,8 +25,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   colorScheme: 'dark light',
   themeColor: [
-    { media: '(prefers-color-scheme: dark)', color: '#0c0f18' },
-    { media: '(prefers-color-scheme: light)', color: '#f8f9fc' },
+    { media: '(prefers-color-scheme: dark)', color: '#090d16' },
+    { media: '(prefers-color-scheme: light)', color: '#f8fafc' },
   ],
 }
 
@@ -36,8 +36,33 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`dark ${geistSans.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
-      <body className="font-sans antialiased bg-background text-foreground">
+    <html lang="en" className={`${geistSans.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function () {
+  try {
+    var stored = localStorage.getItem("apex-theme");
+    var theme = (stored === "light") ? "light" : "mission-control";
+    document.documentElement.dataset.theme = theme;
+    if (theme === "light") {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+    }
+  } catch (e) {
+    document.documentElement.dataset.theme = "mission-control";
+    document.documentElement.classList.add("dark");
+  }
+})();
+`,
+          }}
+        />
+      </head>
+      <body className="font-sans antialiased bg-background text-foreground min-h-screen transition-colors duration-200">
         <AppShell>{children}</AppShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

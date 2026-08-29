@@ -111,7 +111,7 @@ class FinancialDigitalTwin:
             tax_at_risk_paise=blocked_itc_paise,
             settlement_delay_days=30,  # 30-day notice cycle
             recommended_hedging_action=(
-                f"Immediately put ₹{blocked_itc_paise/100:,.2f} in KuberSovereign Escrow (`on_hold: true`) "
+                f"Immediately put ₹{blocked_itc_paise/100:,.2f} in APEX Route Escrow (`on_hold: true`) "
                 f"for vendor {defaulting_vendor_gstin} before next billing cycle."
             ),
             proof_manifest_hash=proof_hash,

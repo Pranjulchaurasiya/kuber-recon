@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getApiUrl } from '@/lib/api-client'
 import {
   CheckCircle2,
@@ -396,16 +397,16 @@ export function ApexAssuranceConsole() {
     activeStep === 3
       ? 'RELEASED'
       : release
-      ? 'RELEASING'
-      : loading && contract
-      ? 'VERIFYING'
-      : assertion?.assertions_passed
-      ? 'RELEASE_READY'
-      : assertion
-      ? 'REFUSED'
-      : contract
-      ? 'HELD'
-      : 'IDLE'
+        ? 'RELEASING'
+        : loading && contract
+          ? 'VERIFYING'
+          : assertion?.assertions_passed
+            ? 'RELEASE_READY'
+            : assertion
+              ? 'REFUSED'
+              : contract
+                ? 'HELD'
+                : 'IDLE'
 
   return (
     <div className="space-y-8">
@@ -463,13 +464,12 @@ export function ApexAssuranceConsole() {
           </div>
           <div>
             <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider block">Current State</span>
-            <span className={`font-mono text-sm font-bold ${
-              displayStatus === 'RELEASED' ? 'text-gain' :
-              displayStatus === 'REFUSED' ? 'text-danger' :
-              displayStatus === 'RELEASING' ? 'text-blue-400' :
-              displayStatus === 'HELD' ? 'text-amber-500' :
-              'text-foreground'
-            }`}>
+            <span className={`font-mono text-sm font-bold ${displayStatus === 'RELEASED' ? 'text-gain' :
+                displayStatus === 'REFUSED' ? 'text-danger' :
+                  displayStatus === 'RELEASING' ? 'text-blue-400' :
+                    displayStatus === 'HELD' ? 'text-amber-500' :
+                      'text-foreground'
+              }`}>
               {displayStatus}
             </span>
           </div>
@@ -490,25 +490,32 @@ export function ApexAssuranceConsole() {
 
       {/* ── 2. Linear 6-Stage Lifecycle Progress Bar ─────────────────────────── */}
       <div className="space-y-2">
-        <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-          Settlement Lifecycle Progression:
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Settlement Lifecycle Progression (Deterministic State Machine):
+          </span>
+          <div className="flex items-center gap-2 font-mono text-[11px]">
+            <Link href="/ledger" className="text-primary hover:underline flex items-center gap-1">
+              <span>Inspect Merkle Block</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center">
           {[
-            { label: 'HELD', active: displayStatus === 'HELD' || activeStep >= 1, color: 'text-amber-500 bg-amber-500/10 border-amber-500/30' },
-            { label: 'VERIFYING', active: displayStatus === 'VERIFYING' || activeStep >= 2, color: 'text-blue-500 bg-blue-500/10 border-blue-500/30' },
-            { label: 'REFUSED', active: displayStatus === 'REFUSED', color: 'text-danger bg-danger/10 border-danger/30' },
-            { label: 'CORRECTED', active: assertion?.assertions_passed, color: 'text-purple-500 bg-purple-500/10 border-purple-500/30' },
-            { label: 'RELEASING', active: displayStatus === 'RELEASING', color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/30' },
-            { label: 'RELEASED', active: displayStatus === 'RELEASED', color: 'text-gain bg-gain/10 border-gain/30' },
+            { label: 'HELD', active: displayStatus === 'HELD' || activeStep >= 1, color: 'text-amber-500 bg-amber-500/15 border-amber-500/50' },
+            { label: 'VERIFYING', active: displayStatus === 'VERIFYING' || activeStep >= 2, color: 'text-blue-500 bg-blue-500/15 border-blue-500/50' },
+            { label: 'REFUSED', active: displayStatus === 'REFUSED', color: 'text-danger bg-danger/15 border-danger/50' },
+            { label: 'CORRECTED', active: assertion?.assertions_passed, color: 'text-purple-500 bg-purple-500/15 border-purple-500/50' },
+            { label: 'RELEASING', active: displayStatus === 'RELEASING', color: 'text-cyan-500 bg-cyan-500/15 border-cyan-500/50' },
+            { label: 'RELEASED', active: displayStatus === 'RELEASED', color: 'text-gain bg-gain/15 border-gain/50' },
           ].map((stage, idx) => (
             <div
               key={idx}
-              className={`rounded-lg border px-3 py-2.5 transition-all ${
-                stage.active
-                  ? `${stage.color} font-bold shadow-sm`
-                  : 'border-border bg-panel text-muted-foreground/50 font-medium'
-              }`}
+              className={`rounded-lg border px-3 py-2.5 transition-all ${stage.active
+                  ? `${stage.color} font-bold shadow-sm ring-1 ring-inset ring-current`
+                  : 'border-border bg-panel text-foreground/70 font-semibold'
+                }`}
             >
               <div className="font-mono text-[10px] uppercase">0{idx + 1}</div>
               <div className="font-mono text-xs">{stage.label}</div>
@@ -663,9 +670,8 @@ export function ApexAssuranceConsole() {
 
           {/* Assertion Details & Honest Refusal Output */}
           {assertion && (
-            <div className={`rounded-xl border p-4 font-mono text-xs space-y-3 ${
-              assertion.assertions_passed ? 'border-gain/40 bg-gain/5' : 'border-danger/40 bg-danger/5'
-            }`}>
+            <div className={`rounded-xl border p-4 font-mono text-xs space-y-3 ${assertion.assertions_passed ? 'border-gain/40 bg-gain/5' : 'border-danger/40 bg-danger/5'
+              }`}>
               <div className="flex flex-wrap items-center justify-between gap-2 font-bold">
                 <span className={`flex items-center gap-2 ${assertion.assertions_passed ? 'text-gain' : 'text-danger'}`}>
                   {assertion.assertions_passed ? (
@@ -765,12 +771,11 @@ export function ApexAssuranceConsole() {
                     <div key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0 last:pb-0">
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">#{entry.id}</span>
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                          entry.status === 'RELEASED' ? 'bg-gain/20 text-gain' :
-                          entry.status === 'REFUSED' ? 'bg-danger/20 text-danger' :
-                          entry.status === 'RELEASING' ? 'bg-blue-500/20 text-blue-400' :
-                          'bg-amber-500/20 text-amber-500'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${entry.status === 'RELEASED' ? 'bg-gain/20 text-gain' :
+                            entry.status === 'REFUSED' ? 'bg-danger/20 text-danger' :
+                              entry.status === 'RELEASING' ? 'bg-blue-500/20 text-blue-400' :
+                                'bg-amber-500/20 text-amber-500'
+                          }`}>
                           {entry.status}
                         </span>
                         <span className="text-muted-foreground truncate max-w-[240px]">{entry.proof_hash}</span>
@@ -813,11 +818,10 @@ export function ApexAssuranceConsole() {
               {agentLogs.map((log, idx) => (
                 <div key={idx} className="flex items-start gap-3">
                   <span className="text-muted-foreground text-[11px] shrink-0">{log.time}</span>
-                  <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] shrink-0 ${
-                    log.type === 'buyer' ? 'bg-blue-500/10 text-blue-400' :
-                    log.type === 'seller' ? 'bg-purple-500/10 text-purple-400' :
-                    'bg-gold/10 text-gold'
-                  }`}>
+                  <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] shrink-0 ${log.type === 'buyer' ? 'bg-blue-500/10 text-blue-400' :
+                      log.type === 'seller' ? 'bg-purple-500/10 text-purple-400' :
+                        'bg-gold/10 text-gold'
+                    }`}>
                     {log.sender}
                   </span>
                   <span className="text-foreground leading-relaxed">{log.msg}</span>

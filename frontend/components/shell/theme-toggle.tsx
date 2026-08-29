@@ -1,49 +1,73 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Sun, Moon } from 'lucide-react'
 
 export function ThemeToggle() {
-  const [dark, setDark] = useState(true)
+  const [isLight, setIsLight] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('kuber-theme')
-    if (saved === 'light') {
-      setDark(false)
-      document.documentElement.classList.remove('dark')
+    setMounted(true)
+    try {
+      const stored = localStorage.getItem('apex-theme')
+      if (stored === 'light' || document.documentElement.classList.contains('light')) {
+        setIsLight(true)
+      } else {
+        setIsLight(false)
+      }
+    } catch {
+      setIsLight(false)
     }
   }, [])
 
-  const toggle = () => {
-    const next = !dark
-    setDark(next)
-    if (next) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('kuber-theme', 'dark')
-    } else {
+  const toggleTheme = () => {
+    const nextIsLight = !isLight
+    setIsLight(nextIsLight)
+
+    if (nextIsLight) {
+      document.documentElement.dataset.theme = 'light'
       document.documentElement.classList.remove('dark')
-      localStorage.setItem('kuber-theme', 'light')
+      document.documentElement.classList.add('light')
+      try {
+        localStorage.setItem('apex-theme', 'light')
+      } catch {}
+    } else {
+      document.documentElement.dataset.theme = 'mission-control'
+      document.documentElement.classList.remove('light')
+      document.documentElement.classList.add('dark')
+      try {
+        localStorage.setItem('apex-theme', 'mission-control')
+      } catch {}
     }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="h-8 w-8 rounded-lg border border-border bg-panel opacity-50" />
+    )
   }
 
   return (
     <button
-      onClick={toggle}
-      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-panel text-muted-foreground transition-colors hover:border-gold/50 hover:text-gold"
-      title={dark ? 'Light mode' : 'Dark mode'}
+      type="button"
+      onClick={toggleTheme}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-panel px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-accent hover:border-primary/40 focus:outline-none"
+      aria-label={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+      title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
     >
-      {dark ? (
-        // Sun icon
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
-          <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
+      {isLight ? (
+        <>
+          <Moon className="h-4 w-4 text-primary" />
+          <span className="font-mono text-xs hidden sm:inline">Dark</span>
+        </>
       ) : (
-        // Moon icon
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <>
+          <Sun className="h-4 w-4 text-gold" />
+          <span className="font-mono text-xs hidden sm:inline">Light</span>
+        </>
       )}
     </button>
   )
 }
+

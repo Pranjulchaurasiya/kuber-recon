@@ -1,37 +1,62 @@
-# 🏛️ APEX Assurance
+# 🏛️ APEX: Autonomous Working Capital & Settlement Assurance
 
 > **Track 01: AI Growth & Agentic Commerce · Razorpay AI Buildathon 2026**
-> **Delivery-Gated Settlement for Agentic Commerce**
-> *Powered by the KuberRecon deterministic verification kernel.*
+> **Autonomous Verified-Revenue Underwriting & Delivery-Gated Settlement**
+> *Powered by the KuberRecon deterministic verification kernel & Razorpay Route.*
 
-[![Tests Passing](https://img.shields.io/badge/pytest-71%20passed-brightgreen)](tests/)
+[![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(bulbul%3Av3)-purple)](https://sarvam.ai)
+[![Tests Passing](https://img.shields.io/badge/pytest-81%20passed-brightgreen)](tests/)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
 [![Razorpay Route Integration](https://img.shields.io/badge/Razorpay%20Route-Transfer%20Hold%20Gating-gold)](src/kuber_recon/server.py)
 [![Whitebox Audit](https://img.shields.io/badge/Whitebox%20Audit-5%2F5%20Vectors%20Mitigated-purple)](tests/test_shannon_whitebox_audit.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ 🚀 Quickstart ](#-quickstart--local-reproduction) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-65-items) • [ 🏢 Razorpay Value ](#-value-for-razorpay)
+[ ⚡ 30s Cold Start ](#-30-second-cold-start-explain-like-im-5) • [ 🚀 Quickstart ](#-quickstart--local-reproduction) • [ 🏗️ Architecture ](#-system-architecture) • [ 🛡️ Invariants ](#-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-81-items) • [ 🏢 Razorpay Value ](#-value-for-razorpay)
 
 ---
 
-## 🎯 The Core Problem: Authorization vs. Assurance
+## ⚡ 30-Second Cold Start: Problem vs Solution
 
-> *"Razorpay Route authorizes an agent's spend. APEX verifies whether the seller agent delivered before settlement is released."*
+### 🚨 The Core Problem vs 🛡️ The APEX Solution
 
-In autonomous agentic commerce, payment gateways authorize funds at transaction time ($T_0$). However, releasing payouts before structured proof of delivery creates counterparty risk. **APEX Assurance** uses Razorpay Route's native `on_hold: true` settlement lock and releases it only when deterministic delivery invariants pass.
+| # | 🔴 The Problem in AI Commerce | 🟢 The APEX Solution |
+|---|---|---|
+| **1** | **Blind Pre-Settlement Disbursals:** AI buyer agents order automatically, but legacy gateways disburse funds immediately before checking if goods actually arrived. | **Deterministic Escrow ([Razorpay Route](src/kuber_recon/server.py)):** Locks funds with `on_hold: true`. Settlement releases only after cryptographic proof of delivery. |
+| **2** | **AI Hallucinations & Float Drift:** Using LLMs to verify invoices causes phantom line items and floating-point errors (`0.1 + 0.2 != 0.3`). | **Zero-LLM Math Kernel:** Uses **Donald Knuth's Exact-Cover algorithm** and **GSTIN Mod-36 checksums** in exact base-10 paise. Zero false matches. |
+| **3** | **Merchant Cash Crunch:** Small sellers face severe 30–45 day cash crunches while waiting for escrow and banking cycles. | **1-Click Capital + 12% Nodal Sweep:** Converts verified revenue into instant working capital, auto-recovering advances directly at the nodal gateway. |
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                          THE APEX ASSURANCE PIPELINE                                   │
+│                                HOW APEX WORKS IN 4 STEPS                               │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  1. AI Buyer Orders      ──▶  Razorpay Route holds merchant payout on strict hold      │
+│  2. Delivery & GST Match ──▶  Donald Knuth's Exact-Cover algorithm & GSTIN Mod-36     │
+│  3. Escrow Releases      ──▶  Funds settle to merchant with ZERO math hallucinations   │
+│  4. 1-Click Capital      ──▶  Merchant gets instant advance; repaid via 12% split-sweep│
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+## 🎯 The Unified Pitch: Underwriting Ground Truth & Nodal Recovery
+
+> *"APEX turns verified agentic commerce into instant working capital for merchants, using deterministic delivery verification as its underwriting moat and Razorpay Route split-settlements for zero-default recovery."*
+
+### Why Capital + Assurance is One Coherent System:
+1. **The Moat (APEX Assurance):** Banks and NBFCs cannot underwrite autonomous AI agent commerce because they lack ground truth line-item delivery logs and statutory GSTIN verification. APEX provides mathematically verifiable proof of delivery before funds settle.
+2. **The Product (APEX Capital):** Armed with real-time Verified Delivered GMV (VD-GMV), Razorpay extends instant working capital advances to merchants against trailing verified revenue.
+3. **The Recovery (Razorpay Route):** Because Razorpay controls the settlement stream via Route, advances are amortized automatically via 10%–15% daily split-sweeps deducted directly at the nodal source—giving Razorpay first-lien priority with near-zero default risk.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                               THE APEX PRODUCT LIFECYCLE                               │
 ├───────────────────┬───────────────────────────────┬────────────────────────────────────┤
-│ 1. ROUTE HOLD     │ 2. DETERMINISTIC VERIFICATION │ 3. ATOMIC CAS ROUTE RELEASE        │
+│ 1. ASSURANCE MOAT │ 2. INSTANT CAPITAL DRAWDOWN   │ 3. SOURCE-SPLIT SETTLEMENT RECOVERY│
 ├───────────────────┼───────────────────────────────┼────────────────────────────────────┤
-│ Buyer Agent signs │ Seller delivers B2B payload.  │ Maker-Checker gate & Ed25519 Auth. │
-│ procurement intent.│ APEX runs Mod-36 GSTIN checks │ Atomic CAS transitions to RELEASING│
-│ Razorpay Route:   │ and line-item bounds.         │ Razorpay Route: on_hold -> false.  │
-│ on_hold = true.   │ If corrupted -> Refused.      │ Webhook `transfer.processed` seals │
-│ (₹25,000 lock)    │ Valid -> Release intent signed.│ the state to RELEASED.           │
+│ Buyer/Seller agent│ Bayesian Underwriter evaluates│ Every incoming bank credit block   │
+│ transactions match│ 30-Day Verified Delivered GMV │ automatically sweeps 12% at source │
+│ via Exact Cover & │ and disburses instant liquidity│ via Razorpay Route until advance   │
+│ Mod-36 GST checks.│ via Razorpay Payouts (T=0).   │ is fully amortized to ₹0.00.       │
 └───────────────────┴───────────────────────────────┴────────────────────────────────────┘
 ```
 
@@ -41,9 +66,10 @@ In autonomous agentic commerce, payment gateways authorize funds at transaction 
 
 | Question | Clear Answer |
 |---|---|
-| **What is it?** | **Razorpay Route Conditional Settlement Extension**: An SDK / webhook hook allowing platforms to attach deterministic delivery verification rules before releasing Route holds. |
-| **Who is the buyer?** | B2B multi-agent marketplaces, procurement platforms, automated API exchanges, and supply-chain platforms using Razorpay Route. |
-| **Why not standard disputes?** | Standard dispute/chargeback workflows operate **post-settlement** (asymmetric risk, recovery friction, 45-day cycle). APEX operates **pre-settlement**—funds never leave Razorpay's nodal account until delivery proof passes. |
+| **What is it?** | **Razorpay Route Capital & Assurance Engine**: An autonomous underwriting and split-settlement extension converting verified platform GMV into instant working capital advances. |
+| **Who is the buyer?** | B2B marketplaces, supply-chain platforms, and agentic commerce merchants processing transactions via Razorpay. |
+| **Why can't banks copy it?** | **The Ownership Triple-Test**: External lenders cannot see line-item GSTIN-verified ground truth, cannot gate settlement holds in real time, and do not possess first-lien priority on the nodal settlement stream. |
+| **Why not standard disputes?** | Standard dispute workflows operate **post-settlement** (asymmetric risk, recovery friction, 45-day cycle). APEX operates **pre-settlement**—funds never leave Razorpay's nodal account until delivery proof passes. |
 
 ---
 
@@ -64,8 +90,8 @@ In autonomous agentic commerce, payment gateways authorize funds at transaction 
 │  │   ├── Indian GSTIN 15-char check-digit algorithm (Mod-36 with 1-2 weight factors)   │
 │  │   └── Exact batch record count & line-item amount invariants                        │
 │  ├── Combinatorial Exact-Cover Matcher:                                                │
-│  │   ├── Horowitz-Sahni meet-in-the-middle subset-sum partitioning for N <= 24 items   │
-│  │   └── Dancing Links (DLX) exact-cover solver with complexity caps (max 10,000 nodes)│
+│  │   ├── Iterative Horowitz-Sahni meet-in-the-middle subset-sum matcher (N <= 24)      │
+│  │   └── Deterministic Exact-Cover Solver with complexity caps (max 10,000 nodes)      │
 │  └── Statutory Tax Engine (Section 194-O TDS, MDR, GST on MDR) in exact base-10 paise  │
 │                                                                                        │
 │  [ CONCURRENCY & SETTLEMENT ESCROW LAYER ]                                             │
@@ -99,7 +125,7 @@ In autonomous agentic commerce, payment gateways authorize funds at transaction 
 
 ---
 
-## 🧪 Full Test Suite Breakdown (71 Items)
+## 🧪 Full Test Suite Breakdown (81 Items)
 
 ```bash
 $ python -m pytest -p no:deepeval -p no:langsmith tests/ -v
@@ -107,6 +133,8 @@ $ python -m pytest -p no:deepeval -p no:langsmith tests/ -v
 
 ```text
 tests/test_apex_assurance.py              17 passed (CAS updates, trigger immutability, audit logging)
+tests/test_capital_concurrency.py          5 passed (double-drawdown races, zero over-recovery, API 409)
+tests/test_capital_underwriting.py          4 passed (Bayesian SRI, advance disbursement, split-sweeps, stagnancy)
 tests/test_chaos_suite.py                  4 passed (adversarial batches & stress blasts)
 tests/test_concurrent_workers.py           4 passed (webhook deduplication, CAS race protection)
 tests/test_digital_twin_simulation.py      3 passed (bank holiday freezes, TDS shocks)
@@ -119,29 +147,36 @@ tests/test_webhook_idempotency.py         14 passed (HMAC signatures, secret enf
 tests/test_zero_float_policy.py            1 passed (AST scanning for float prohibition)
 tests/test_zero_llm_in_math.py             1 passed (AST scanning for zero LLM imports in math)
 --------------------------------------------------------------------------------------------------
-Total: 71 passed, 0 skipped, 0 failed across 12 test modules
+Total: 81 passed, 0 skipped, 0 failed across 14 test modules
 ```
 
 ---
 
 ## 🚀 Quickstart & Local Reproduction
 
-### 1. Backend Service
+### 1. Instant Capital & Settlement CLI Demos
 ```bash
-# Python 3.11+
-python -m pip install -e ".[dev]"
+# 1. Run Verified-Revenue Capital Underwriting & Split-Sweep Demo
+python -m kuber_recon.cli run-capital-demo
+
+# 2. Run Instant Exact-Cover Verification Demo
+python -m kuber_recon.cli run-demo
+
+# 3. Run Causal Digital Twin Liquidity Stress-Test
+python -m kuber_recon.cli simulate-shock
+```
+
+### 2. Full-Stack Web Console
+```bash
+# Terminal 1: Backend API (port 8000)
 python -m uvicorn kuber_recon.server:app --host 127.0.0.1 --port 8000
+
+# Terminal 2: Frontend Dashboard (port 3000)
+cd frontend && npm run dev
+# Open http://localhost:3000
 ```
 
-### 2. Frontend Dashboard
-```bash
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:3000 (Landing Page) or http://localhost:3000/apex (Assurance Console)
-```
-
-### 3. Run Automated Invariant Tests
+### 3. Run Automated Invariant Tests (81 Items)
 ```bash
 python -m pytest -p no:deepeval -p no:langsmith tests/ -q
 ```
