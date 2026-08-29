@@ -1,6 +1,6 @@
 'use client'
 
-import { Landmark, FileClock, ShieldAlert, AlertOctagon, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { Landmark, FileClock, ShieldAlert, AlertOctagon } from 'lucide-react'
 
 export function GapSection() {
   const silos = [
@@ -87,30 +87,19 @@ export function GapSection() {
         })}
       </div>
 
-      {/* Unifying Bridge Banner */}
-      <div className="relative rounded-2xl border border-primary/40 bg-primary/5 p-6 sm:p-8 text-center space-y-4 shadow-lg hover-glow animate-fade-up">
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-xs font-mono font-bold text-primary">
-          <ShieldCheck className="h-4 w-4" />
-          The APEX Unifying Solution
+      {/* Evidence Strip — hard numbers anchored to the blind spots */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-2xl border border-border bg-panel/60 p-5 max-w-2xl mx-auto text-center animate-fade-up">
+        <div>
+          <div className="font-mono text-2xl font-extrabold text-foreground">₹1.8 Lakh Cr</div>
+          <div className="text-xs text-muted-foreground mt-1">Underserved Indian MSME Credit Gap</div>
         </div>
-        <p className="text-base sm:text-lg md:text-xl font-medium text-foreground max-w-3xl mx-auto leading-relaxed">
-          <strong className="text-primary font-bold">Only Razorpay holds first-lien priority on the nodal settlement pipeline.</strong> By coupling pre-settlement escrow holds (<code className="font-mono text-xs bg-background/80 px-1.5 py-0.5 rounded border border-border">on_hold: true</code>) with line-item GSTIN delivery truth, APEX turns transactional execution into an uncopyable credit and assurance moat.
-        </p>
-
-        {/* Hard Numbers Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-primary/20 max-w-2xl mx-auto">
-          <div>
-            <div className="font-mono text-2xl font-extrabold text-foreground">₹1.8 Lakh Cr</div>
-            <div className="text-xs text-muted-foreground">Underserved Indian MSME Credit Gap</div>
-          </div>
-          <div>
-            <div className="font-mono text-2xl font-extrabold text-gain">0.000 FMR</div>
-            <div className="text-xs text-muted-foreground">False Match Rate Across 11,100 Logs</div>
-          </div>
-          <div>
-            <div className="font-mono text-2xl font-extrabold text-primary">₹0.00</div>
-            <div className="text-xs text-muted-foreground">Over-Recovery Under Concurrent Race</div>
-          </div>
+        <div>
+          <div className="font-mono text-2xl font-extrabold text-gain">0.000 FMR</div>
+          <div className="text-xs text-muted-foreground mt-1">False Match Rate Across 11,100 Logs</div>
+        </div>
+        <div>
+          <div className="font-mono text-2xl font-extrabold text-primary">₹0.00</div>
+          <div className="text-xs text-muted-foreground mt-1">Over-Recovery Under Concurrent Race</div>
         </div>
       </div>
     </section>
