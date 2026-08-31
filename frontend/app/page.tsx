@@ -47,9 +47,13 @@ export default function RootLandingPage() {
 
             {/* High-Impact Split Headline */}
             <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.08]">
-              AI agents can transact.<br />
-              <span className="text-primary drop-shadow-sm">
-                They should not settle blindly.
+              AI transactions move fast.<br />
+              <span>
+                Settlement must never be{' '}
+                <span className="text-primary drop-shadow-sm underline decoration-primary/40 underline-offset-8">
+                  blind
+                </span>
+                .
               </span>
             </h1>
 

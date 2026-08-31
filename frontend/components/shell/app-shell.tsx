@@ -103,13 +103,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Primary Action Button */}
+            {/* Ghost Action Button */}
             <Link
               href="/apex"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3.5 py-2 text-xs font-bold text-background shadow-md transition-all hover:opacity-90 hover:scale-[1.02]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-panel/80 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent hover:border-primary/40 transition shadow-sm"
             >
-              Launch Console
-              <ArrowRight className="h-3.5 w-3.5" />
+              Console
+              <ArrowRight className="h-3 w-3 text-muted-foreground" />
             </Link>
           </div>
         </header>
