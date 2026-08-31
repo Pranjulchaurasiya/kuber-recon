@@ -125,7 +125,7 @@ export function VoiceBriefingPlayer() {
 
           <div className="text-left space-y-0.5">
             <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
-              <span>60s Executive Audio Brief</span>
+              <span>30s Executive Audio Brief</span>
               <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-primary border border-primary/20">
                 Sarvam AI (Advait)
               </span>

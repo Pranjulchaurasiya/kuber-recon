@@ -96,9 +96,9 @@ export function ProblemSolutionSection() {
             <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3.5 border-l-4 border-l-primary">
               <Zap className="h-5 w-5 text-primary shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <h4 className="text-sm font-bold text-foreground">2. Zero-LLM Deterministic Math Kernel</h4>
+                <h4 className="text-sm font-bold text-foreground">2. Dual-Layer: AI Agent Intelligence + Zero-Float Kernel</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Replaces fallible AI parsing with <span className="text-foreground font-semibold">Donald Knuth&apos;s Exact-Cover algorithm</span> and <span className="text-foreground font-semibold">Indian GSTIN Mod-36 checksums</span> in exact base-10 paise. Zero false matches.
+                  AI handles autonomous order orchestration and CFO copilot insights, while financial clearing is locked to <span className="text-foreground font-semibold">Donald Knuth&apos;s Exact-Cover algorithm</span> and <span className="text-foreground font-semibold">GSTIN Mod-36 checksums</span> in exact base-10 paise. Zero false matches.
                 </p>
               </div>
             </div>

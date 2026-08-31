@@ -292,7 +292,7 @@ export function CapitalHub() {
             Instant Capital Approved
           </div>
           <div className="text-2xl font-bold font-mono text-gain">₹59,764.78</div>
-          <div className="text-xs text-muted-foreground">25% Cap · Fixed 4% Factor Fee</div>
+          <div className="text-xs text-muted-foreground">25% Cap · 4.13% Factor Fee (SRI Scaled)</div>
         </div>
 
         <div className="rounded-xl border border-border bg-background p-4 space-y-1">

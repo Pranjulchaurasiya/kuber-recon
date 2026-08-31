@@ -41,7 +41,7 @@ export default function RootLandingPage() {
               </span>
               <span className="text-muted-foreground/40">•</span>
               <span className="text-xs text-muted-foreground">
-                AI Growth & Agentic Commerce
+                AI Agentic Commerce &amp; Capital Assurance
               </span>
             </div>
 
