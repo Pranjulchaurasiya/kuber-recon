@@ -4,7 +4,7 @@
 > **Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery**
 > *Powered by Donald Knuth's Exact-Cover (DLX), GSTIN Mod-36 Checksums, and RFC 6962 Merkle Trees.*
 
-[![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(bulbul%3Av3)-purple)](https://sarvam.ai)
+[![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
 [![Tests Passing](https://img.shields.io/badge/pytest-81%20passed-brightgreen)](tests/)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
