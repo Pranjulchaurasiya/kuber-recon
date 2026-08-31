@@ -844,7 +844,7 @@ export function ApexAssuranceConsole() {
 
         <div className="rounded-xl border border-border bg-panel p-5 text-center">
           <p className="font-mono text-sm sm:text-base font-bold text-foreground">
-            “APEX prevents autonomous seller settlement until delivery is mathematically proven.”
+            “Kuber OS prevents blind seller settlement until delivery is mathematically proven.”
           </p>
         </div>
       </footer>
