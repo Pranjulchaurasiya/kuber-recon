@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { navItems } from '@/lib/kuber-data'
 import { CfoCopilotDrawer } from '@/components/kuber/cfo-copilot-drawer'
-import { Sparkles, ShieldCheck, Database } from 'lucide-react'
+import { Sparkles, ShieldCheck, Database, Github, BookOpen, ExternalLink } from 'lucide-react'
+import { getApiUrl } from '@/lib/api-client'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -80,6 +81,28 @@ export function Sidebar() {
             )
           })}
         </nav>
+
+        {/* Developer & Documentation Links */}
+        <div className="px-3 pb-2 flex items-center gap-2">
+          <a
+            href="https://github.com/Pranjulchaurasiya/kuber-recon"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background/60 py-1.5 font-mono text-[11px] font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground transition"
+          >
+            <Github className="h-3.5 w-3.5" />
+            <span>GitHub</span>
+          </a>
+          <a
+            href={`${getApiUrl()}/docs`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background/60 py-1.5 font-mono text-[11px] font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground transition"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>API Docs</span>
+          </a>
+        </div>
 
         {/* Bottom Merkle Root Verification Box */}
         <div className="border-t border-border p-4 space-y-2 bg-background/50">

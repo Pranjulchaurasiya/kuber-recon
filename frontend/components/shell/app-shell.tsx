@@ -6,7 +6,7 @@ import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { ThemeToggle } from './theme-toggle'
 import { AmbientMesh3D } from '@/components/ui/ambient-mesh-3d'
-import { ArrowRight, Cpu, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Cpu, ShieldCheck, Github, BookOpen, ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getApiUrl } from '@/lib/api-client'
 
@@ -70,8 +70,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </nav>
 
-          {/* Right Actions & Theme Switcher */}
+          {/* Right Actions, GitHub Link & Theme Switcher */}
           <div className="flex items-center gap-3">
+            {/* Live Gateway Mode Badge */}
             {gatewayMode === 'test_mode' ? (
               <div className="hidden sm:flex items-center gap-2 rounded-full border border-gain/30 bg-gain/10 px-3 py-1 font-mono text-xs font-semibold text-gain">
                 <span className="h-2 w-2 rounded-full bg-gain animate-status-dot" />
@@ -83,6 +84,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 SANDBOX SIMULATION
               </div>
             )}
+
+            {/* GitHub Repository Link */}
+            <a
+              href="https://github.com/Pranjulchaurasiya/kuber-recon"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-panel text-muted-foreground hover:bg-accent hover:text-foreground transition shadow-sm"
+              title="View Source on GitHub"
+              aria-label="View Source on GitHub"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+
+            {/* Swagger API Docs */}
+            <a
+              href={`${getApiUrl()}/docs`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-border bg-panel px-3 py-2 font-mono text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition shadow-sm"
+              title="Open API Documentation"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span>API Docs</span>
+            </a>
 
             <ThemeToggle />
 
@@ -108,6 +133,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span>· Razorpay AI Buildathon 2026 (Track 01 &amp; 04)</span>
             </div>
             <div className="flex items-center gap-6 font-mono text-[11px]">
+              <a
+                href="https://github.com/Pranjulchaurasiya/kuber-recon"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition flex items-center gap-1"
+              >
+                <Github className="h-3 w-3" />
+                <span>GitHub Repo</span>
+              </a>
               <span>81/81 INVARIANT TESTS PASSING</span>
               <span>FMR 0.000</span>
               <span>BASE-10 ZERO FLOAT</span>
