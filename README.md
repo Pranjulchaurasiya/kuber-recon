@@ -12,7 +12,7 @@
 [![Whitebox Audit](https://img.shields.io/badge/Whitebox%20Audit-5%2F5%20Vectors%20Mitigated-purple)](tests/test_shannon_whitebox_audit.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ ⚡ 30s Cold Start ](#-30-second-cold-start-explain-like-im-5) • [ 🚀 Quickstart ](#-quickstart--local-reproduction) • [ 🏗️ Architecture ](#-system-architecture) • [ 🛡️ Invariants ](#-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-81-items) • [ 🏢 Razorpay Value ](#-value-for-razorpay)
+[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-81-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
 
 ---
 
