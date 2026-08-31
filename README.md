@@ -38,6 +38,19 @@
 ```
 
 ---
+
+## 🏗️ System Architecture & Layer Taxonomy
+
+Kuber OS unifies three specialized engineering layers into one coherent financial operating system:
+
+| Layer | Component | Core Technical Responsibility |
+|---|---|---|
+| **OS & Intelligence Layer** | **Kuber OS** | CFO AI Copilot, Multi-Source Settlement Radar, Verified-Revenue Capital Hub, and 7-Day Forecasting. |
+| **Escrow Protocol Layer** | **APEX Protocol** | **A**utonomous **P**roof & **Ex**ecution engine gating Razorpay Route settlements (`on_hold: true`) behind delivery verification. |
+| **Mathematical Kernel** | **KuberRecon** | **Donald Knuth’s Exact-Cover (DLX Algorithm)**, **Indian GSTIN Mod-36 Checksums**, **Paise-Exact Zero-Float Policy**, and **RFC 6962 Merkle Tree Audit Chains** (0.000 FMR across 11,100 records). |
+
+---
+
 ## 🎯 The Unified Pitch: Underwriting Ground Truth & Nodal Recovery
 
 > *"APEX turns verified agentic commerce into instant working capital for merchants, using deterministic delivery verification as its underwriting moat and Razorpay Route split-settlements for zero-default recovery."*
