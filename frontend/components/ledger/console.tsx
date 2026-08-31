@@ -186,7 +186,7 @@ export function LedgerConsole() {
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-gain" />
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-bold">
-              Merkle Ledger · RFC 6962 Audit Chain
+              Immutable Settlement Audit Chain · RFC 6962 Verified
             </h2>
           </div>
           <Pill tone="gain">chain verified</Pill>

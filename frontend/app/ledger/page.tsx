@@ -10,7 +10,7 @@ export default function LedgerPage() {
       {/* Header */}
       <header>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Pill tone="gold">RFC 6962 Audit Ledger · Ed25519 Signed · Statutory Triage</Pill>
+          <Pill tone="gold">Tamper-Proof Audit Trail · Bank &amp; Tax Reconciled · Zero-Drift</Pill>
           <div className="flex items-center gap-3 font-mono text-xs">
             <Link href="/console" className="text-muted-foreground hover:text-primary transition flex items-center gap-1">
               <span>Assurance Radar</span>
@@ -27,8 +27,8 @@ export default function LedgerPage() {
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground">
           Reconciliation Ledger &amp; Self-Healing Console
         </h1>
-        <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground leading-relaxed">
-          The autonomous finance controller matches multi-rail settlements, CBIC GSTR-2B Input Tax Credit, and Section 194-O TDS. Ambiguous exceptions are isolated to an Asynchronous Human-in-the-Loop queue with strict spend caps and Ed25519 cryptographic certification.
+        <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground/90 font-medium leading-relaxed">
+          The autonomous finance controller matches multi-rail bank settlements, CBIC GSTR-2B Input Tax Credit, and Section 194-O TDS in real-time. Unresolved exceptions are automatically routed to a Manual Review Queue with strict spend caps and 1-click verification.
         </p>
       </header>
 
