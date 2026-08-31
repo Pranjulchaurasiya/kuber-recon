@@ -46,7 +46,7 @@ export default function RootLandingPage() {
             </div>
 
             {/* High-Impact Split Headline */}
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.08]">
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-foreground leading-snug sm:leading-[1.14]">
               AI transactions move fast.<br />
               <span>
                 Settlement must never be{' '}
@@ -58,7 +58,7 @@ export default function RootLandingPage() {
             </h1>
 
             {/* Pitch Lede */}
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground/90 font-medium leading-relaxed max-w-3xl mx-auto">
               Kuber OS gates Razorpay Route pre-settlement behind line-item delivery proofs, turns verified revenue into instant working capital, and sweeps repayments at the nodal source.
             </p>
 
@@ -75,7 +75,6 @@ export default function RootLandingPage() {
                 href="#product-console"
                 className="inline-flex items-center gap-2 rounded-xl border border-border bg-panel/80 px-6 py-3 text-sm font-bold text-foreground shadow-sm transition-all hover:bg-accent hover:border-primary/40"
               >
-                <Banknote className="h-4 w-4 text-primary" />
                 Working Capital Terminal
               </a>
             </div>
