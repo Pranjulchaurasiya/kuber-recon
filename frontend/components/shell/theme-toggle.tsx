@@ -4,20 +4,20 @@ import { useEffect, useState } from 'react'
 import { Sun, Moon } from 'lucide-react'
 
 export function ThemeToggle() {
-  const [isLight, setIsLight] = useState(false)
+  const [isLight, setIsLight] = useState(true)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
     try {
       const stored = localStorage.getItem('apex-theme')
-      if (stored === 'light' || document.documentElement.classList.contains('light')) {
-        setIsLight(true)
-      } else {
+      if (stored === 'mission-control' || stored === 'dark') {
         setIsLight(false)
+      } else {
+        setIsLight(true)
       }
     } catch {
-      setIsLight(false)
+      setIsLight(true)
     }
   }, [])
 
@@ -31,14 +31,14 @@ export function ThemeToggle() {
       document.documentElement.classList.add('light')
       try {
         localStorage.setItem('apex-theme', 'light')
-      } catch {}
+      } catch { }
     } else {
       document.documentElement.dataset.theme = 'mission-control'
       document.documentElement.classList.remove('light')
       document.documentElement.classList.add('dark')
       try {
         localStorage.setItem('apex-theme', 'mission-control')
-      } catch {}
+      } catch { }
     }
   }
 

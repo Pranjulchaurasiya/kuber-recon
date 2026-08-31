@@ -23,7 +23,7 @@ const THEMES: ThemeOption[] = [
 ]
 
 export function ThemeSwitcher() {
-  const [theme, setTheme] = useState<ThemeType>('mission-control')
+  const [theme, setTheme] = useState<ThemeType>('light')
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -34,10 +34,10 @@ export function ThemeSwitcher() {
         setTheme(stored)
         applyTheme(stored)
       } else {
-        applyTheme('mission-control')
+        applyTheme('light')
       }
     } catch {
-      applyTheme('mission-control')
+      applyTheme('light')
     }
   }, [])
 

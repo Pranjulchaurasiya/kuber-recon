@@ -47,7 +47,7 @@ export default function RootLayout({
 (function () {
   try {
     var stored = localStorage.getItem("apex-theme");
-    var theme = (stored === "light") ? "light" : "mission-control";
+    var theme = (stored === "mission-control" || stored === "dark") ? "mission-control" : "light";
     document.documentElement.dataset.theme = theme;
     if (theme === "light") {
       document.documentElement.classList.remove("dark");
@@ -57,8 +57,8 @@ export default function RootLayout({
       document.documentElement.classList.add("dark");
     }
   } catch (e) {
-    document.documentElement.dataset.theme = "mission-control";
-    document.documentElement.classList.add("dark");
+    document.documentElement.dataset.theme = "light";
+    document.documentElement.classList.add("light");
   }
 })();
 `,
