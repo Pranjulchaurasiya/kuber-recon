@@ -11,7 +11,7 @@ export default function TwinPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Pill tone="gold">Causal Inference · What-If Stress Engine</Pill>
           <div className="flex items-center gap-3 font-mono text-xs">
-            <Link href="/apex" className="text-muted-foreground hover:text-primary transition flex items-center gap-1">
+            <Link href="/console" className="text-muted-foreground hover:text-primary transition flex items-center gap-1">
               <span>Assurance Radar</span>
               <ArrowRight className="h-3 w-3" />
             </Link>

@@ -105,7 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Ghost Action Button */}
             <Link
-              href="/apex"
+              href="/console"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-panel/80 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent hover:border-primary/40 transition shadow-sm"
             >
               Console

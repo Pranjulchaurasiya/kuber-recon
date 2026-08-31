@@ -563,7 +563,7 @@ export function ApexAssuranceConsole() {
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <span className="font-mono text-xs font-bold text-gold flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" /> APEX ASSURANCE
+                <ShieldCheck className="h-4 w-4" /> KUBER ASSURANCE
               </span>
               <span className="font-mono text-[11px] text-gold">KuberRecon</span>
             </div>

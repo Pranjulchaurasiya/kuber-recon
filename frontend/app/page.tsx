@@ -65,7 +65,7 @@ export default function RootLandingPage() {
             {/* CTAs & 60s Voice Briefing */}
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <Link
-                href="/apex"
+                href="/console"
                 className="inline-flex items-center gap-2 rounded-xl bg-foreground px-6 py-3 text-sm font-bold text-background shadow-lg transition-all hover:opacity-90 hover:scale-[1.02]"
               >
                 Launch Assurance Radar
