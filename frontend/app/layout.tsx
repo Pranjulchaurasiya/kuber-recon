@@ -37,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`light ${geistSans.variable} ${jetbrainsMono.variable}`} data-theme="light" suppressHydrationWarning>
       <head>
         <Script
           id="theme-initializer"

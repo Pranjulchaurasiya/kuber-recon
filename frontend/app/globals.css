@@ -44,9 +44,48 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   THEME 1: MISSION CONTROL (Default Dark - Tactical Slate & Emerald/Cyan)
+   THEME 0: DEFAULT ROOT (Crisp Light - High Contrast Ink & Paper White)
 ═══════════════════════════════════════════════════════════════════ */
-:root, [data-theme="mission-control"], html[data-theme="mission-control"] {
+:root, [data-theme="light"], html[data-theme="light"], html.light {
+  color-scheme: light;
+
+  --background: #f8fafc;
+  --foreground: #020617; /* High contrast Deep Slate Ink */
+
+  --panel: #ffffff;
+  --panel-header: #f1f5f9;
+  --card: #ffffff;
+  --card-foreground: #020617;
+  --popover: #ffffff;
+  --popover-foreground: #020617;
+
+  --primary: #0284c7; /* Vivid Azure Sky */
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #020617;
+  --muted: #f1f5f9;
+  --muted-foreground: #334155; /* Darker Slate for crisp, readable subtext (4.5:1+ WCAG AA) */
+  --accent: #e2e8f0;
+  --accent-foreground: #0369a1;
+
+  --gold: #b45309; /* Deep Amber */
+  --gold-foreground: #ffffff;
+
+  --gain: #047857; /* Deep Emerald */
+  --warn: #b45309;
+  --danger: #b91c1c; /* Deep Crimson */
+  --destructive: #b91c1c;
+
+  --border: #cbd5e1;
+  --input: #cbd5e1;
+  --ring: #0284c7;
+  --glow-color: rgba(2, 132, 199, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME 1: MISSION CONTROL (Dark - Tactical Slate & Emerald/Cyan)
+═══════════════════════════════════════════════════════════════════ */
+[data-theme="mission-control"], html[data-theme="mission-control"], html.dark {
   color-scheme: dark;
 
   --background: #090d16;
