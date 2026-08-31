@@ -15,7 +15,7 @@ import {
 export function VoiceBriefingPlayer() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [duration, setDuration] = useState(52)
+  const [duration, setDuration] = useState(30)
   const [currentTime, setCurrentTime] = useState(0)
   const [showTranscript, setShowTranscript] = useState(false)
   const [playbackRate, setPlaybackRate] = useState<number>(1.0)
@@ -114,8 +114,8 @@ export function VoiceBriefingPlayer() {
           <button
             onClick={togglePlay}
             className={`flex h-9 w-9 items-center justify-center rounded-full transition-all shadow-md ${isPlaying
-                ? 'bg-primary text-primary-foreground scale-105'
-                : 'bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground'
+              ? 'bg-primary text-primary-foreground scale-105'
+              : 'bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground'
               }`}
             aria-label={isPlaying ? 'Pause Audio Briefing' : 'Play Audio Briefing'}
             title={isPlaying ? 'Pause' : 'Listen to 60s Briefing'}
@@ -176,8 +176,8 @@ export function VoiceBriefingPlayer() {
           <button
             onClick={() => setShowTranscript(!showTranscript)}
             className={`flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold border transition-all ${showTranscript
-                ? 'bg-accent text-foreground border-primary/40'
-                : 'border-border bg-background text-muted-foreground hover:text-foreground'
+              ? 'bg-accent text-foreground border-primary/40'
+              : 'border-border bg-background text-muted-foreground hover:text-foreground'
               }`}
             title="Show spoken transcript"
           >
@@ -193,7 +193,7 @@ export function VoiceBriefingPlayer() {
         <input
           type="range"
           min="0"
-          max={duration || 52}
+          max={duration || 30}
           value={currentTime}
           onChange={handleSeek}
           className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-primary focus:outline-none"
