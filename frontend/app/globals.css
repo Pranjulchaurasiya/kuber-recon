@@ -239,42 +239,42 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   THEME 6: CRISP LIGHT (Clean Paper White, Crisp Borders & Deep Slate Text)
+   THEME 6: CRISP LIGHT (High Contrast Ink & Paper White)
 ═══════════════════════════════════════════════════════════════════ */
 [data-theme="light"], html[data-theme="light"], html.light {
   color-scheme: light;
 
   --background: #f8fafc;
-  --foreground: #090e17;
+  --foreground: #020617; /* High contrast Deep Slate Ink */
 
   --panel: #ffffff;
   --panel-header: #f1f5f9;
   --card: #ffffff;
-  --card-foreground: #090e17;
+  --card-foreground: #020617;
   --popover: #ffffff;
-  --popover-foreground: #090e17;
+  --popover-foreground: #020617;
 
-  --primary: #0284c7;
+  --primary: #0284c7; /* Vivid Azure Sky */
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
-  --secondary-foreground: #090e17;
+  --secondary-foreground: #020617;
   --muted: #f1f5f9;
-  --muted-foreground: #475569;
+  --muted-foreground: #334155; /* Darker Slate for crisp, readable subtext (4.5:1+ WCAG AA) */
   --accent: #e2e8f0;
-  --accent-foreground: #0284c7;
+  --accent-foreground: #0369a1;
 
-  --gold: #d97706;
+  --gold: #b45309; /* Deep Amber */
   --gold-foreground: #ffffff;
 
-  --gain: #059669;
-  --warn: #d97706;
-  --danger: #dc2626;
-  --destructive: #dc2626;
+  --gain: #047857; /* Deep Emerald */
+  --warn: #b45309;
+  --danger: #b91c1c; /* Deep Crimson */
+  --destructive: #b91c1c;
 
   --border: #cbd5e1;
   --input: #cbd5e1;
   --ring: #0284c7;
-  --glow-color: rgba(2, 132, 199, 0.12);
+  --glow-color: rgba(2, 132, 199, 0.15);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -1,0 +1,15 @@
+services:
+  # Python FastAPI Backend
+  - type: web
+    name: kuberrecon-backend
+    runtime: python
+    buildCommand: pip install --upgrade pip && pip install hatchling && pip install .
+    startCommand: uvicorn kuber_recon.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+    healthCheckPath: /health

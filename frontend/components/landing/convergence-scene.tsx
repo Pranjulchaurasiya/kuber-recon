@@ -293,7 +293,7 @@ export function ConvergenceScene() {
                 Advance Facility
               </text>
               <text x="656" y="162" className="fill-[var(--foreground)] text-base font-mono font-bold text-gain">
-                ₹59,764.78 <span className="text-xs text-muted-foreground font-normal">(`pout_live_01`)</span>
+                ₹59,764.78 <tspan className="fill-[var(--muted-foreground)] text-xs font-normal">(`pout_live_01`)</tspan>
               </text>
 
               <line x1="656" y1="174" x2="884" y2="174" stroke="var(--border)" strokeWidth="1" />
