@@ -15,7 +15,7 @@ export function ProofSection() {
           Measured against the methods it replaces.
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-          Every assertion in APEX is backed by automated property-based fuzzing and static AST verification. We do not use probabilistic LLM guesses for money reconciliation.
+          Every assertion in Kuber OS is backed by automated property-based fuzzing and static AST verification. We do not use probabilistic LLM guesses for money reconciliation.
         </p>
       </div>
 

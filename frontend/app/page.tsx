@@ -55,7 +55,7 @@ export default function RootLandingPage() {
 
             {/* Pitch Lede */}
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-              APEX gates Razorpay Route pre-settlement behind line-item delivery proofs, turns verified revenue into instant working capital, and sweeps repayments at the nodal source.
+              Kuber OS gates Razorpay Route pre-settlement behind line-item delivery proofs, turns verified revenue into instant working capital, and sweeps repayments at the nodal source.
             </p>
 
             {/* CTAs & 60s Voice Briefing */}

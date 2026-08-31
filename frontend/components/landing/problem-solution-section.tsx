@@ -9,7 +9,7 @@ export function ProblemSolutionSection() {
           <Sparkles className="h-3.5 w-3.5" /> The Core Problem
         </div>
         <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-foreground">
-          Why AI Commerce Breaks —{' '}<span className="text-primary">And How APEX Fixes It</span>
+          Why Blind Settlement Breaks —{' '}<span className="text-primary">And How Kuber OS Fixes It</span>
         </h2>
         <p className="text-muted-foreground text-sm sm:text-base">
           Autonomous agents execute purchases in milliseconds. Traditional payment rails settle funds blindly. That gap costs real money.

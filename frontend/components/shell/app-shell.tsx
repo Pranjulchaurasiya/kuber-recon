@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Navigation Links */}
           <nav className="hidden lg:flex items-center gap-7 font-medium text-xs text-muted-foreground">
             <a href="#problem-solution" className="transition-colors hover:text-foreground font-semibold">
-              Why APEX
+              Why Kuber OS
             </a>
             <a href="#the-proof" className="transition-colors hover:text-foreground font-semibold">
               Proof
