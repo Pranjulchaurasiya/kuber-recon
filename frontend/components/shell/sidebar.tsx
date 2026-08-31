@@ -16,15 +16,15 @@ export function Sidebar() {
     <>
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-panel md:flex">
         {/* Brand Header */}
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4 bg-background/50">
+        <Link href="/" className="flex items-center gap-3 border-b border-border px-5 py-4 bg-background/50 hover:bg-accent/40 transition group">
           <KuberMark />
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold tracking-tight text-foreground">Kuber OS</div>
+            <div className="truncate text-sm font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">Kuber OS</div>
             <div className="truncate font-mono text-[11px] uppercase tracking-wider text-gold font-bold">
               AI Finance Controller
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* CFO AI Copilot Quick Trigger Card */}
         <div className="p-3">

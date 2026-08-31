@@ -417,7 +417,7 @@ export function ApexAssuranceConsole() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                APEX Assurance
+                Kuber OS Assurance
               </h1>
               <span className="text-muted-foreground/40">•</span>
               <span className="text-xs text-muted-foreground">

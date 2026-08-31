@@ -183,7 +183,7 @@ export const guardrails = [
 /* ----------------------------------------------------------- Navigation */
 
 export const navItems = [
-  { href: '/', label: 'APEX Overview', code: 'APX' },
+  { href: '/', label: 'Kuber OS Overview', code: 'KBR' },
   { href: '/apex', label: 'Assurance Console', code: 'CTL' },
   { href: '/escrow', label: 'Gateway Escrow', code: 'ESC' },
   { href: '/lineage', label: 'Money Lineage', code: 'DAG' },

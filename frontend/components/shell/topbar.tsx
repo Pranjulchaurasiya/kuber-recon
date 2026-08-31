@@ -51,7 +51,7 @@ export function Topbar() {
 
           {/* Mobile brand mark */}
           <div className="flex items-center gap-2 md:hidden">
-            <Link href="/" className="font-mono text-xs font-bold text-primary">APEX</Link>
+            <Link href="/" className="font-mono text-xs font-bold text-primary">Kuber OS</Link>
           </div>
 
           {/* Breadcrumb */}
