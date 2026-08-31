@@ -26,7 +26,6 @@ export default function RootLandingPage() {
       {/* ── Atmospheric Hero Backdrop ─────────────────────────────────────── */}
       <div className="aurora-backdrop" aria-hidden="true">
         <div className="aurora-glow" />
-        <div className="grid-rings" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-[1280px] px-4 py-8 sm:px-8 sm:py-12 space-y-20">
