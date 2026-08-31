@@ -85,9 +85,7 @@ export function ConvergenceScene() {
               </linearGradient>
             </defs>
 
-            {/* ── 1. Left Input Feeds (3 Stations) ────────────────────────── */}
-
-            {/* Feed 1: Agentic Commerce PO */}
+            {/* Feed 1: Signed Delivery Manifest & E-Way Bill Webhook */}
             <g className="cursor-pointer transition-transform hover:scale-[1.01]">
               <rect
                 x="20"
@@ -100,13 +98,13 @@ export function ConvergenceScene() {
               />
               <circle cx="42" cy="42" r="5" className="fill-[var(--primary)]" />
               <text x="56" y="44" className="fill-[var(--muted-foreground)] text-[10px] font-mono font-bold tracking-wider">
-                01 · AGENTIC COMMERCE
+                01 · DELIVERY PROOF INGESTION
               </text>
               <text x="56" y="62" className="fill-[var(--foreground)] text-xs font-mono font-bold">
-                PO #9482 · Autonomous PO
+                E-Way Bill &amp; Ed25519 Manifest
               </text>
               <text x="56" y="78" className="fill-[var(--primary)] text-[10px] font-mono font-semibold">
-                Captured via Route on_hold: true
+                Triggers Route on_hold: false
               </text>
             </g>
 
