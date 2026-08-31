@@ -47,7 +47,7 @@ export default function RootLayout({
 (function () {
   try {
     var stored = localStorage.getItem("apex-theme");
-    var theme = (stored === "mission-control" || stored === "dark") ? "mission-control" : "light";
+    var theme = stored || "light";
     document.documentElement.dataset.theme = theme;
     if (theme === "light") {
       document.documentElement.classList.remove("dark");

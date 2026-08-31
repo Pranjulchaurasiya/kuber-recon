@@ -32,12 +32,11 @@ export function ThemeSwitcher() {
       const stored = localStorage.getItem('apex-theme') as ThemeType
       if (stored && THEMES.some((t) => t.id === stored)) {
         setTheme(stored)
-        applyTheme(stored)
       } else {
-        applyTheme('light')
+        setTheme('light')
       }
     } catch {
-      applyTheme('light')
+      setTheme('light')
     }
   }, [])
 
