@@ -436,8 +436,8 @@ class WebhookIdempotencyStore:
 # ── Singletons ────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="KuberRecon & APEX Assurance API",
-    description="Autonomous Financial Integrity & Agentic Settlement OS — Razorpay AI Buildathon 2026",
+    title="Kuber OS: Autonomous AI Finance Controller API",
+    description="Multi-Source Reconciliation, Cryptographic Settlement Assurance & Nodal Recovery (Track 04: AI Finance Controller · Razorpay AI Buildathon 2026)",
     version="2.0.0",
 )
 

@@ -179,8 +179,8 @@ export function CapitalHub() {
                 <h4 className="font-mono text-sm font-bold text-danger uppercase tracking-wider">
                   Duplicate Drawdown Blocked · ActiveFacilityExistsError (HTTP 409)
                 </h4>
-                <p className="text-xs text-foreground/90">
-                  Track 01 Invariant Enforcement: APEX Kernel halts debt stacking.
+                <p className="text-xs text-muted-foreground font-mono">
+                  Track 04 Invariant Enforcement: Kuber OS Kernel halts debt stacking.
                 </p>
               </div>
             </div>

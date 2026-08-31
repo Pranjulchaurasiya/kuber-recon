@@ -1,8 +1,8 @@
-# 🏛️ APEX: Autonomous Working Capital & Settlement Assurance
+# 🏛️ Kuber OS: Autonomous AI Finance Controller & Settlement Assurance
 
-> **Track 01: AI Growth & Agentic Commerce · Razorpay AI Buildathon 2026**
-> **Autonomous Verified-Revenue Underwriting & Delivery-Gated Settlement**
-> *Powered by the KuberRecon deterministic verification kernel & Razorpay Route.*
+> **Track 04: AI Finance Controller · Razorpay AI Buildathon 2026**
+> **Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery**
+> *Powered by Donald Knuth's Exact-Cover (DLX), GSTIN Mod-36 Checksums, and RFC 6962 Merkle Trees.*
 
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(bulbul%3Av3)-purple)](https://sarvam.ai)
 [![Tests Passing](https://img.shields.io/badge/pytest-81%20passed-brightgreen)](tests/)

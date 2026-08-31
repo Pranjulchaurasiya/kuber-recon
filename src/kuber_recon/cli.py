@@ -38,8 +38,8 @@ console = Console(force_terminal=True)
 def print_banner():
     console.print(
         Panel.fit(
-            "[bold cyan]KUBERRECON (कुबेर मिलान)[/bold cyan] [white]-- Autonomous Financial Operating System[/white]\n"
-            "[dim]Track 01: AI Growth & Agentic Commerce | Razorpay AI Buildathon 2026[/dim]\n"
+            "[bold cyan]🏛️  KUBER OS - Autonomous AI Finance Controller[/bold cyan]\n"
+            "[dim]Track 04: AI Finance Controller | Razorpay AI Buildathon 2026[/dim]\n"
             "[green]Status: Zero-Float AST Verified | Exact-Cover Solver | Route Escrow | Digital Twin Active[/green]",
             border_style="cyan",
         )

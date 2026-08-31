@@ -37,11 +37,11 @@ export default function RootLandingPage() {
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel/90 px-3.5 py-1.5 shadow-sm backdrop-blur">
               <span className="flex h-2 w-2 rounded-full bg-primary animate-status-dot" />
               <span className="font-mono text-xs font-bold text-primary">
-                Razorpay AI Buildathon 2026 · Track 01
+                Razorpay AI Buildathon 2026 · Track 04
               </span>
               <span className="text-muted-foreground/40">•</span>
               <span className="text-xs text-muted-foreground">
-                AI Agentic Commerce &amp; Capital Assurance
+                AI Finance Controller &amp; Settlement OS
               </span>
             </div>
 

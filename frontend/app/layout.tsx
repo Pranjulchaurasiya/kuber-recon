@@ -18,9 +18,9 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'APEX Assurance — Delivery-Gated Settlement for Agentic Commerce',
+  title: 'Kuber OS — Autonomous AI Finance Controller & Settlement Assurance',
   description:
-    'Razorpay Route locks the settlement; APEX releases it only when delivery proof passes. Powered by the KuberRecon deterministic verification kernel.',
+    'Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery. Built for Razorpay AI Buildathon 2026 (Track 04: AI Finance Controller).',
 }
 
 export const viewport: Viewport = {

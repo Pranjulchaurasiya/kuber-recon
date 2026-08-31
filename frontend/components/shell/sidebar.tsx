@@ -19,9 +19,9 @@ export function Sidebar() {
         <div className="flex items-center gap-3 border-b border-border px-5 py-4 bg-background/50">
           <KuberMark />
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold tracking-tight text-foreground">APEX Assurance</div>
+            <div className="truncate text-sm font-bold tracking-tight text-foreground">Kuber OS</div>
             <div className="truncate font-mono text-[11px] uppercase tracking-wider text-gold font-bold">
-              Powered by KuberRecon
+              AI Finance Controller
             </div>
           </div>
         </div>

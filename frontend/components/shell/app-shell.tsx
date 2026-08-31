@@ -40,11 +40,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 font-mono text-sm font-bold text-primary shadow-sm group-hover:border-primary transition-colors">
-                A
+                K
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-base font-bold tracking-tight text-foreground">APEX</span>
-                <span className="text-xs text-muted-foreground font-semibold">Assurance</span>
+                <span className="text-base font-bold tracking-tight text-foreground">Kuber OS</span>
+                <span className="text-xs text-muted-foreground font-semibold">Finance Controller</span>
               </div>
             </Link>
           </div>
@@ -122,8 +122,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="max-w-[1280px] mx-auto flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-gain" />
-              <span className="font-mono font-semibold text-foreground">APEX Autonomous Kernel</span>
-              <span>· Razorpay AI Buildathon 2026 (Track 01 &amp; 04)</span>
+              <span className="font-mono font-semibold text-foreground">Kuber OS Financial Kernel</span>
+              <span>· Razorpay AI Buildathon 2026 · Track 04 (AI Finance Controller)</span>
             </div>
             <div className="flex items-center gap-6 font-mono text-[11px]">
               <a
