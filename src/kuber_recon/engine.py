@@ -51,17 +51,16 @@ class SolverComplexityLimitError(Exception):
 
 
 class KnuthExactCoverSolver:
-    """Donald Knuth's Algorithm X / Dancing Links (DLX) & Horowitz-Sahni Solver for Integer Paise."""
+    """Donald Knuth's Exact-Cover / Horowitz-Sahni Meet-in-the-Middle Combinatorial Solver for Integer Paise."""
 
     def __init__(self, max_nodes: int = 10000, timeout_ms: float = 500.0):
-        self.solutions: List[List[int]] = []
         self.max_nodes = max_nodes
         self.timeout_ms = timeout_ms
 
     def solve_exact_subsets(
         self,
         target_paise: int,
-        candidates: List[Tuple[str, int]],  # (item_id, amount_in_paise)
+        candidates: List[Tuple[str, int]],
         max_solutions: int = 5,
     ) -> List[List[str]]:
         """Find all subsets of candidates that sum EXACTLY to target_paise with complexity bounds."""
@@ -83,6 +82,10 @@ class KnuthExactCoverSolver:
         if not valid_candidates:
             return SolverResult(MatchResultStatus.NO_MATCH, [])
 
+        # Strict Honest Refusal Invariant: Any candidate pool with N > 24 is truncated and MUST return INCONCLUSIVE_TRUNCATED
+        if len(candidates) > 24 or len(valid_candidates) > 24:
+            return SolverResult(MatchResultStatus.INCONCLUSIVE_TRUNCATED, [], 0, is_truncated=True)
+
         # Direct 1-to-1 exact single item matches
         singles = [[k] for k, v in valid_candidates if v == target_paise]
         if len(singles) > 1:
@@ -93,12 +96,9 @@ class KnuthExactCoverSolver:
         # Sort candidates descending for fast subset generation
         sorted_candidates = sorted(valid_candidates, key=lambda x: x[1], reverse=True)
 
-        # Check if candidate pool is truncated due to N > 24 boundary limit
-        is_truncated = len(sorted_candidates) > 24
-        bounded = sorted_candidates[:24]
-        mid = len(bounded) // 2
-        left_half = bounded[:mid]
-        right_half = bounded[mid:]
+        mid = len(sorted_candidates) // 2
+        left_half = sorted_candidates[:mid]
+        right_half = sorted_candidates[mid:]
 
         left_map: Dict[int, List[Tuple[str, ...]]] = {}
         left_subsets: List[Tuple[int, Tuple[str, ...]]] = [(0, ())]
@@ -151,7 +151,7 @@ class KnuthExactCoverSolver:
                             if len(solutions) >= max_solutions:
                                 break
 
-        if timed_out or (is_truncated and len(solutions) == 0):
+        if timed_out:
             return SolverResult(MatchResultStatus.INCONCLUSIVE_TRUNCATED, [], nodes_explored, is_truncated=True)
 
         if len(solutions) == 0:
@@ -160,72 +160,6 @@ class KnuthExactCoverSolver:
             return SolverResult(MatchResultStatus.EXACT_MATCH, solutions, nodes_explored)
         else:
             return SolverResult(MatchResultStatus.AMBIGUOUS_COLLISION, solutions[:max_solutions], nodes_explored)
-
-        # Direct 1-to-1 exact single item matches
-        singles = [[k] for k, v in valid_candidates if v == target_paise]
-        if len(singles) > 1:
-            return singles[:max_solutions]
-
-        t_start = time.perf_counter()
-
-        # Sort candidates descending for fast subset generation
-        sorted_candidates = sorted(valid_candidates, key=lambda x: x[1], reverse=True)
-
-        # Iterative Horowitz-Sahni Meet-in-the-Middle (O(2^(N/2)))
-        bounded = sorted_candidates[:24]
-        mid = len(bounded) // 2
-        left_half = bounded[:mid]
-        right_half = bounded[mid:]
-
-        left_map: Dict[int, List[Tuple[str, ...]]] = {}
-        left_subsets: List[Tuple[int, Tuple[str, ...]]] = [(0, ())]
-        nodes_explored = 0
-
-        for item_id, amt in left_half:
-            new_subs = []
-            for s, items in left_subsets:
-                nodes_explored += 1
-                s_inc = s + amt
-                if s_inc <= target_paise:
-                    new_subs.append((s_inc, items + (item_id,)))
-            left_subsets.extend(new_subs)
-            if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
-                break
-
-        for s, items in left_subsets:
-            entry = left_map.setdefault(s, [])
-            if len(entry) < max_solutions:
-                entry.append(items)
-
-        solutions: List[List[str]] = list(singles)
-        seen_solutions = set(tuple(s) for s in solutions)
-
-        right_subsets: List[Tuple[int, Tuple[str, ...]]] = [(0, ())]
-        for item_id, amt in right_half:
-            new_subs = []
-            for s, items in right_subsets:
-                nodes_explored += 1
-                s_inc = s + amt
-                if s_inc <= target_paise:
-                    new_subs.append((s_inc, items + (item_id,)))
-            right_subsets.extend(new_subs)
-            if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
-                break
-
-        for s_r, items_r in right_subsets:
-            comp = target_paise - s_r
-            if comp in left_map:
-                for items_l in left_map[comp]:
-                    comb = list(items_l + items_r)
-                    if comb:
-                        comb_tuple = tuple(comb)
-                        if comb_tuple not in seen_solutions:
-                            seen_solutions.add(comb_tuple)
-                            solutions.append(comb)
-                            if len(solutions) >= max_solutions:
-                                return solutions[:max_solutions]
-
-        return solutions[:max_solutions]
 
 
 class ReconciliationEngine:

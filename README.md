@@ -2,10 +2,10 @@
 
 > **Track 04: AI Finance Controller · Razorpay AI Buildathon 2026**
 > **Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery**
-> *Powered by Donald Knuth's Exact-Cover (DLX), GSTIN Mod-36 Checksums, and RFC 6962 Merkle Trees.*
+> *Powered by Horowitz-Sahni Meet-in-the-Middle Combinatorial Exact-Cover, GSTIN Mod-36 Checksums, and RFC 6962 Merkle Trees.*
 
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
-[![Tests Passing](https://img.shields.io/badge/pytest-86%20passed-brightgreen)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-88%20passed-brightgreen)](tests/)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
 [![Razorpay Route Integration](https://img.shields.io/badge/Razorpay%20Route-Transfer%20Hold%20Gating-gold)](src/kuber_recon/server.py)
@@ -13,7 +13,7 @@
 [![Security & Tenant Isolation](https://img.shields.io/badge/Tenant%20Auth-401%20Enforced%20%26%20Sanitized-purple)](tests/test_security_tenant_isolation.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-86-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
+[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-88-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
 
 ---
 
@@ -24,7 +24,7 @@
 | # | 🔴 The Problem in AI Commerce | 🟢 The APEX Solution |
 |---|---|---|
 | **1** | **Blind Pre-Settlement Disbursals:** AI buyer agents order automatically, but legacy gateways disburse funds immediately before checking if goods actually arrived. | **Deterministic Escrow ([Razorpay Route](src/kuber_recon/server.py)):** Locks funds with `on_hold: true`. Settlement releases only after cryptographic proof of delivery. |
-| **2** | **AI Hallucinations & Float Drift:** Using LLMs to verify invoices causes phantom line items and floating-point errors (`0.1 + 0.2 != 0.3`). | **Zero-LLM Math Kernel:** Uses **Donald Knuth's Exact-Cover algorithm** and **GSTIN Mod-36 checksums** in exact base-10 paise. Zero false matches. |
+| **2** | **AI Hallucinations & Float Drift:** Using LLMs to verify invoices causes phantom line items and floating-point errors (`0.1 + 0.2 != 0.3`). | **Zero-LLM Math Kernel:** Uses **Horowitz-Sahni Exact-Cover algorithm** and **GSTIN Mod-36 checksums** in exact base-10 paise. Zero false matches. |
 | **3** | **Merchant Cash Crunch:** Small sellers face severe 30–45 day cash crunches while waiting for escrow and banking cycles. | **1-Click Capital + 12% Nodal Sweep:** Converts verified revenue into instant working capital, auto-recovering advances directly at the nodal gateway. |
 
 ```
@@ -32,7 +32,7 @@
 │                                HOW APEX WORKS IN 4 STEPS                               │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  1. AI Buyer Orders      ──▶  Razorpay Route holds merchant payout on strict hold      │
-│  2. Delivery & GST Match ──▶  Donald Knuth's Exact-Cover algorithm & GSTIN Mod-36     │
+│  2. Delivery & GST Match ──▶  Horowitz-Sahni Exact-Cover & GSTIN Mod-36 Checksums     │
 │  3. Escrow Releases      ──▶  Funds settle to merchant with ZERO math hallucinations   │
 │  4. 1-Click Capital      ──▶  Merchant gets instant advance; repaid via 12% split-sweep│
 └────────────────────────────────────────────────────────────────────────────────────────┘
@@ -48,7 +48,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 |---|---|---|
 | **OS & Intelligence Layer** | **Kuber OS** | CFO AI Copilot, Multi-Source Settlement Radar, Verified-Revenue Capital Hub, and 7-Day Forecasting. |
 | **Escrow Protocol Layer** | **APEX Protocol** | **A**utonomous **P**roof & **Ex**ecution engine gating Razorpay Route settlements (`on_hold: true`) behind delivery verification. |
-| **Mathematical Kernel** | **KuberRecon** | **Donald Knuth’s Exact-Cover (DLX Algorithm)**, **Indian GSTIN Mod-36 Checksums**, **Paise-Exact Zero-Float Policy**, and **RFC 6962 Merkle Tree Audit Chains** (0.000 FMR across 11,100 records). |
+| **Mathematical Kernel** | **KuberRecon** | **Horowitz-Sahni Exact-Cover Solver**, **Indian GSTIN Mod-36 Checksums**, **Paise-Exact Zero-Float Policy**, and **RFC 6962 Merkle Tree Audit Chains** (0.000 FMR across verified fixtures). |
 
 ---
 

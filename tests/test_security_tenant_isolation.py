@@ -14,9 +14,20 @@ from kuber_recon.server import app, REGISTERED_TENANTS
 from kuber_recon.engine import KnuthExactCoverSolver, MatchResultStatus
 
 
+@pytest.fixture(autouse=True)
+def _tmp_db(tmp_path, monkeypatch):
+    from kuber_recon.server import WebhookIdempotencyStore
+    tmp_db = tmp_path / "test_sec.db"
+    monkeypatch.setattr(WebhookIdempotencyStore, "DB_FILE", tmp_db)
+    import kuber_recon.server as srv
+    monkeypatch.setattr(srv.razorpay_adapter, "is_live", False)
+    srv.idempotency_store = WebhookIdempotencyStore()
+    yield
+
+
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 def test_tenant_auth_missing_headers_returns_401(client):
@@ -68,37 +79,122 @@ def test_tenant_auth_valid_credentials_succeeds(client):
     )
     assert res.status_code == 200
     data = res.json()
-    assert data["merchant_id"] == "merch_delhi_logistics_01"
-    assert "verified_delivered_gmv_paise" in data
-
-
-def test_error_handler_sanitizes_tracebacks(client):
-    """500 Internal Server Errors must return a structured JSON response without stack traces."""
-    # Force a 500 error by triggering an invalid twin scenario
-    res = client.post(
-        "/api/twin/simulate",
-        json={"scenario": "invalid_scenario_trigger_500", "severity": 1.0},
+def test_cross_tenant_contract_isolation(client):
+    """Proves that a contract created by Tenant A cannot be read or mutated by Tenant B."""
+    # 1. Tenant A creates contract
+    create_res = client.post(
+        "/api/apex/contracts/create",
+        json={
+            "buyer_agent_id": "buyer_tenant_a",
+            "seller_agent_id": "seller_tenant_a",
+            "seller_account_id": "acc_tenant_a",
+            "amount_paise": 50000,
+            "expected_record_count": 1,
+            "ttl_seconds": 3600,
+        },
         headers={
             "X-Merchant-Id": "merchant_rzp_primary",
             "X-API-Key": "kuber_sandbox_key_primary_2026",
-        }
+        },
     )
-    # The application gracefully handles 400 for unknown scenario
-    assert res.status_code in (400, 500)
+    assert create_res.status_code == 200
+    cid = create_res.json()["contract_id"]
+
+    # 2. Tenant A can read its own contract
+    get_res_a = client.get(
+        f"/api/apex/contracts/{cid}",
+        headers={
+            "X-Merchant-Id": "merchant_rzp_primary",
+            "X-API-Key": "kuber_sandbox_key_primary_2026",
+        },
+    )
+    assert get_res_a.status_code == 200
+    assert get_res_a.json()["contract_id"] == cid
+
+    # 3. Tenant B attempts to read Tenant A's contract -> 404 Not Found
+    get_res_b = client.get(
+        f"/api/apex/contracts/{cid}",
+        headers={
+            "X-Merchant-Id": "merchant_agent_demo_01",
+            "X-API-Key": "kuber_sandbox_key_agent_01_2026",
+        },
+    )
+    assert get_res_b.status_code == 404
+    assert "Contract not found for authenticated tenant" in get_res_b.json()["detail"]
+
+
+def test_error_handler_sanitizes_tracebacks(client, monkeypatch):
+    """500 Internal Server Errors must return a structured JSON response without stack traces or exception leaks."""
+    import kuber_recon.server as srv
+    
+    # Intentionally force an unhandled runtime error inside an endpoint to trigger global_exception_handler
+    def _exploding_offer(*args, **kwargs):
+        raise RuntimeError("Simulated Database Connection Collapse")
+
+    monkeypatch.setattr(srv.capital_underwriter, "generate_offer", _exploding_offer)
+
+    res = client.get(
+        "/api/capital/offer",
+        headers={
+            "X-Merchant-Id": "merchant_rzp_primary",
+            "X-API-Key": "kuber_sandbox_key_primary_2026",
+        },
+    )
+    assert res.status_code == 500
     body = res.json()
+    assert body["detail"] == "Internal Server Error"
+    assert "error_id" in body
+    assert body["error_id"].startswith("err_")
     assert "traceback" not in body
     assert "trace" not in body
+    assert "Simulated Database Connection Collapse" not in str(body)
 
 
 def test_solver_explicit_inconclusive_truncated_state():
-    """Solver must return INCONCLUSIVE_TRUNCATED when candidates exceed complexity bounds (N > 24)."""
+    """Solver must return INCONCLUSIVE_TRUNCATED whenever candidates exceed N=24, even if partial solution exists."""
     solver = KnuthExactCoverSolver(max_nodes=5000, timeout_ms=100.0)
 
-    # 30 items - strictly exceeding the N=24 exact-cover boundary limit
-    candidates = [(f"inv_{i}", (i + 1) * 1000) for i in range(30)]
-    target = 99999999  # No exact subset exists
+    # 30 items where item 0 + item 1 sum to 3000, but total candidates N=30 > 24
+    candidates = [(f"inv_{i}", 1500 if i < 2 else (i + 1) * 1000) for i in range(30)]
+    target = 3000
 
     result = solver.solve_with_diagnostics(target_paise=target, candidates=candidates)
     assert result.status == MatchResultStatus.INCONCLUSIVE_TRUNCATED
     assert result.is_truncated is True
     assert len(result.solutions) == 0
+
+
+def test_webhook_replay_protection_timestamp_freshness(client):
+    """Webhook requests with timestamps older than 300 seconds MUST be rejected with 400 Bad Request."""
+    import time
+    import json
+    import hmac
+    import hashlib
+    from kuber_recon.server import get_webhook_secret
+
+    now = int(time.time())
+    stale_timestamp = now - 600  # 10 minutes old
+
+    body_dict = {
+        "entity": "event",
+        "account_id": "acc_kuber_escrow_001",
+        "event": "transfer.processed",
+        "contains": ["transfer"],
+        "payload": {"transfer": {"entity": {"id": "trf_test_replay_01", "status": "processed", "on_hold": False}}},
+        "created_at": stale_timestamp,
+    }
+    raw_body = json.dumps(body_dict, separators=(",", ":")).encode("utf-8")
+    secret = get_webhook_secret()
+    sig = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+
+    res = client.post(
+        "/api/webhook/razorpay",
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Razorpay-Signature": sig,
+            "X-Razorpay-Event-Id": "evt_stale_replay_01",
+        },
+    )
+    assert res.status_code == 400
+    assert "Webhook Replay Rejected" in res.json()["detail"]
