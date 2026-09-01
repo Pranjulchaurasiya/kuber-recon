@@ -433,6 +433,12 @@ class WebhookIdempotencyStore:
         return expired_ids
 
 
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+
 import logging
 import uuid
 
@@ -453,19 +459,27 @@ def verify_tenant_auth(
 ) -> str:
     """
     Authenticate tenant identity via constant-time hashed API key comparison.
-    Defaults to sandbox merchant if running in local non-auth mode.
+    Strictly enforces 401 Unauthorized if headers are missing or invalid.
     """
     if not x_merchant_id or not x_api_key:
-        # Fallback to demo default merchant in local sandbox
-        return "merchant_rzp_primary"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication Failed: Missing X-Merchant-Id or X-API-Key header.",
+        )
 
     expected_hash = REGISTERED_TENANTS.get(x_merchant_id)
     if not expected_hash:
-        raise HTTPException(status_code=401, detail="Invalid merchant or tenant identifier.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication Failed: Invalid merchant or tenant identifier.",
+        )
 
     provided_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
     if not hmac.compare_digest(provided_hash, expected_hash):
-        raise HTTPException(status_code=401, detail="Invalid API key for specified merchant.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication Failed: Invalid API key for specified merchant.",
+        )
 
     return x_merchant_id
 
@@ -920,7 +934,7 @@ async def razorpay_webhook_listener(
 # ── APEX ASSURANCE PROTOCOL ENDPOINTS ─────────────────────────────────────────
 
 @app.post("/api/apex/contracts/create")
-def apex_create_contract(req: CreateContractRequest):
+def apex_create_contract(req: CreateContractRequest, tenant_id: str = Depends(verify_tenant_auth)):
     """
     Step 1: Buyer Agent initiates an escrow contract.
     Creates a Razorpay Route transfer with on_hold: true and TTL timeout.
@@ -935,7 +949,7 @@ def apex_create_contract(req: CreateContractRequest):
         amount_paise=req.amount_paise,
         currency="INR",
         on_hold_until=ttl_expiry,
-        notes={"apex_contract_id": contract_id, "buyer_agent": req.buyer_agent_id},
+        notes={"apex_contract_id": contract_id, "buyer_agent": req.buyer_agent_id, "tenant_id": tenant_id},
     )
 
     contract = AssuranceContract(
@@ -959,6 +973,7 @@ def apex_create_contract(req: CreateContractRequest):
 
     return {
         "contract_id": contract.contract_id,
+        "tenant_id": tenant_id,
         "status": contract.status.value,
         "amount_paise": contract.amount_paise,
         "amount_inr": _fmt_paise(contract.amount_paise),
@@ -972,7 +987,7 @@ def apex_create_contract(req: CreateContractRequest):
 
 
 @app.post("/api/apex/contracts/deliver")
-def apex_deliver_payload(req: DeliverContractRequest):
+def apex_deliver_payload(req: DeliverContractRequest, tenant_id: str = Depends(verify_tenant_auth)):
     """
     Step 2: Seller Agent submits delivery payload records.
     Runs non-LLM deterministic assertions (<5MB memory bounded) and validates financial sum matching & seller signature.
@@ -1048,7 +1063,7 @@ def apex_deliver_payload(req: DeliverContractRequest):
 
 
 @app.post("/api/apex/contracts/release")
-def apex_release_settlement(req: ReleaseContractRequest):
+def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depends(verify_tenant_auth)):
     """
     Step 3: Release Route Settlement with Anti-Collusion & CAS Concurrency Safety.
     Executes PATCH /v1/transfers/{id} with on_hold: false.
@@ -1164,7 +1179,7 @@ def apex_release_settlement(req: ReleaseContractRequest):
 
 
 @app.post("/api/apex/contracts/sweep-expired")
-def apex_sweep_expired():
+def apex_sweep_expired(tenant_id: str = Depends(verify_tenant_auth)):
     """Liveness sweep: force-resolves expired contracts to EXPIRED_AUTO_REFUNDED."""
     swept_ids = idempotency_store.sweep_expired_contracts()
     return {
@@ -1176,7 +1191,7 @@ def apex_sweep_expired():
 
 
 @app.get("/api/apex/contracts/{contract_id}")
-def apex_get_contract(contract_id: str):
+def apex_get_contract(contract_id: str, tenant_id: str = Depends(verify_tenant_auth)):
     contract_data = idempotency_store.get_contract(contract_id)
     if not contract_data:
         raise HTTPException(status_code=404, detail="Contract not found.")
@@ -1186,7 +1201,7 @@ def apex_get_contract(contract_id: str):
 
 
 @app.post("/api/twin/simulate")
-def twin_simulate(req: TwinRequest):
+def twin_simulate(req: TwinRequest, tenant_id: str = Depends(verify_tenant_auth)):
     t0 = time.perf_counter()
     invoices, _, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=50)
     twin = FinancialDigitalTwin(invoices)
@@ -1224,7 +1239,7 @@ class CapitalSweepRequest(BaseModel):
 
 
 @app.get("/api/capital/offer")
-def get_capital_offer(merchant_id: str = "merch_delhi_logistics_01"):
+def get_capital_offer(merchant_id: str = "merch_delhi_logistics_01", tenant_id: str = Depends(verify_tenant_auth)):
     """Underwrite real-time working capital advance off verified delivered ledger truth."""
     invoices, bank_credits, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=100)
     blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
@@ -1253,7 +1268,7 @@ def get_capital_offer(merchant_id: str = "merch_delhi_logistics_01"):
 
 
 @app.post("/api/capital/drawdown")
-def disburse_capital_advance(req: CapitalDrawdownRequest):
+def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depends(verify_tenant_auth)):
     """Execute 1-click working capital advance drawdown with simulated Razorpay Payout."""
     invoices, bank_credits, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=100)
     blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
@@ -1284,7 +1299,7 @@ def disburse_capital_advance(req: CapitalDrawdownRequest):
 
 
 @app.get("/api/capital/facilities")
-def list_capital_facilities():
+def list_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
     """List all working capital facilities and repayment audit logs."""
     res = []
     for fac in capital_facility_manager.facilities.values():
@@ -1316,7 +1331,7 @@ def list_capital_facilities():
 
 
 @app.post("/api/capital/reconcile-and-sweep")
-def reconcile_and_sweep(req: CapitalSweepRequest):
+def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verify_tenant_auth)):
     """Reconcile incoming bank settlement block and apply automated split recovery sweep."""
     facility = capital_facility_manager.facilities.get(req.facility_id)
     if not facility:
@@ -1343,7 +1358,7 @@ def reconcile_and_sweep(req: CapitalSweepRequest):
 
 
 @app.post("/api/capital/reset")
-def reset_capital_facilities():
+def reset_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
     """Reset all capital facilities and clear active state for demonstration."""
     capital_facility_manager.facilities.clear()
     return {"status": "RESET_SUCCESS", "active_facilities": 0}

@@ -10,6 +10,7 @@ Features:
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
+from enum import Enum
 import hashlib
 import time
 from typing import Dict, List, Optional, Set, Tuple
@@ -328,19 +329,21 @@ class ReconciliationEngine:
                 exceptions.append((credit, "NO_EXACT_COVER_FOUND"))
                 continue
 
-            matching_subsets = self.solver.solve_exact_subsets(
+            solver_res = self.solver.solve_with_diagnostics(
                 target_paise=target_paise,
                 candidates=candidate_tuples,
                 max_solutions=2,
             )
 
-            # 5. Honest Refusal Evaluation
-            if len(matching_subsets) == 0:
+            # 5. Honest Refusal & Complexity Truncation Evaluation
+            if solver_res.status == MatchResultStatus.INCONCLUSIVE_TRUNCATED:
+                exceptions.append((credit, "INCONCLUSIVE_TRUNCATED (Candidate pool > 24 or solver budget exceeded)"))
+            elif solver_res.status == MatchResultStatus.NO_MATCH or len(solver_res.solutions) == 0:
                 exceptions.append((credit, "NO_EXACT_COVER_FOUND"))
-            elif len(matching_subsets) > 1:
-                exceptions.append((credit, f"AMBIGUOUS_COLLISION ({len(matching_subsets)} subsets)"))
+            elif solver_res.status == MatchResultStatus.AMBIGUOUS_COLLISION or len(solver_res.solutions) > 1:
+                exceptions.append((credit, f"AMBIGUOUS_COLLISION ({len(solver_res.solutions)} subsets)"))
             else:
-                matched_ids = matching_subsets[0]
+                matched_ids = solver_res.solutions[0]
                 for mid in matched_ids:
                     inv_d = inv_net_cache[mid][0].captured_at.date()
                     inv_amt = inv_net_cache[mid][4]

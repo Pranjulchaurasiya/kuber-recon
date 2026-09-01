@@ -5,14 +5,15 @@
 > *Powered by Donald Knuth's Exact-Cover (DLX), GSTIN Mod-36 Checksums, and RFC 6962 Merkle Trees.*
 
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
-[![Tests Passing](https://img.shields.io/badge/pytest-81%20passed-brightgreen)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-86%20passed-brightgreen)](tests/)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
 [![Razorpay Route Integration](https://img.shields.io/badge/Razorpay%20Route-Transfer%20Hold%20Gating-gold)](src/kuber_recon/server.py)
 [![Whitebox Audit](https://img.shields.io/badge/Whitebox%20Audit-5%2F5%20Vectors%20Mitigated-purple)](tests/test_shannon_whitebox_audit.py)
+[![Security & Tenant Isolation](https://img.shields.io/badge/Tenant%20Auth-401%20Enforced%20%26%20Sanitized-purple)](tests/test_security_tenant_isolation.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-81-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
+[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-86-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
 
 ---
 
@@ -138,7 +139,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🧪 Full Test Suite Breakdown (81 Items)
+## 🧪 Full Test Suite Breakdown (86 Items)
 
 ```bash
 $ python -m pytest -p no:deepeval -p no:langsmith tests/ -v
@@ -155,12 +156,13 @@ tests/test_escrow_sovereign.py             5 passed (statutory splits & partial 
 tests/test_planted_undecidables.py        10 passed (9 parameterized ambiguity traps + FMR formal proof)
 tests/test_production_integrations.py      5 passed (layer 1-5 integration harnesses)
 tests/test_property_based_invariants.py    2 passed (conservation of money & GSTIN fuzzing)
+tests/test_security_tenant_isolation.py    5 passed (401 unauthorized, key hashing, trace sanitation, solver truncation)
 tests/test_shannon_whitebox_audit.py       5 passed (BOLA, spend caps, state drift mitigation)
 tests/test_webhook_idempotency.py         14 passed (HMAC signatures, secret enforcement, replay defense)
 tests/test_zero_float_policy.py            1 passed (AST scanning for float prohibition)
 tests/test_zero_llm_in_math.py             1 passed (AST scanning for zero LLM imports in math)
 --------------------------------------------------------------------------------------------------
-Total: 81 passed, 0 skipped, 0 failed across 14 test modules
+Total: 86 passed, 0 skipped, 0 failed across 15 test modules
 ```
 
 ---

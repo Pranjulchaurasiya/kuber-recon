@@ -27,7 +27,13 @@ def _tmp_db(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(
+        app,
+        headers={
+            "X-Merchant-Id": "merchant_rzp_primary",
+            "X-API-Key": "kuber_sandbox_key_primary_2026",
+        },
+    )
 
 
 # ── 1. Concurrent Webhook Deduplication Race ──────────────────────────────────

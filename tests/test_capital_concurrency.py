@@ -239,7 +239,13 @@ def test_overshoot_sweep_capped_at_exact_remaining_balance(underwriter, facility
 
 def test_rest_api_drawdown_conflict_on_duplicate():
     """FastAPI REST endpoint returns 409 Conflict when merchant attempts second active drawdown."""
-    client = TestClient(app)
+    client = TestClient(
+        app,
+        headers={
+            "X-Merchant-Id": "merchant_rzp_primary",
+            "X-API-Key": "kuber_sandbox_key_primary_2026",
+        },
+    )
     
     # 1. First drawdown succeeds
     res1 = client.post("/api/capital/drawdown", json={"merchant_id": "merch_api_dup_01", "requested_amount_paise": 2000000})
