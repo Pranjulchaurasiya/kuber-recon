@@ -17,6 +17,21 @@ from kuber_recon.tax import IndianTaxKernel
 from kuber_recon.types import BankNodalCredit, EvidenceTier, InvoiceRecord, ReconciledSettlementBlock, SettlementStatus
 
 
+class MatchResultStatus(str, Enum):
+    EXACT_MATCH = "EXACT_MATCH"
+    NO_MATCH = "NO_MATCH"
+    AMBIGUOUS_COLLISION = "AMBIGUOUS_COLLISION"
+    INCONCLUSIVE_TRUNCATED = "INCONCLUSIVE_TRUNCATED"
+
+
+class SolverResult:
+    def __init__(self, status: MatchResultStatus, solutions: List[List[str]], nodes_explored: int = 0, is_truncated: bool = False):
+        self.status = status
+        self.solutions = solutions
+        self.nodes_explored = nodes_explored
+        self.is_truncated = is_truncated
+
+
 class AmbiguousMatchError(Exception):
     """Raised when more than one valid exact-cover subset matches a bank credit."""
 
@@ -49,13 +64,101 @@ class KnuthExactCoverSolver:
         max_solutions: int = 5,
     ) -> List[List[str]]:
         """Find all subsets of candidates that sum EXACTLY to target_paise with complexity bounds."""
+        res = self.solve_with_diagnostics(target_paise, candidates, max_solutions)
+        return res.solutions
+
+    def solve_with_diagnostics(
+        self,
+        target_paise: int,
+        candidates: List[Tuple[str, int]],
+        max_solutions: int = 5,
+    ) -> SolverResult:
+        """Find subsets returning explicit MatchResultStatus including INCONCLUSIVE_TRUNCATED."""
         if not candidates or target_paise <= 0:
-            return []
+            return SolverResult(MatchResultStatus.NO_MATCH, [])
 
         # Fast prune candidates greater than target
         valid_candidates = [(k, v) for k, v in candidates if 0 < v <= target_paise]
         if not valid_candidates:
-            return []
+            return SolverResult(MatchResultStatus.NO_MATCH, [])
+
+        # Direct 1-to-1 exact single item matches
+        singles = [[k] for k, v in valid_candidates if v == target_paise]
+        if len(singles) > 1:
+            return SolverResult(MatchResultStatus.AMBIGUOUS_COLLISION, singles[:max_solutions])
+
+        t_start = time.perf_counter()
+
+        # Sort candidates descending for fast subset generation
+        sorted_candidates = sorted(valid_candidates, key=lambda x: x[1], reverse=True)
+
+        # Check if candidate pool is truncated due to N > 24 boundary limit
+        is_truncated = len(sorted_candidates) > 24
+        bounded = sorted_candidates[:24]
+        mid = len(bounded) // 2
+        left_half = bounded[:mid]
+        right_half = bounded[mid:]
+
+        left_map: Dict[int, List[Tuple[str, ...]]] = {}
+        left_subsets: List[Tuple[int, Tuple[str, ...]]] = [(0, ())]
+        nodes_explored = 0
+        timed_out = False
+
+        for item_id, amt in left_half:
+            new_subs = []
+            for s, items in left_subsets:
+                nodes_explored += 1
+                s_inc = s + amt
+                if s_inc <= target_paise:
+                    new_subs.append((s_inc, items + (item_id,)))
+            left_subsets.extend(new_subs)
+            if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
+                timed_out = True
+                break
+
+        for s, items in left_subsets:
+            entry = left_map.setdefault(s, [])
+            if len(entry) < max_solutions:
+                entry.append(items)
+
+        solutions: List[List[str]] = list(singles)
+        seen_solutions = set(tuple(s) for s in solutions)
+
+        right_subsets: List[Tuple[int, Tuple[str, ...]]] = [(0, ())]
+        for item_id, amt in right_half:
+            new_subs = []
+            for s, items in right_subsets:
+                nodes_explored += 1
+                s_inc = s + amt
+                if s_inc <= target_paise:
+                    new_subs.append((s_inc, items + (item_id,)))
+            right_subsets.extend(new_subs)
+            if nodes_explored > self.max_nodes or (time.perf_counter() - t_start) * 1000.0 > self.timeout_ms:
+                timed_out = True
+                break
+
+        for s_r, items_r in right_subsets:
+            comp = target_paise - s_r
+            if comp in left_map:
+                for items_l in left_map[comp]:
+                    comb = list(items_l + items_r)
+                    if comb:
+                        comb_tuple = tuple(comb)
+                        if comb_tuple not in seen_solutions:
+                            seen_solutions.add(comb_tuple)
+                            solutions.append(comb)
+                            if len(solutions) >= max_solutions:
+                                break
+
+        if timed_out or (is_truncated and len(solutions) == 0):
+            return SolverResult(MatchResultStatus.INCONCLUSIVE_TRUNCATED, [], nodes_explored, is_truncated=True)
+
+        if len(solutions) == 0:
+            return SolverResult(MatchResultStatus.NO_MATCH, [], nodes_explored)
+        elif len(solutions) == 1:
+            return SolverResult(MatchResultStatus.EXACT_MATCH, solutions, nodes_explored)
+        else:
+            return SolverResult(MatchResultStatus.AMBIGUOUS_COLLISION, solutions[:max_solutions], nodes_explored)
 
         # Direct 1-to-1 exact single item matches
         singles = [[k] for k, v in valid_candidates if v == target_paise]

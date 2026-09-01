@@ -193,3 +193,16 @@ cd frontend && npm run dev
 ```bash
 python -m pytest -p no:deepeval -p no:langsmith tests/ -q
 ```
+
+---
+
+## ⚖️ Architecture Boundary & Regulatory Disclaimer
+
+| Dimension | Implemented in Kernel (This Repo) | Sandbox / Prototype Layer | Planned Production Topology |
+|---|---|---|---|
+| **Reconciliation Math** | Base-10 paise integer arithmetic, Donald Knuth DLX solver, explicit `INCONCLUSIVE_TRUNCATED` outcomes. | Synthetic benchmark fixture generator (11,100 cases). | Distributed streaming partitions ($N \le 24$ per worker). |
+| **Cryptography** | RFC 8032 Ed25519 asymmetric math via Python cryptography hazmat. | In-memory key seed registry for demonstration evaluation. | Dedicated AWS CloudHSM / KMS hardware key custody. |
+| **State Durability** | SQLite WAL mode with optimistic CAS version updates and trigger logs. | Local sandbox single-node filesystem. | Multi-AZ AWS Aurora PostgreSQL with row-level locks and Redis Cluster. |
+| **Statutory Rules** | Algorithmic implementations of Section 194-O TDS, GSTR-2B matching, and 12% nodal recovery sweeps. | Simulated marketplace ledger models. | Formally reviewed production legal/compliance workflows. |
+
+> *Disclaimer: Statutory tax rules (Section 194-O, GSTR-2B, FLDG) represent algorithmic models developed for hackathon evaluation and demonstration, subject to formal institutional legal and regulatory review prior to live deployment.*

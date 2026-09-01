@@ -433,6 +433,43 @@ class WebhookIdempotencyStore:
         return expired_ids
 
 
+import logging
+import uuid
+
+logger = logging.getLogger("kuber_recon.server")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+# ── API Authentication & Tenant Validation Registry ───────────────────────────
+
+REGISTERED_TENANTS: Dict[str, str] = {
+    # merchant_id / tenant_id -> sha256 hash of API key
+    "merchant_rzp_primary": hashlib.sha256("kuber_sandbox_key_primary_2026".encode()).hexdigest(),
+    "merchant_agent_demo_01": hashlib.sha256("kuber_sandbox_key_agent_01_2026".encode()).hexdigest(),
+}
+
+def verify_tenant_auth(
+    x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+) -> str:
+    """
+    Authenticate tenant identity via constant-time hashed API key comparison.
+    Defaults to sandbox merchant if running in local non-auth mode.
+    """
+    if not x_merchant_id or not x_api_key:
+        # Fallback to demo default merchant in local sandbox
+        return "merchant_rzp_primary"
+
+    expected_hash = REGISTERED_TENANTS.get(x_merchant_id)
+    if not expected_hash:
+        raise HTTPException(status_code=401, detail="Invalid merchant or tenant identifier.")
+
+    provided_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
+    if not hmac.compare_digest(provided_hash, expected_hash):
+        raise HTTPException(status_code=401, detail="Invalid API key for specified merchant.")
+
+    return x_merchant_id
+
+
 # ── Singletons ────────────────────────────────────────────────────────────────
 
 app = FastAPI(
@@ -441,21 +478,25 @@ app = FastAPI(
     version="2.0.0",
 )
 
+allowed_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://kuber-os.vercel.app")
+allowed_origins_list = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Merchant-Id", "X-API-Key", "X-Razorpay-Signature", "Authorization"],
 )
-
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    error_id = f"err_{uuid.uuid4().hex[:8]}"
+    logger.error("Internal Server Error [%s] on %s: %s", error_id, request.url.path, exc, exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal Server Error", "error": str(exc), "trace": traceback.format_exc()}
+        content={"detail": "Internal Server Error", "error_id": error_id}
     )
 
 escrow_engine = KuberSovereignEscrowEngine()

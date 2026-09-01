@@ -1,8 +1,9 @@
 """
-Layer 4: Hardware Cryptographic Custody & HSM Key Governance
-------------------------------------------------------------
-Abstract interface for non-exportable hardware-backed signing
-supporting Ed25519 (RFC 8032) and AWS KMS / CloudHSM ECDSA P-256.
+Layer 4: In-Memory Demonstration Cryptographic Signer & Verification (RFC 8032)
+--------------------------------------------------------------------------------
+Reference implementation for asymmetric signing and verification using Ed25519 (RFC 8032).
+Note: This is a local in-memory prototype signer for sandbox demonstration.
+Production deployment specifies hardware HSM / AWS CloudHSM key custody.
 """
 
 from abc import ABC, abstractmethod
@@ -16,7 +17,7 @@ from cryptography.exceptions import InvalidSignature
 
 class SignatureCertificate(BaseModel):
     key_id: str
-    algorithm: str  # 'Ed25519' or 'ECDSA_SHA256'
+    algorithm: str  # 'Ed25519'
     key_version: str
     signed_at_ns: int
     public_key_hex: str
@@ -28,7 +29,7 @@ class SignatureCertificate(BaseModel):
 class BaseKeyCustodian(ABC):
     @abstractmethod
     def sign_merkle_leaf(self, leaf_hash: str, context: Dict[str, Any]) -> SignatureCertificate:
-        """Sign a Merkle leaf hash with hardware-bound private key."""
+        """Sign a Merkle leaf hash with local demonstration private key."""
         pass
 
     @abstractmethod
@@ -39,11 +40,12 @@ class BaseKeyCustodian(ABC):
 
 class SoftwareEd25519Custodian(BaseKeyCustodian):
     """
-    Production-grade Software-isolated Ed25519 Custodian (RFC 8032).
-    Uses cryptography hazmat ed25519 for genuine asymmetric signing & verification.
+    Local Demonstration Ed25519 Signer & Verifier (RFC 8032).
+    Uses Python's cryptography hazmat ed25519 for genuine asymmetric math.
+    (Not an HSM / KMS hardware solution; operates strictly for sandbox evaluation).
     """
 
-    # Production Registry: Pinned RFC 8032 Public Keys for Authorized Checker Identities
+    # Pinned RFC 8032 Public Keys for Authorized Checker Identities
     PINNED_CHECKER_REGISTRY = {
         "cfo_autonomous_verifier": "0f11d9206303ebdc7533920222d1b5bda7d05519211aff465e30138b7a45581c",
         "cfo_ed25519_primary": "3f7c468e21a8d11c34bb9910d510c4bc807085a6cf17f69894e6da2cf08d169c",
@@ -51,7 +53,7 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
         "cfo_arbiter_sec_01": "a189f77e6e580e55097f48126e84d436a5b67277a05ebf36ea0ef4273df8996b",
     }
 
-    # Deterministic Seed Registry for Authorized Checkers (used by HSM / Custodian instances)
+    # Deterministic Seed Registry for Demo Checkers (In-Memory Prototype)
     AUTHORIZED_CHECKERS = {
         "cfo_autonomous_verifier": "kuber_cfo_autonomous_verifier_sec_key_v1",
         "cfo_ed25519_primary": "kuber_cfo_ed25519_primary_sec_key_v1",
@@ -63,7 +65,7 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
         self.key_id = key_id
         self.key_version = "v1"
         
-        # Derive deterministic 32-byte private key seed for this custodian identity
+        # Derive deterministic 32-byte private key seed for this sandbox identity
         seed_source = self.AUTHORIZED_CHECKERS.get(key_id, f"kuber_seed_default_{key_id}")
         seed_bytes = hashlib.sha256(seed_source.encode("utf-8")).digest()
         self._private_key = ed25519.Ed25519PrivateKey.from_private_bytes(seed_bytes)
@@ -138,7 +140,7 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
     ) -> bool:
         """
         Cryptographically verify that the client/caller is an authenticated checker identity:
-        1. checker_id is recognized in the HSM PINNED_CHECKER_REGISTRY.
+        1. checker_id is recognized in the PINNED_CHECKER_REGISTRY.
         2. public_key_hex strictly matches the pinned public key for this checker (Identity Pinning).
         3. signature_hex is a valid RFC 8032 Ed25519 signature of the canonical release-intent payload.
         """
@@ -171,27 +173,4 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
             return True
         except (InvalidSignature, ValueError, Exception):
             return False
-
-
-class AWSKMSCustodian(BaseKeyCustodian):
-    """AWS KMS / CloudHSM Asymmetric Signing Custodian (ECDSA P-256)."""
-
-    def __init__(self, kms_key_arn: str = "arn:aws:kms:ap-south-1:123456789012:key/cfo-signing"):
-        self.kms_key_arn = kms_key_arn
-        self.key_version = "v1"
-
-    def sign_merkle_leaf(self, leaf_hash: str, context: Dict[str, Any]) -> SignatureCertificate:
-        sig_hex = hashlib.sha256(f"kms:{self.kms_key_arn}:{leaf_hash}".encode("utf-8")).hexdigest()
-        return SignatureCertificate(
-            key_id=self.kms_key_arn,
-            algorithm="ECDSA_SHA256",
-            key_version=self.key_version,
-            signed_at_ns=time.time_ns(),
-            public_key_hex="0x04bf89...cloudhsm",
-            signature_hex=f"ecdsa:{sig_hex[:64]}",
-            merkle_leaf_hash=leaf_hash,
-        )
-
-    def verify_certificate(self, cert: SignatureCertificate, expected_payload: Optional[bytes] = None) -> bool:
-        return cert.signature_hex.startswith("ecdsa:")
 

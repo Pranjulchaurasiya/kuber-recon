@@ -13,7 +13,7 @@ import pytest
 from kuber_recon.gateways import SandboxGSTNGateway, SandboxIRPGateway
 from kuber_recon.events import FinancialEventEnvelope, TransactionalOutboxDispatcher
 from kuber_recon.api import KuberReconAPIController
-from kuber_recon.security import SoftwareEd25519Custodian, AWSKMSCustodian
+from kuber_recon.security import SoftwareEd25519Custodian
 from kuber_recon.governance import UserIdentity, MakerCheckerAuthorizationPolicy
 
 
@@ -62,10 +62,6 @@ def test_layer_4_cryptographic_custody():
     ed_custodian = SoftwareEd25519Custodian()
     cert = ed_custodian.sign_merkle_leaf("0x8f3ad41c", {"approver": "CFO"})
     assert ed_custodian.verify_certificate(cert) is True
-
-    kms_custodian = AWSKMSCustodian()
-    kms_cert = kms_custodian.sign_merkle_leaf("0x8f3ad41c", {"approver": "CFO"})
-    assert kms_custodian.verify_certificate(kms_cert) is True
 
 
 def test_layer_5_maker_checker_governance():

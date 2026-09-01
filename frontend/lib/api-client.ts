@@ -9,6 +9,12 @@ export function getApiUrl(): string {
   return url.replace(/\/$/, '')
 }
 
+export const DEFAULT_AUTH_HEADERS = {
+  'Content-Type': 'application/json',
+  'X-Merchant-Id': 'merchant_rzp_primary',
+  'X-API-Key': 'kuber_sandbox_key_primary_2026',
+}
+
 export interface BackendHealth {
   status: string
   service: string
@@ -23,6 +29,7 @@ export async function checkBackendHealth(): Promise<{ online: boolean; data?: Ba
     const timeoutId = setTimeout(() => controller.abort(), 2000)
     const res = await fetch(`${getApiUrl()}/api/health`, {
       method: 'GET',
+      headers: DEFAULT_AUTH_HEADERS,
       signal: controller.signal,
       cache: 'no-store',
     })
@@ -81,6 +88,7 @@ export interface CapitalSweepResponse {
 export async function fetchCapitalOffer(merchantId = 'merch_delhi_hyperlocal_01'): Promise<CapitalOfferResponse> {
   const res = await fetch(`${getApiUrl()}/api/capital/offer?merchant_id=${merchantId}`, {
     method: 'GET',
+    headers: DEFAULT_AUTH_HEADERS,
     cache: 'no-store',
   })
   if (!res.ok) {
@@ -93,7 +101,7 @@ export async function executeCapitalDrawdown(merchantId = 'merch_delhi_hyperloca
   try {
     const res = await fetch(`${getApiUrl()}/api/capital/drawdown`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: DEFAULT_AUTH_HEADERS,
       body: JSON.stringify({
         merchant_id: merchantId,
         requested_amount_paise: requestedAmountPaise,
@@ -113,7 +121,7 @@ export async function executeCapitalSweep(facilityId: string, numRecords = 20): 
   try {
     const res = await fetch(`${getApiUrl()}/api/capital/reconcile-and-sweep`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: DEFAULT_AUTH_HEADERS,
       body: JSON.stringify({
         facility_id: facilityId,
         num_records: numRecords,
@@ -131,7 +139,10 @@ export async function executeCapitalSweep(facilityId: string, numRecords = 20): 
 
 export async function resetCapitalFacilities(): Promise<boolean> {
   try {
-    const res = await fetch(`${getApiUrl()}/api/capital/reset`, { method: 'POST' })
+    const res = await fetch(`${getApiUrl()}/api/capital/reset`, {
+      method: 'POST',
+      headers: DEFAULT_AUTH_HEADERS,
+    })
     return res.ok
   } catch {
     return false
