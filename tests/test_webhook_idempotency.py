@@ -51,10 +51,13 @@ def _make_signed_payload(body_dict: dict, event_id: str, secret: str = None) -> 
 
 
 
+import time
+
 _SAMPLE_EVENT = {
     "entity": "event",
     "event": "payment.captured",
     "payload": {"payment": {"entity": {"id": "pay_test_001", "amount": 118000}}},
+    "created_at": int(time.time()),
 }
 
 

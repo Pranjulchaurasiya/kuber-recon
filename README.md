@@ -139,7 +139,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🧪 Full Test Suite Breakdown (86 Items)
+## 🧪 Full Test Suite Breakdown (90 Items)
 
 ```bash
 $ python -m pytest -p no:deepeval -p no:langsmith tests/ -v
@@ -156,13 +156,13 @@ tests/test_escrow_sovereign.py             5 passed (statutory splits & partial 
 tests/test_planted_undecidables.py        10 passed (9 parameterized ambiguity traps + FMR formal proof)
 tests/test_production_integrations.py      5 passed (layer 1-5 integration harnesses)
 tests/test_property_based_invariants.py    2 passed (conservation of money & GSTIN fuzzing)
-tests/test_security_tenant_isolation.py    5 passed (401 unauthorized, key hashing, trace sanitation, solver truncation)
+tests/test_security_tenant_isolation.py    9 passed (401 auth, cross-tenant isolation, trace sanitation, webhook replay)
 tests/test_shannon_whitebox_audit.py       5 passed (BOLA, spend caps, state drift mitigation)
 tests/test_webhook_idempotency.py         14 passed (HMAC signatures, secret enforcement, replay defense)
 tests/test_zero_float_policy.py            1 passed (AST scanning for float prohibition)
 tests/test_zero_llm_in_math.py             1 passed (AST scanning for zero LLM imports in math)
 --------------------------------------------------------------------------------------------------
-Total: 86 passed, 0 skipped, 0 failed across 15 test modules
+Total: 90 passed, 0 skipped, 0 failed across 15 test modules
 ```
 
 ---

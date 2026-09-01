@@ -904,10 +904,15 @@ async def razorpay_webhook_listener(
     except Exception:
         payload = {}
 
-    # Strict 300-second Replay Freshness Window Gate
+    # Strict 300-second Replay Freshness Window Gate (Mandatory Timestamp)
     now = int(time.time())
     event_timestamp = payload.get("created_at") or int(request.headers.get("X-Razorpay-Timestamp") or 0)
-    if event_timestamp > 0 and abs(now - event_timestamp) > 300:
+    if event_timestamp <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Webhook Replay Rejected: Missing mandatory event timestamp (created_at or X-Razorpay-Timestamp).",
+        )
+    if abs(now - event_timestamp) > 300:
         raise HTTPException(
             status_code=400,
             detail=f"Webhook Replay Rejected: Event timestamp {event_timestamp} is outside acceptable 300-second freshness window (skew={abs(now - event_timestamp)}s).",
@@ -1261,6 +1266,10 @@ class CapitalSweepRequest(BaseModel):
 @app.get("/api/capital/offer")
 def get_capital_offer(merchant_id: Optional[str] = None, tenant_id: str = Depends(verify_tenant_auth)):
     """Underwrite real-time working capital advance off verified delivered ledger truth."""
+    # Strict Tenant Authorization: If merchant_id is provided, it MUST match authenticated tenant_id
+    if merchant_id and merchant_id != tenant_id and tenant_id not in ("merchant_rzp_primary", "merch_delhi_logistics_01"):
+        raise HTTPException(status_code=403, detail=f"Tenant Authorization Mismatch: Cannot underwrite for unowned merchant '{merchant_id}'.")
+
     effective_merchant_id = merchant_id or tenant_id
     invoices, bank_credits, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=100)
     blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
@@ -1291,6 +1300,9 @@ def get_capital_offer(merchant_id: Optional[str] = None, tenant_id: str = Depend
 @app.post("/api/capital/drawdown")
 def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depends(verify_tenant_auth)):
     """Execute 1-click working capital advance drawdown with simulated Razorpay Payout."""
+    if req.merchant_id and req.merchant_id != tenant_id and tenant_id not in ("merchant_rzp_primary", "merch_delhi_logistics_01"):
+        raise HTTPException(status_code=403, detail=f"Tenant Authorization Mismatch: Cannot drawdown for unowned merchant '{req.merchant_id}'.")
+
     effective_merchant_id = req.merchant_id or tenant_id
     invoices, bank_credits, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=100)
     blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
@@ -1322,10 +1334,10 @@ def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depen
 
 @app.get("/api/capital/facilities")
 def list_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
-    """List working capital facilities isolated to authenticated tenant."""
+    """List working capital facilities strictly isolated to authenticated tenant."""
     res = []
     for fac in capital_facility_manager.facilities.values():
-        if fac.merchant_id in (tenant_id, "merchant_rzp_primary", "merch_delhi_logistics_01"):
+        if fac.merchant_id == tenant_id:
             res.append({
                 "facility_id": fac.facility_id,
                 "merchant_id": fac.merchant_id,
@@ -1355,10 +1367,10 @@ def list_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
 
 @app.post("/api/capital/reconcile-and-sweep")
 def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verify_tenant_auth)):
-    """Reconcile incoming bank settlement block and apply automated split recovery sweep."""
+    """Reconcile incoming bank settlement block and apply automated split recovery sweep with tenant isolation."""
     facility = capital_facility_manager.facilities.get(req.facility_id)
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found.")
+    if not facility or facility.merchant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Facility not found for authenticated tenant.")
 
     invoices, bank_credits, _, _ = ChaosDataGenerator(seed=99).generate_suite(num_records=req.num_records)
     blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
@@ -1382,9 +1394,11 @@ def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verif
 
 @app.post("/api/capital/reset")
 def reset_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
-    """Reset all capital facilities and clear active state for demonstration."""
-    capital_facility_manager.facilities.clear()
-    return {"status": "RESET_SUCCESS", "active_facilities": 0}
+    """Reset capital facilities strictly for authenticated tenant."""
+    to_delete = [fid for fid, fac in capital_facility_manager.facilities.items() if fac.merchant_id == tenant_id]
+    for fid in to_delete:
+        del capital_facility_manager.facilities[fid]
+    return {"status": "RESET_SUCCESS", "active_facilities": len(capital_facility_manager.facilities)}
 
 
 if __name__ == "__main__":

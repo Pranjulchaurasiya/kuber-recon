@@ -198,3 +198,72 @@ def test_webhook_replay_protection_timestamp_freshness(client):
     )
     assert res.status_code == 400
     assert "Webhook Replay Rejected" in res.json()["detail"]
+
+
+def test_webhook_missing_timestamp_rejected(client):
+    """Webhook requests with missing timestamp MUST be rejected with 400 Bad Request."""
+    import json
+    import hmac
+    import hashlib
+    from kuber_recon.server import get_webhook_secret
+
+    body_dict = {
+        "entity": "event",
+        "account_id": "acc_kuber_escrow_001",
+        "event": "transfer.processed",
+        "contains": ["transfer"],
+        "payload": {"transfer": {"entity": {"id": "trf_test_no_ts_01", "status": "processed", "on_hold": False}}},
+    }
+    raw_body = json.dumps(body_dict, separators=(",", ":")).encode("utf-8")
+    secret = get_webhook_secret()
+    sig = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+
+    res = client.post(
+        "/api/webhook/razorpay",
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Razorpay-Signature": sig,
+            "X-Razorpay-Event-Id": "evt_no_ts_01",
+        },
+    )
+    assert res.status_code == 400
+    assert "Missing mandatory event timestamp" in res.json()["detail"]
+
+
+def test_cross_tenant_capital_facility_isolation(client):
+    """Proves Tenant A's capital facility cannot be listed, swept, or mutated by Tenant B."""
+    # 1. Tenant A draws down a capital facility
+    res_a = client.post(
+        "/api/capital/drawdown",
+        json={"requested_amount_paise": 2000000},
+        headers={
+            "X-Merchant-Id": "merchant_rzp_primary",
+            "X-API-Key": "kuber_sandbox_key_primary_2026",
+        },
+    )
+    assert res_a.status_code == 200
+    facility_id = res_a.json()["facility_id"]
+
+    # 2. Tenant B lists facilities -> receives empty list (0 facilities for Tenant B)
+    res_b_list = client.get(
+        "/api/capital/facilities",
+        headers={
+            "X-Merchant-Id": "merchant_agent_demo_01",
+            "X-API-Key": "kuber_sandbox_key_agent_01_2026",
+        },
+    )
+    assert res_b_list.status_code == 200
+    assert len(res_b_list.json()["facilities"]) == 0
+
+    # 3. Tenant B attempts to sweep Tenant A's facility -> 404 Not Found
+    res_b_sweep = client.post(
+        "/api/capital/reconcile-and-sweep",
+        json={"facility_id": facility_id, "num_records": 10},
+        headers={
+            "X-Merchant-Id": "merchant_agent_demo_01",
+            "X-API-Key": "kuber_sandbox_key_agent_01_2026",
+        },
+    )
+    assert res_b_sweep.status_code == 404
+    assert "Facility not found for authenticated tenant" in res_b_sweep.json()["detail"]

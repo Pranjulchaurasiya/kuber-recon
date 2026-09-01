@@ -16,6 +16,7 @@ Unit & Resilience Tests for APEX Assurance:
 import hashlib
 import hmac
 import json
+import time
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -521,6 +522,7 @@ def test_apex_contract_lifecycle_polling_to_released(client):
                 }
             }
         },
+        "created_at": int(time.time()),
     }
     raw_bytes = json.dumps(wh_payload).encode("utf-8")
     sig = hmac.new(get_webhook_secret().encode("utf-8"), raw_bytes, hashlib.sha256).hexdigest()
@@ -774,6 +776,7 @@ def test_webhook_mismatched_transfer_id_does_not_finalize(client):
                 }
             }
         },
+        "created_at": int(time.time()),
     }
     raw_bytes = json.dumps(mismatched_wh).encode("utf-8")
     sig = hmac.new(get_webhook_secret().encode("utf-8"), raw_bytes, hashlib.sha256).hexdigest()
