@@ -106,6 +106,11 @@ class StorageBackend(ABC):
         """Transition expired active hold contracts to EXPIRED_HOLD."""
         pass
 
+    @abstractmethod
+    def find_releasing_contract_by_transfer(self, transfer_id: str, contract_id: Optional[str] = None) -> Optional[str]:
+        """Lookup contract_id for a transfer currently in RELEASING status."""
+        pass
+
     # ── Capital Facilities & Sweeps ──────────────────────────────────────────
     @abstractmethod
     def insert_capital_facility(self, facility: Dict[str, Any]) -> bool:
@@ -289,16 +294,31 @@ class SQLiteStorageBackend(StorageBackend):
             """)
 
             # Safe migration checks for columns added to existing SQLite databases
-            for col_sql in [
-                "ALTER TABLE apex_contracts ADD COLUMN fee_paise INTEGER NOT NULL DEFAULT 0",
-                "ALTER TABLE apex_contracts ADD COLUMN expected_record_count INTEGER",
-                "ALTER TABLE apex_contracts ADD COLUMN release_started_at INTEGER",
-                "ALTER TABLE apex_contracts ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'merchant_rzp_primary'",
+            cur = conn.execute("PRAGMA table_info(apex_contracts)")
+            existing_apex_cols = {row[1] for row in cur.fetchall()}
+            for col_name, col_def in [
+                ("fee_paise", "INTEGER NOT NULL DEFAULT 0"),
+                ("expected_record_count", "INTEGER"),
+                ("release_started_at", "INTEGER"),
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'merchant_rzp_primary'"),
+                ("settlement_id", "TEXT"),
+                ("recipient_account", "TEXT"),
+                ("proof_hash", "TEXT"),
+                ("assertions_passed", "INTEGER DEFAULT 0"),
+                ("refusal_reason", "TEXT"),
+                ("webhook_event_id", "TEXT"),
+                ("buyer_agent_id", "TEXT NOT NULL DEFAULT ''"),
+                ("seller_agent_id", "TEXT NOT NULL DEFAULT ''"),
+                ("seller_account_id", "TEXT NOT NULL DEFAULT ''"),
+                ("created_at", "INTEGER NOT NULL DEFAULT 0"),
+                ("updated_at", "INTEGER DEFAULT 0"),
+                ("version", "INTEGER NOT NULL DEFAULT 1"),
             ]:
-                try:
-                    conn.execute(col_sql)
-                except sqlite3.OperationalError:
-                    pass
+                if col_name not in existing_apex_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE apex_contracts ADD COLUMN {col_name} {col_def}")
+                    except sqlite3.OperationalError:
+                        pass
 
             # 3. Append-only audit trail with engine immutability
 
@@ -426,6 +446,21 @@ class SQLiteStorageBackend(StorageBackend):
                     resolution_notes TEXT
                 )
             """)
+
+            # Safe schema migration for existing SQLite databases
+            for col, col_type in [
+                ("status", "TEXT NOT NULL DEFAULT 'PENDING'"),
+                ("retry_count", "INTEGER NOT NULL DEFAULT 0"),
+                ("max_retries", "INTEGER NOT NULL DEFAULT 5"),
+                ("next_attempt_at_ns", "INTEGER"),
+                ("lease_expires_at_ns", "INTEGER"),
+                ("worker_id", "TEXT"),
+                ("last_error", "TEXT"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE financial_outbox ADD COLUMN {col} {col_type}")
+                except Exception:
+                    pass
 
             # Indexing
             with contextlib.suppress(Exception):
@@ -662,6 +697,21 @@ class SQLiteStorageBackend(StorageBackend):
                     expired.append(cid)
             return expired
 
+    def find_releasing_contract_by_transfer(self, transfer_id: str, contract_id: Optional[str] = None) -> Optional[str]:
+        with self._lock, self._connect() as conn:
+            if contract_id:
+                cur = conn.execute(
+                    "SELECT contract_id FROM apex_contracts WHERE contract_id = ? AND transfer_id = ? AND status = 'RELEASING'",
+                    (contract_id, transfer_id),
+                )
+            else:
+                cur = conn.execute(
+                    "SELECT contract_id FROM apex_contracts WHERE transfer_id = ? AND status = 'RELEASING'",
+                    (transfer_id,),
+                )
+            row = cur.fetchone()
+            return row["contract_id"] if row else None
+
     # ── Capital Facilities ────────────────────────────────────────────────────
     def insert_capital_facility(self, facility: Dict[str, Any]) -> bool:
         now = datetime.now(timezone.utc).isoformat()
@@ -819,16 +869,17 @@ class SQLiteStorageBackend(StorageBackend):
     # ── Manual Review Queue ──────────────────────────────────────────────────
     def insert_manual_review_record(self, record: Dict[str, Any]) -> bool:
         now = datetime.now(timezone.utc).isoformat()
+        rec_id = record.get("id") or record.get("item_id") or f"MR-{uuid.uuid4().hex[:12]}"
         with self._lock, self._connect() as conn:
             try:
                 conn.execute("""
                     INSERT INTO manual_review_queue (id, tenant_id, category, reason, details_json, status, created_at)
                     VALUES (?, ?, ?, ?, ?, 'PENDING', ?)
                 """, (
-                    record["id"],
+                    rec_id,
                     record.get("tenant_id", "merchant_rzp_primary"),
-                    record["category"],
-                    record["reason"],
+                    record.get("category", "DENSE_CLUSTER"),
+                    record.get("reason", "Manual review required"),
                     record.get("details_json", "{}"),
                     now,
                 ))
@@ -848,21 +899,35 @@ class SQLiteStorageBackend(StorageBackend):
                 rows = conn.execute("SELECT * FROM manual_review_queue WHERE status = ? ORDER BY created_at DESC", (status,)).fetchall()
             return [dict(r) for r in rows]
 
-    def resolve_manual_review_record(self, record_id: str, resolution: str, resolved_by: str, tenant_id: Optional[str] = None) -> bool:
+    def resolve_manual_review_record(
+        self,
+        record_id: Optional[str] = None,
+        resolution: str = "RESOLVED",
+        resolved_by: str = "system",
+        tenant_id: Optional[str] = None,
+        item_id: Optional[str] = None,
+        resolution_notes: Optional[str] = None,
+    ) -> bool:
         now = datetime.now(timezone.utc).isoformat()
+        rec_id = record_id or item_id
+        notes = resolution_notes or resolution
         with self._lock, self._connect() as conn:
             sql = """
                 UPDATE manual_review_queue
                 SET status = 'RESOLVED', resolved_at = ?, resolved_by = ?, resolution_notes = ?
                 WHERE id = ?
             """
-            params: List[Any] = [now, resolved_by, resolution, record_id]
+            params: List[Any] = [now, resolved_by, notes, rec_id]
             if tenant_id:
                 sql += " AND tenant_id = ?"
                 params.append(tenant_id)
             cur = conn.execute(sql, tuple(params))
             conn.commit()
             return cur.rowcount == 1
+
+    insert_manual_review_item = insert_manual_review_record
+    list_manual_review_items = list_manual_review_records
+    resolve_manual_review_item = resolve_manual_review_record
 
     # ── Transactional Outbox & DLQ ───────────────────────────────────────────
     def insert_outbox_record(self, record: Dict[str, Any]) -> bool:
@@ -1377,6 +1442,22 @@ class PostgreSQLStorageBackend(StorageBackend):
                         expired.append(cid)
                 return expired
 
+    def find_releasing_contract_by_transfer(self, transfer_id: str, contract_id: Optional[str] = None) -> Optional[str]:
+        with self._lock, self._get_connection() as conn:
+            with conn.cursor() as cur:
+                if contract_id:
+                    cur.execute(
+                        "SELECT contract_id FROM apex_contracts WHERE contract_id = %s AND transfer_id = %s AND status = 'RELEASING'",
+                        (contract_id, transfer_id),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT contract_id FROM apex_contracts WHERE transfer_id = %s AND status = 'RELEASING'",
+                        (transfer_id,),
+                    )
+                row = cur.fetchone()
+                return row["contract_id"] if row else None
+
     # ── Capital Facilities ────────────────────────────────────────────────────
     def insert_capital_facility(self, facility: Dict[str, Any]) -> bool:
         now = datetime.now(timezone.utc).isoformat()
@@ -1553,6 +1634,7 @@ class PostgreSQLStorageBackend(StorageBackend):
     # ── Manual Review Queue ──────────────────────────────────────────────────
     def insert_manual_review_record(self, record: Dict[str, Any]) -> bool:
         now = datetime.now(timezone.utc).isoformat()
+        rec_id = record.get("id") or record.get("item_id") or f"MR-{uuid.uuid4().hex[:12]}"
         with self._lock, self._get_connection() as conn:
             try:
                 with conn.cursor() as cur:
@@ -1560,10 +1642,10 @@ class PostgreSQLStorageBackend(StorageBackend):
                         INSERT INTO manual_review_queue (id, tenant_id, category, reason, details_json, status, created_at)
                         VALUES (%s, %s, %s, %s, %s, 'PENDING', %s)
                     """, (
-                        record["id"],
+                        rec_id,
                         record.get("tenant_id", "merchant_rzp_primary"),
-                        record["category"],
-                        record["reason"],
+                        record.get("category", "DENSE_CLUSTER"),
+                        record.get("reason", "Manual review required"),
                         record.get("details_json", "{}"),
                         now,
                     ))
@@ -1583,13 +1665,23 @@ class PostgreSQLStorageBackend(StorageBackend):
                 rows = cur.fetchall()
                 return [dict(r) for r in rows]
 
-    def resolve_manual_review_record(self, record_id: str, resolution: str, resolved_by: str, tenant_id: Optional[str] = None) -> bool:
+    def resolve_manual_review_record(
+        self,
+        record_id: Optional[str] = None,
+        resolution: str = "RESOLVED",
+        resolved_by: str = "system",
+        tenant_id: Optional[str] = None,
+        item_id: Optional[str] = None,
+        resolution_notes: Optional[str] = None,
+    ) -> bool:
         now = datetime.now(timezone.utc).isoformat()
+        rec_id = record_id or item_id
+        notes = resolution_notes or resolution
         with self._lock, self._get_connection() as conn:
             try:
                 with conn.cursor() as cur:
                     sql = "UPDATE manual_review_queue SET status = 'RESOLVED', resolved_at = %s, resolved_by = %s, resolution_notes = %s WHERE id = %s"
-                    params: List[Any] = [now, resolved_by, resolution, record_id]
+                    params: List[Any] = [now, resolved_by, notes, rec_id]
                     if tenant_id:
                         sql += " AND tenant_id = %s"
                         params.append(tenant_id)
@@ -1599,6 +1691,10 @@ class PostgreSQLStorageBackend(StorageBackend):
             except Exception:
                 conn.rollback()
                 return False
+
+    insert_manual_review_item = insert_manual_review_record
+    list_manual_review_items = list_manual_review_records
+    resolve_manual_review_item = resolve_manual_review_record
 
     # ── Transactional Outbox & DLQ ───────────────────────────────────────────
     def insert_outbox_record(self, record: Dict[str, Any]) -> bool:
@@ -1774,18 +1870,21 @@ def get_storage_backend(
     effective_env = env or config.environment
     effective_url = database_url or config.database_url
 
-    if effective_env == EnvironmentMode.PRODUCTION:
-        if "sqlite" in effective_url.lower():
+    if effective_env in (EnvironmentMode.PRODUCTION, EnvironmentMode.STAGING):
+        env_name = effective_env.value
+        url_str = str(effective_url or "")
+        if "sqlite" in url_str.lower():
             raise SecurityConfigError(
-                "Production Invariant Violation: SQLite is strictly prohibited in PRODUCTION. "
-                "Configure a high-availability PostgreSQL / Amazon Aurora database URL (DATABASE_URL)."
+                f"SQLite is prohibited in {env_name}. "
+                f"{env_name} Invariant Violation: SQLite is strictly prohibited in {env_name}."
             )
-        return PostgreSQLStorageBackend(effective_url, db_connection=injected_conn)
-
-    if effective_env == EnvironmentMode.STAGING:
-        if "sqlite" in effective_url.lower():
+        if not effective_url or not (
+            url_str.startswith("postgresql") or url_str.startswith("postgres")
+        ):
             raise SecurityConfigError(
-                "Staging Invariant Violation: SQLite is prohibited in STAGING. PostgreSQL is required."
+                f"SQLite is prohibited in {env_name}. "
+                f"{env_name} Invariant Violation: DATABASE_URL must contain a valid PostgreSQL scheme ('postgresql://' or 'postgres://'). "
+                f"SQLite and filesystem paths are strictly prohibited in {env_name}."
             )
         return PostgreSQLStorageBackend(effective_url, db_connection=injected_conn)
 

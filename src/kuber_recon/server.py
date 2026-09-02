@@ -24,7 +24,6 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
 import sys
 import time
 import uuid
@@ -85,14 +84,13 @@ from kuber_recon.metrics import metrics
 from kuber_recon.security import (
     DualAuthorizationEngine,
     PROVISIONED_SUBJECTS,
-    SoftwareEd25519Custodian,
     UserRole,
     create_access_token,
     decode_access_token,
     get_key_custodian,
 )
 from kuber_recon.simulation import FinancialDigitalTwin
-from kuber_recon.storage import SQLiteStorageBackend, StorageBackend, get_storage_backend
+from kuber_recon.storage import PostgreSQLStorageBackend, SQLiteStorageBackend, StorageBackend, get_storage_backend
 from kuber_recon.types import InvoiceRecord, BankNodalCredit, paise_to_inr_decimal
 
 # ── Unified Durable Storage & Idempotency Store ───────────────────────────────
@@ -109,20 +107,34 @@ class WebhookIdempotencyStore:
     def __init__(
         self,
         backend: Optional[StorageBackend] = None,
+        database_url: Optional[str] = None,
         db_path: Optional[Union[str, Path]] = None,
     ) -> None:
         self._lock = RLock()
         if backend is not None:
             self.backend = backend
+        elif database_url is not None:
+            self.backend = get_storage_backend(database_url=database_url, env=config.environment)
         elif db_path is not None:
             self.backend = SQLiteStorageBackend(str(db_path))
         else:
-            self.backend = get_storage_backend(str(self.DB_FILE) if self.DB_FILE else None)
+            if config.environment == EnvironmentMode.SANDBOX_DEMO and hasattr(self, "DB_FILE") and self.DB_FILE:
+                self.backend = SQLiteStorageBackend(str(self.DB_FILE))
+            else:
+                self.backend = get_storage_backend(
+                    database_url=config.database_url,
+                    env=config.environment,
+                )
 
     def _connect(self):
         if hasattr(self.backend, "_connect"):
             return self.backend._connect()
-        raise AttributeError("StorageBackend does not expose direct connection")
+        if hasattr(self.backend, "_get_connection"):
+            return self.backend._get_connection()
+        raise AttributeError("Underlying backend does not have _connect")
+
+    def find_releasing_contract_by_transfer(self, transfer_id: str, contract_id: Optional[str] = None) -> Optional[str]:
+        return self.backend.find_releasing_contract_by_transfer(transfer_id=transfer_id, contract_id=contract_id)
 
     def try_insert(self, event_id: str) -> bool:
 
@@ -322,9 +334,9 @@ def verify_authenticated_context(
             detail="Authentication Failed: Invalid API key for specified merchant.",
         )
 
-    # API key maps to provisioned operator roles
+    # API key maps strictly to provisioned operator roles (never defaults to privileged roles)
     provisioned = PROVISIONED_SUBJECTS.get(x_merchant_id, {})
-    roles = provisioned.get("roles", [UserRole.MERCHANT_OPERATOR, UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR])
+    roles = provisioned.get("roles", [UserRole.MERCHANT_OPERATOR])
     return AuthContext(
         subject=x_merchant_id,
         tenant_id=x_merchant_id,
@@ -357,7 +369,14 @@ def require_roles(*allowed_roles: UserRole):
 async def lifespan(app: FastAPI):
     # Enforce strict production readiness invariants at application boot
     config.validate_production_readiness()
-    logger.info("KuberRecon API Gateway initialized in environment mode: %s", config.environment)
+    backend = get_storage_backend(
+        database_url=config.database_url,
+        env=config.environment,
+    )
+    app.state.backend = backend
+    idempotency_store.backend = backend
+    capital_facility_manager.backend = backend
+    logger.info("KuberRecon API Gateway initialized with backend %s in environment mode: %s", backend.__class__.__name__, config.environment)
     yield
 
 
@@ -542,14 +561,29 @@ def _fmt_paise(paise: int) -> str:
 # ── Core Endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/health")
+@app.get("/health/live")
 @app.get("/api/health")
 def health():
+    backend_status = "unavailable/error"
+    backend_name = "unavailable/error"
+    try:
+        chk = idempotency_store.backend.health_check()
+        status_ok = chk.get("status") in ("connected", "ok", "healthy")
+        is_pg = "PostgreSQL" in chk.get("backend", "") or isinstance(idempotency_store.backend, PostgreSQLStorageBackend)
+        backend_name = "PostgreSQL/Aurora" if is_pg else "SQLite WAL"
+        backend_status = "connected" if status_ok else "unavailable/error"
+    except Exception:
+        backend_name = "unavailable/error"
+        backend_status = "unavailable/error"
+
     return {
         "status": "live",
         "service": "KuberRecon & APEX Assurance API",
         "protocol": "APEX Assurance v2.0 (Razorpay Route Escrow)",
         "engine": "Horowitz–Sahni Meet-in-the-Middle + Paise-Exact Decimal + Non-LLM Assertion Kernel",
         "mode": "test_mode" if razorpay_adapter.is_live else "sandbox_simulation",
+        "storage_backend": backend_name,
+        "storage_status": backend_status,
         "fmr": "0.000 (measured synthetic corpus)",
         "timestamp": int(time.time()),
     }
@@ -588,6 +622,7 @@ class TokenIssueResponse(BaseModel):
     roles: List[str]
 
 
+@app.post("/api/auth/token", response_model=TokenIssueResponse)
 @app.post("/api/v2/auth/token", response_model=TokenIssueResponse)
 def issue_sandbox_jwt_token(
     req: TokenIssueRequest,
@@ -906,20 +941,12 @@ async def razorpay_webhook_listener(
         except KeyError:
             pass
         else:
-            with idempotency_store._lock, idempotency_store._connect() as conn:
-                if apex_contract_id:
-                    cur = conn.execute(
-                        "SELECT contract_id FROM apex_contracts WHERE contract_id = ? AND transfer_id = ? AND status = 'RELEASING'",
-                        (apex_contract_id, transfer_id),
-                    )
-                else:
-                    cur = conn.execute(
-                        "SELECT contract_id FROM apex_contracts WHERE transfer_id = ? AND status = 'RELEASING'",
-                        (transfer_id,),
-                    )
-                row = cur.fetchone()
-                if row:
-                    idempotency_store.cas_finalize_release(row[0], event_id)
+            releasing_cid = idempotency_store.find_releasing_contract_by_transfer(
+                transfer_id=transfer_id,
+                contract_id=apex_contract_id,
+            )
+            if releasing_cid:
+                idempotency_store.cas_finalize_release(releasing_cid, event_id)
 
     latency_ms = (time.perf_counter() - t0) * 1000
 
@@ -928,7 +955,7 @@ async def razorpay_webhook_listener(
         "event_id": event_id,
         "event": event,
         "signature_verified": True,
-        "idempotency_backend": "SQLite (durable — survives restart)",
+        "idempotency_backend": idempotency_store.backend.__class__.__name__,
         "processed_background": True,
         "proof_hash": "sha256:" + hashlib.sha256(raw_body).hexdigest(),
         "latency_ms": round(latency_ms, 3),
@@ -1068,12 +1095,12 @@ def apex_deliver_payload(req: DeliverContractRequest, tenant_id: str = Depends(v
 @app.post("/api/apex/contracts/release")
 def apex_release_settlement(
     req: ReleaseContractRequest,
-    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR)),
+    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.ADMINISTRATOR)),
 ):
     """
     Step 3: Release Route Settlement with Anti-Collusion & CAS Concurrency Safety.
     Executes PATCH /v1/transfers/{id} with on_hold: false.
-    Requires role: FINANCE_REVIEWER, RISK_OFFICER, or ADMINISTRATOR.
+    Requires role: FINANCE_REVIEWER or ADMINISTRATOR.
     """
     tenant_id = auth.tenant_id
     contract_data = idempotency_store.get_contract(req.contract_id, tenant_id=tenant_id)
@@ -1193,7 +1220,7 @@ def get_signer_public_key():
 
     is_prod_kms = custodian.algorithm == "ECDSA_SHA_256"
     return {
-        "key_id": getattr(custodian, "key_id", "kuber_signer_key"),
+        "key_id": getattr(custodian, "key_id", "demo_software_ed25519_v1"),
         "algorithm": custodian.algorithm,
         "custody_type": "Enterprise AWS KMS (FIPS 140-2 Level 3)" if is_prod_kms else "Local Software Memory Demo Signer",
         "public_key_hex": custodian.public_key_hex,
@@ -1370,11 +1397,11 @@ def get_capital_offer(merchant_id: Optional[str] = None, tenant_id: str = Depend
 @app.post("/api/capital/drawdown")
 def disburse_capital_advance(
     req: CapitalDrawdownRequest,
-    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR)),
+    auth: AuthContext = Depends(require_roles(UserRole.RISK_ANALYST, UserRole.RISK_OFFICER, UserRole.FINANCE_REVIEWER, UserRole.ADMINISTRATOR)),
 ):
     """
     Execute 1-click working capital advance drawdown with SQLite CAS durability.
-    Requires role: FINANCE_REVIEWER, RISK_OFFICER, or ADMINISTRATOR.
+    Requires role: RISK_ANALYST, RISK_OFFICER, FINANCE_REVIEWER, or ADMINISTRATOR.
     """
     tenant_id = auth.tenant_id
     if req.merchant_id and req.merchant_id != tenant_id:
@@ -1526,7 +1553,7 @@ def resolve_manual_review_item(
     ok = idempotency_store.backend.resolve_manual_review_item(
         item_id=req.item_id,
         tenant_id=auth.tenant_id,
-        resolved_by=f"{auth.subject}:{auth.role.value}",
+        resolved_by=f"{auth.subject}:{auth.roles[0].value if auth.roles else 'FINANCE_REVIEWER'}",
         resolution_notes=req.notes or f"Resolution: {req.resolution}",
     )
     if not ok:

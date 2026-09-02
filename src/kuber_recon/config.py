@@ -102,13 +102,23 @@ class AppConfig(BaseModel):
         
         Production startup fails immediately if any local simulation primitive is active.
         """
-        if self.environment == EnvironmentMode.PRODUCTION:
-            # 1. Prohibit SQLite in Production
-            if "sqlite" in self.database_url.lower():
+        if self.environment in (EnvironmentMode.PRODUCTION, EnvironmentMode.STAGING):
+            env_name = self.environment.value
+            url_str = str(self.database_url or "")
+            if "sqlite" in url_str.lower():
                 raise SecurityConfigError(
-                    "Production Invariant Violation: SQLite is strictly prohibited in PRODUCTION. "
+                    f"{env_name} Invariant Violation: SQLite is strictly prohibited in {env_name}. "
                     "Configure a high-availability PostgreSQL / Amazon Aurora database URL (DATABASE_URL)."
                 )
+            if not self.database_url or not (
+                url_str.startswith("postgresql") or url_str.startswith("postgres")
+            ):
+                raise SecurityConfigError(
+                    f"{env_name} Invariant Violation: DATABASE_URL must contain a valid PostgreSQL scheme ('postgresql://' or 'postgres://'). "
+                    f"SQLite and filesystem paths are strictly prohibited in {env_name}."
+                )
+
+        if self.environment == EnvironmentMode.PRODUCTION:
 
             # 2. Prohibit Software Key Custody in Production
             if not self.use_aws_kms or not self.aws_kms_key_arn:

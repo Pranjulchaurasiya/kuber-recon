@@ -36,6 +36,7 @@ class UserRole(str, Enum):
     MERCHANT_OPERATOR = "MERCHANT_OPERATOR"
     FINANCE_REVIEWER = "FINANCE_REVIEWER"
     RISK_OFFICER = "RISK_OFFICER"
+    RISK_ANALYST = "RISK_ANALYST"
     ADMINISTRATOR = "ADMINISTRATOR"
 
 
@@ -49,9 +50,17 @@ class AuthTokenPayload(BaseModel):
 
 
 PROVISIONED_SUBJECTS: Dict[str, Dict[str, Any]] = {
+    "merchant_rzp_primary": {
+        "tenant_id": "merchant_rzp_primary",
+        "roles": [UserRole.MERCHANT_OPERATOR, UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR],
+    },
     "cfo_demo_operator": {
         "tenant_id": "merchant_rzp_primary",
         "roles": [UserRole.MERCHANT_OPERATOR, UserRole.FINANCE_REVIEWER],
+    },
+    "risk_analyst_user": {
+        "tenant_id": "merchant_rzp_primary",
+        "roles": [UserRole.RISK_ANALYST],
     },
     "risk_officer_primary": {
         "tenant_id": "merchant_rzp_primary",
@@ -133,6 +142,7 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
 
     # Pinned RFC 8032 Public Keys for Authorized Checker Identities
     PINNED_CHECKER_REGISTRY = {
+        "demo_software_ed25519_v1": "0f11d9206303ebdc7533920222d1b5bda7d05519211aff465e30138b7a45581c",
         "cfo_autonomous_verifier": "0f11d9206303ebdc7533920222d1b5bda7d05519211aff465e30138b7a45581c",
         "cfo_ed25519_primary": "c8f85e05aff655a2fb56a078938a7f9e5f10a2c0836bd195e9da05977295f468",
         "cfo_approver_01": "b6dd788ca57b2ca938e65c5dd268d242e36070bc497287a4c68b5addee5a1de6",
@@ -142,6 +152,7 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
 
     # Deterministic Seed Registry for Demo Checkers (In-Memory Prototype)
     AUTHORIZED_CHECKERS = {
+        "demo_software_ed25519_v1": "kuber_cfo_autonomous_verifier_sec_key_v1",
         "cfo_autonomous_verifier": "kuber_cfo_autonomous_verifier_sec_key_v1",
         "cfo_ed25519_primary": "kuber_cfo_ed25519_primary_sec_key_v1",
         "cfo_approver_01": "kuber_cfo_approver_01_sec_key_v1",
@@ -150,9 +161,9 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
     }
 
     def __init__(self, key_id: str = "cfo_autonomous_verifier"):
-        if config.environment == EnvironmentMode.PRODUCTION:
+        if config.environment in (EnvironmentMode.PRODUCTION, EnvironmentMode.STAGING):
             raise SecurityConfigError(
-                "Fatal Security Guard: SoftwareEd25519Custodian cannot be instantiated in PRODUCTION mode. "
+                f"Fatal Security Guard: SoftwareEd25519Custodian cannot be instantiated in {config.environment.value} mode. "
                 "AWSKMSAsymmetricCustodian is required."
             )
         self.key_id = key_id
@@ -216,8 +227,7 @@ class SoftwareEd25519Custodian(BaseKeyCustodian):
             elif cert.canonical_payload:
                 payload_to_verify = cert.canonical_payload.encode("utf-8")
             else:
-                expected_custodian = SoftwareEd25519Custodian(key_id=cert.key_id)
-                payload_to_verify = expected_custodian.build_canonical_payload(
+                payload_to_verify = self.build_canonical_payload(
                     cert.merkle_leaf_hash, {"approver": cert.key_id, "action": "RELEASE"}
                 )
 
@@ -410,7 +420,10 @@ def get_key_custodian(
         if config.use_aws_kms or kms_client is not None:
             arn = key_arn or config.aws_kms_key_arn or "arn:aws:kms:ap-south-1:123456789012:key/staging-kuber-key"
             return AWSKMSAsymmetricCustodian(key_arn=arn, kms_client=kms_client)
-        return SoftwareEd25519Custodian(key_id=key_id or "cfo_staging_verifier")
+        raise SecurityConfigError(
+            "Staging Invariant Violation: Software key custody is prohibited in STAGING. "
+            "AWS KMS Asymmetric Signer (ECC_NIST_P256) or an injected KMS custodian test double is required."
+        )
 
     # SANDBOX_DEMO
     if config.use_aws_kms or kms_client is not None:

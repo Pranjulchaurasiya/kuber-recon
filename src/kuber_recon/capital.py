@@ -276,9 +276,12 @@ class CapitalFacilityManager:
             self.backend = get_storage_backend(database_url=db_url)
 
     def _get_connection(self):
+        """Backward-compatible connection accessor delegating to underlying backend."""
         if hasattr(self.backend, "_connect"):
             return self.backend._connect()
-        raise AttributeError("StorageBackend does not expose direct connection")
+        if hasattr(self.backend, "_get_connection"):
+            return self.backend._get_connection()
+        raise AttributeError("Underlying backend does not have connection method")
 
     def _dict_to_facility(self, d: Dict[str, Any]) -> AdvanceFacility:
 

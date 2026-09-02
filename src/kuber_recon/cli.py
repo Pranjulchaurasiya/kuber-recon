@@ -83,18 +83,18 @@ def run_demo():
 
     if reconciled_blocks:
         sample = reconciled_blocks[0]
-        tree = Tree(f"[bold green]Verified Settlement Block: {sample.block_id}[/bold green]")
-        tree.add(f"[cyan]Bank Credit UTR: {sample.bank_credit.utr_reference} ({sample.bank_credit.source_bank})[/cyan]")
-        tree.add(f"[green]Reconciled Net Credit: Rs {sample.bank_credit.amount_in_paise / 100:,.2f}[/green]")
+        tree = Tree(f"[bold green]Verified Settlement Block: {sample.settlement_id}[/bold green]")
+        tree.add(f"[cyan]Bank Credit UTR: {sample.utr_number}[/cyan]")
+        tree.add(f"[green]Reconciled Net Credit: Rs {sample.lump_sum_paise / 100:,.2f}[/green]")
 
         invs = tree.add(f"[yellow]Matched Invoices ({len(sample.matched_invoices)} items)[/yellow]")
-        for inv in sample.matched_invoices:
-            invs.add(f"{inv.invoice_number} | {inv.counterparty_gstin} | Rs {inv.amount_in_paise / 100:,.2f}")
+        for inv_id in sample.matched_invoices:
+            invs.add(f"{inv_id}")
 
         deductions = tree.add("[red]Paise-Exact Statutory & Gateway Deductions[/red]")
-        deductions.add("[dim]1.85% MDR Fee: Deducted at source[/dim]")
-        deductions.add("[dim]18% GST on MDR: Matched with GSTR-2B ITC JSON[/dim]")
-        deductions.add("[dim]1% Section 194-O TDS: Withheld under Income Tax Act[/dim]")
+        deductions.add(f"[dim]Total MDR Fee: Rs {sample.total_mdr_fee_paise / 100:,.2f}[/dim]")
+        deductions.add(f"[dim]GST on MDR: Rs {sample.total_gst_on_mdr_paise / 100:,.2f}[/dim]")
+        deductions.add(f"[dim]Section 194-O TDS: Rs {sample.total_tds_withheld_paise / 100:,.2f}[/dim]")
 
         proof = tree.add(f"[magenta]IETF Signed Manifest Hash: {sample.proof_hash[:24]}...[/magenta]")
         console.print(tree)
@@ -203,7 +203,7 @@ def run_capital_demo():
 
     # Step 3: Execute 1-Click Advance Disbursement
     manager = CapitalFacilityManager()
-    facility = manager.disburse_advance(offer)
+    facility = manager.disburse_advance(offer, tenant_id=offer.merchant_id)
     console.print(f"\n[bold green]>> Instant Advance Disbursed:[/bold green] [white]Rs {facility.principal_paise/100:,.2f}[/white] | Transfer Ref: [dim]{facility.payout_transfer_id}[/dim]")
     console.print(f"[cyan]Total Repayment Obligation:[/cyan] Rs {facility.total_repayment_paise/100:,.2f} | Status: [bold green]{facility.status.value}[/bold green]\n")
 
@@ -217,15 +217,15 @@ def run_capital_demo():
     sweep_table.add_column("Remaining Balance", style="bold white", justify="right")
 
     # Cycle 1
-    fac, ev1 = manager.process_settlement_sweep(facility.facility_id, blocks[0])
+    fac, ev1 = manager.process_settlement_sweep(facility.facility_id, blocks[0], tenant_id=offer.merchant_id)
     sweep_table.add_row("Day 1 Settlement", ev1.settlement_utr, f"Rs {ev1.gross_settlement_paise/100:,.2f}", f"Rs {ev1.sweep_deduction_paise/100:,.2f}", f"Rs {ev1.net_merchant_payout_paise/100:,.2f}", f"Rs {ev1.remaining_balance_paise/100:,.2f}")
 
     # Cycle 2
-    fac, ev2 = manager.process_settlement_sweep(facility.facility_id, blocks[1])
+    fac, ev2 = manager.process_settlement_sweep(facility.facility_id, blocks[1], tenant_id=offer.merchant_id)
     sweep_table.add_row("Day 2 Settlement", ev2.settlement_utr, f"Rs {ev2.gross_settlement_paise/100:,.2f}", f"Rs {ev2.sweep_deduction_paise/100:,.2f}", f"Rs {ev2.net_merchant_payout_paise/100:,.2f}", f"Rs {ev2.remaining_balance_paise/100:,.2f}")
 
     # Cycle 3 (Finalizing sweep)
-    fac, ev3 = manager.process_settlement_sweep(facility.facility_id, blocks[2])
+    fac, ev3 = manager.process_settlement_sweep(facility.facility_id, blocks[2], tenant_id=offer.merchant_id)
     sweep_table.add_row("Day 3 Settlement", ev3.settlement_utr, f"Rs {ev3.gross_settlement_paise/100:,.2f}", f"Rs {ev3.sweep_deduction_paise/100:,.2f}", f"Rs {ev3.net_merchant_payout_paise/100:,.2f}", f"Rs {ev3.remaining_balance_paise/100:,.2f}")
 
     console.print(sweep_table)

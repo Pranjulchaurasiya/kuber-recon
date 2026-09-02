@@ -39,6 +39,11 @@ class MessagePublisher(ABC):
         pass
 
 
+def calculate_backoff_seconds(retry_count: int, max_backoff: int = 60) -> int:
+    """Explicit 2^retry exponential backoff bounded by max_backoff."""
+    return min(max_backoff, 2 ** max(0, retry_count))
+
+
 class DeterministicFakePublisher(MessagePublisher):
     """Deterministic in-memory publisher with simulated broker ACK, retries, and drop tracking."""
 
@@ -197,7 +202,7 @@ class TransactionalOutboxDispatcher:
                     pass
             conn.commit()
 
-    def stage_event(self, envelope: FinancialEventEnvelope) -> OutboxRecord:
+    def stage_event(self, envelope: FinancialEventEnvelope, max_retries: int = 5) -> OutboxRecord:
         """Stage event inside atomic database transaction with idempotency protection."""
         record_id = str(uuid.uuid4())
         created_at_ns = int(time.time_ns())
@@ -209,8 +214,8 @@ class TransactionalOutboxDispatcher:
                     INSERT INTO financial_outbox (
                         id, tenant_id, event_id, event_type, aggregate_id,
                         idempotency_key, payload_json, created_at_ns, status, published,
-                        next_attempt_at_ns
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?)
+                        max_retries, next_attempt_at_ns
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?)
                 """, (
                     record_id,
                     envelope.tenant_id,
@@ -220,6 +225,7 @@ class TransactionalOutboxDispatcher:
                     envelope.idempotency_key,
                     payload_json,
                     created_at_ns,
+                    max_retries,
                     created_at_ns,
                 ))
                 conn.commit()
@@ -232,6 +238,7 @@ class TransactionalOutboxDispatcher:
                     created_at_ns=created_at_ns,
                     status=OutboxStatus.PENDING,
                     published=False,
+                    max_retries=max_retries,
                     next_attempt_at_ns=created_at_ns,
                 )
             except sqlite3.IntegrityError:
@@ -262,12 +269,16 @@ class TransactionalOutboxDispatcher:
                     )
                 raise
 
+    append_event = stage_event
+
     def poll_and_publish_cdc(
         self,
         publisher: Optional[MessagePublisher] = None,
         batch_size: int = 100,
         worker_id: Optional[str] = None,
         lease_duration_ms: int = 30000,
+        tenant_id: Optional[str] = None,
+        use_backoff: Optional[bool] = None,
     ) -> int:
         """CDC worker with distributed worker lease claiming, exponential backoff, and explicit publisher ACK."""
         active_publisher = publisher or self._default_publisher
@@ -282,16 +293,22 @@ class TransactionalOutboxDispatcher:
             # - Not quarantined to DLQ
             # - Ready for next attempt (next_attempt_at_ns <= now_ns or NULL)
             # - Not claimed by active worker, or previous lease expired
-            rows = conn.execute("""
+            query = """
                 SELECT id, tenant_id, event_id, event_type, aggregate_id, payload_json, retry_count, max_retries
                 FROM financial_outbox
                 WHERE published = 0
                   AND status != 'DLQ'
                   AND (next_attempt_at_ns IS NULL OR next_attempt_at_ns <= ?)
                   AND (status = 'PENDING' OR (status = 'IN_FLIGHT' AND (lease_expires_at_ns IS NULL OR lease_expires_at_ns < ?)))
-                ORDER BY created_at_ns ASC
-                LIMIT ?
-            """, (now_ns, now_ns, batch_size)).fetchall()
+            """
+            params: List[Any] = [now_ns, now_ns]
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
+            query += " ORDER BY created_at_ns ASC LIMIT ?"
+            params.append(batch_size)
+
+            rows = conn.execute(query, tuple(params)).fetchall()
 
             if not rows:
                 return 0
@@ -349,8 +366,8 @@ class TransactionalOutboxDispatcher:
                             reason=f"Max retries ({max_retries}) exceeded without publisher acknowledgement",
                         )
                     else:
-                        # Exponential backoff: min(60s, 2^retries seconds) in staging/prod; 0s in sandbox for test speed
-                        backoff_seconds = min(60, 2 ** new_retries) if config.environment != EnvironmentMode.SANDBOX_DEMO else 0
+                        apply_bo = use_backoff if use_backoff is not None else (config.environment != EnvironmentMode.SANDBOX_DEMO)
+                        backoff_seconds = calculate_backoff_seconds(new_retries) if apply_bo else 0
                         next_attempt_ns = now_ns + (backoff_seconds * 1_000_000_000)
                         conn.execute("""
 

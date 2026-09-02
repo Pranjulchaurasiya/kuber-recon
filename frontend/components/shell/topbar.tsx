@@ -13,20 +13,25 @@ export function Topbar() {
   const pathname = usePathname()
   const current = navItems.find((n) => n.href === pathname) ?? navItems[0]
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [gatewayMode, setGatewayMode] = useState<'test_mode' | 'sandbox_simulation'>('sandbox_simulation')
+  const [gatewayMode, setGatewayMode] = useState<'SANDBOX_DEMO' | 'TEST_MODE' | 'LIVE_MODE' | 'BACKEND_OFFLINE'>('SANDBOX_DEMO')
   const [copilotOpen, setCopilotOpen] = useState(false)
 
   useEffect(() => {
     fetch(`${getApiUrl()}/api/integration-status`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then((data) => {
-        if (data.mode === 'test_mode' || data.razorpay_api_live) {
-          setGatewayMode('test_mode')
+        if (data.environment === 'PRODUCTION' || data.mode === 'live') {
+          setGatewayMode('LIVE_MODE')
+        } else if (data.mode === 'test_mode' || data.razorpay_api_live) {
+          setGatewayMode('TEST_MODE')
         } else {
-          setGatewayMode('sandbox_simulation')
+          setGatewayMode('SANDBOX_DEMO')
         }
       })
-      .catch(() => setGatewayMode('sandbox_simulation'))
+      .catch(() => setGatewayMode('BACKEND_OFFLINE'))
   }, [])
 
   return (
@@ -75,23 +80,37 @@ export function Topbar() {
               <span className="hidden sm:inline">CFO Copilot</span>
             </button>
 
-            {/* Dynamic Truthful Mode Badge */}
-            {gatewayMode === 'test_mode' ? (
+            {/* Dynamic Truthful Mode Badge (4 States) */}
+            {gatewayMode === 'LIVE_MODE' && (
+              <div className="hidden items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 sm:flex font-mono text-[11px] font-semibold text-emerald-500">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                LIVE MODE
+              </div>
+            )}
+            {gatewayMode === 'TEST_MODE' && (
               <div className="hidden items-center gap-2 rounded-full border border-gain/30 bg-gain/10 px-3 py-1 sm:flex font-mono text-[11px] font-semibold text-gain">
                 <span className="h-1.5 w-1.5 rounded-full bg-gain animate-status-dot" />
                 RAZORPAY TEST MODE
               </div>
-            ) : (
+            )}
+            {gatewayMode === 'SANDBOX_DEMO' && (
               <div className="hidden items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:flex font-mono text-[11px] font-semibold text-amber-500">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-status-dot" />
-                SANDBOX SIMULATION
+                SANDBOX DEMO
+              </div>
+            )}
+            {gatewayMode === 'BACKEND_OFFLINE' && (
+              <div className="hidden items-center gap-2 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 sm:flex font-mono text-[11px] font-semibold text-destructive">
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                BACKEND OFFLINE
               </div>
             )}
 
-            {/* Test Corpus FMR display */}
+            {/* Test Corpus FMR display with honest fixture demarcation */}
             <div className="hidden text-right md:block">
-              <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                TEST CORPUS FMR
+              <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 justify-end">
+                <span>TEST CORPUS FMR</span>
+                <span className="text-[9px] px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border">DEMO FIXTURE</span>
               </div>
               <div className="font-mono text-sm font-semibold text-gain">0.000</div>
             </div>
@@ -111,8 +130,9 @@ export function Topbar() {
           <div className="flex items-center gap-2 min-w-0">
             <span className="flex h-2 w-2 rounded-full bg-gain animate-status-dot shrink-0" />
             <span className="font-bold text-primary shrink-0 uppercase tracking-wider text-[10px]">
-              LIVE WEBHOOK STREAM
+              TELEMETRY STREAM
             </span>
+            <span className="text-[9px] px-1 py-0.2 rounded bg-muted/80 text-muted-foreground border border-border shrink-0">DEMO FIXTURE</span>
             <span className="text-muted-foreground/40 shrink-0">•</span>
             <div className="truncate text-foreground/90 transition-all duration-300">
               <LiveWebhookTicker />

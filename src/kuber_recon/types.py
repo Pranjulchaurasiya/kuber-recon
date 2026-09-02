@@ -58,6 +58,7 @@ class InvoiceRecord(BaseModel):
     method: PaymentMethod = Field(default=PaymentMethod.UPI)
     captured_at: datetime = Field(..., description="Timestamp payment was captured")
     is_settled: bool = Field(default=False)
+    tenant_id: Optional[str] = Field(default=None, description="Tenant ID owning this invoice")
 
 
 class RazorpaySettlementItem(BaseModel):

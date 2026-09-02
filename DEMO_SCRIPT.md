@@ -16,7 +16,7 @@
 │ 00:45 - 02:00 │ Live Underwriting & Split-Sweep Demo     │ `run-capital-demo` Terminal │
 │ 02:00 - 03:00 │ Subset-Sum Verification & Webhook CAS   │ `run-demo` Terminal         │
 │ 03:00 - 03:45 │ The Ownership Triple-Test & Moat         │ Architecture / Pitch Slide  │
-│ 03:45 - 04:00 │ Closing Invariants & Q&A Handoff         │ 122/122 Tests Screen        │
+│ 03:45 - 04:00 │ Closing Invariants & Q&A Handoff         │ 212/212 Tests Screen        │
 ├───────────────┴──────────────────────────────────────────┴─────────────────────────────┤
 ```
 
@@ -93,10 +93,10 @@ python -m kuber_recon.cli run-demo
 
 **[Action: In Terminal, run:]**
 ```bash
-python -m pytest -p no:deepeval -p no:langsmith tests/ -q
+python -m pytest tests/ -q
 ```
 
-> *"Every claim we’ve demonstrated is backed by **122 automated invariant tests** running across 16 modules—including AST scanners enforcing zero floats, multi-threaded concurrency suites proving zero over-recovery, and 0.000 False Match Rate verification on our synthetic benchmark fixture corpus.*
+> *"Every claim we’ve demonstrated is backed by **212 automated invariant tests** running across 29 modules—including AST scanners enforcing zero floats, multi-threaded concurrency suites proving zero over-recovery, and 0.000 False Match Rate verification on our synthetic benchmark fixture corpus.*
 > 
 > *Thank you. We are happy to take your questions."*
 

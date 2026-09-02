@@ -390,13 +390,14 @@ class ClusteredReconciliationPipeline:
             seen_invoice_ids.add(inv.invoice_id)
 
         # 2. Validation: Prevent cross-tenant invoice reuse
-        batch_tenants = {getattr(inv, "tenant_id", "merchant_rzp_primary") for inv in invoices}
-        if len(batch_tenants) > 1:
-            raise ValueError(f"Cross-tenant invoice reuse violation: Batch contains invoices across multiple tenants: {batch_tenants}")
-        if tenant_id and any(t != tenant_id for t in batch_tenants):
+        specified_tenants = {inv.tenant_id for inv in invoices if inv.tenant_id is not None}
+        if len(specified_tenants) > 1:
+            raise ValueError(f"Cross-tenant invoice reuse violation: Batch contains invoices across multiple tenants: {specified_tenants}")
+        if tenant_id and any(t != tenant_id for t in specified_tenants):
             raise ValueError(f"Cross-tenant invoice reuse violation: Batch invoices do not match expected tenant '{tenant_id}'.")
+        effective_tenant = tenant_id or (next(iter(specified_tenants)) if specified_tenants else "merchant_rzp_primary")
 
-        # 3. Deterministic Multi-Dimensional Clustering: (Counterparty GSTIN, Capture Date)
+        # 3. Deterministic Clustering: (Counterparty GSTIN, Capture Date)
         invoices_by_cluster: Dict[Tuple[str, date], List[InvoiceRecord]] = defaultdict(list)
         for inv in invoices:
             cluster_key = (inv.supplier_gstin, inv.captured_at.date())
@@ -408,7 +409,7 @@ class ClusteredReconciliationPipeline:
 
         t_solve_start = time.perf_counter()
 
-        # 4. Pre-process each cluster: bound dense clusters and persist truncated items into manual review queue
+        # 4. Pre-process each cluster: bound dense clusters and persist into manual review queue
         backend = self._get_backend()
         cluster_candidate_invoices: Dict[Tuple[str, date], List[InvoiceRecord]] = {}
         for (gstin, cap_date), cluster_invoices in sorted(invoices_by_cluster.items(), key=lambda x: (x[0][0], x[0][1])):
@@ -426,30 +427,37 @@ class ClusteredReconciliationPipeline:
                     dense_credit_dummy,
                     f"INCONCLUSIVE_TRUNCATED (Cluster for GSTIN {gstin} on {cap_date} has {len(cluster_invoices)} items > {self.max_cluster_size})",
                 ))
-                # Persist skipped excess invoices into durable manual review queue
+                # Persist dense cluster into durable manual review queue
                 if backend is not None:
-                    eff_tenant = tenant_id or (batch_tenants.pop() if batch_tenants else "merchant_rzp_primary")
-                    for exc_inv in excess_invoices:
-                        try:
-                            backend.insert_manual_review_item({
-                                "item_id": f"MR-TRUNC-{exc_inv.invoice_id}",
+                    eff_tenant = effective_tenant
+                    cluster_id_str = f"GSTIN:{gstin}|DATE:{cap_date}"
+                    now_str = datetime.now(timezone.utc).isoformat()
+                    try:
+                        backend.insert_manual_review_record({
+                            "id": f"MR-DENSE-{gstin}-{cap_date.strftime('%Y%m%d')}",
+                            "tenant_id": eff_tenant,
+                            "category": "DENSE_CLUSTER",
+                            "utr": dense_credit_dummy.utr_number,
+                            "cluster_identity": cluster_id_str,
+                            "reason": f"Cluster exceeded max_cluster_size={self.max_cluster_size}",
+                            "candidate_count": len(cluster_invoices),
+                            "status": "PENDING",
+                            "created_at": now_str,
+                            "details_json": json.dumps({
                                 "tenant_id": eff_tenant,
-                                "source_type": "DENSE_CLUSTER_OVERFLOW",
-                                "reference_id": exc_inv.invoice_id,
-                                "amount_paise": exc_inv.amount_in_paise,
-                                "reason": f"Cluster ({gstin}, {cap_date}) exceeded max_cluster_size={self.max_cluster_size}",
+                                "utr": dense_credit_dummy.utr_number,
+                                "cluster_identity": cluster_id_str,
+                                "reason": f"Cluster exceeded max_cluster_size={self.max_cluster_size}",
+                                "candidate_count": len(cluster_invoices),
+                                "max_cluster_size": self.max_cluster_size,
+                                "excess_invoices_count": len(excess_invoices),
+                                "total_excess_paise": sum(inv.amount_in_paise for inv in excess_invoices),
+                                "created_at": now_str,
                                 "status": "PENDING",
-                                "payload_json": json.dumps({
-                                    "invoice_id": exc_inv.invoice_id,
-                                    "order_id": exc_inv.order_id,
-                                    "payment_id": exc_inv.payment_id,
-                                    "amount_paise": exc_inv.amount_in_paise,
-                                    "supplier_gstin": gstin,
-                                    "captured_at": exc_inv.captured_at.isoformat(),
-                                }),
-                            })
-                        except Exception:
-                            pass
+                            }),
+                        })
+                    except Exception as err:
+                        logger.warning(f"Failed to record dense cluster manual review: {err}")
             else:
                 active_invoices = cluster_invoices
             cluster_candidate_invoices[(gstin, cap_date)] = active_invoices
@@ -502,10 +510,10 @@ class ClusteredReconciliationPipeline:
             elif len(matches) > 1:
                 # Global Multi-Cluster Ambiguity Collision:
                 # Do NOT accept first alphabetically sorted cluster; refuse both with global AMBIGUOUS_COLLISION
-                colliding_gstins = list({c[0][0] for c in matches})
+                colliding_clusters = [f"GSTIN:{c[0][0]}|DATE:{c[0][1]}" for c in matches]
                 all_exceptions.append((
                     credit,
-                    f"AMBIGUOUS_COLLISION (Credit matches valid subsets across {len(matches)} distinct clusters: GSTINs {colliding_gstins})",
+                    f"AMBIGUOUS_COLLISION (Credit matches valid subsets across {len(matches)} distinct clusters: {colliding_clusters})",
                 ))
             else:
                 all_exceptions.append((credit, "NO_EXACT_COVER_FOUND"))
