@@ -38,27 +38,28 @@ export default function LedgerPage() {
       </section>
 
       {/* Proof & Invariant Callout Banner */}
-      <div className="rounded-xl border border-border bg-[#0f1626]/90 p-5 shadow-lg backdrop-blur">
+      <div className="rounded-xl border border-border bg-panel p-5 shadow-lg backdrop-blur space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-          <div className="rounded-lg border border-border/70 bg-[#090d16] p-4 space-y-2">
-            <div className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
-              Traditional ERP &amp; Fuzzy Matching (Competitors):
+          <div className="rounded-lg border border-danger/30 bg-danger/5 dark:bg-danger/10 p-4 space-y-2">
+            <div className="font-bold text-danger uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+              <span>Traditional ERP &amp; Fuzzy Matching (Competitors):</span>
             </div>
-            <p className="text-muted-foreground leading-relaxed">
+            <p className="text-muted-foreground leading-relaxed font-medium">
               Accepts 2.8% False Match Rates, leaves unexplained rounding noise, ignores CBIC Rule 36(4) GST ITC mismatches, and relies on LLM guessing when amounts collide.
             </p>
           </div>
-          <div className="rounded-lg border border-gain/40 bg-gain/5 p-4 space-y-2">
+          <div className="rounded-lg border border-gain/40 bg-gain/5 dark:bg-gain/10 p-4 space-y-2">
             <div className="font-bold text-gain uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4" />
-              KuberRecon Invariant Properties:
+              <CheckCircle2 className="h-4 w-4 text-gain" />
+              <span>KuberRecon Invariant Properties:</span>
             </div>
-            <p className="text-foreground/90 leading-relaxed">
+            <p className="text-foreground leading-relaxed font-medium">
               Horowitz–Sahni meet-in-the-middle subset-sum solver achieves 0 false matches on the measured synthetic/planted fixture corpus. All currency is calculated in base-10 paise integers without floating-point math.
             </p>
           </div>
         </div>
       </div>
+
 
       {/* Filterable Reconciliation Ledger Workspace */}
       <section>
