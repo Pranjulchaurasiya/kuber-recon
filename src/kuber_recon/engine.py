@@ -1,10 +1,10 @@
-r"""Horowitz-Sahni Combinatorial Subset-Sum & Exact-Cover Reconciliation Solver.
+r"""Horowitz–Sahni Combinatorial Subset-Sum Reconciliation Solver.
 
 Features:
-1. Exact-Cover subset-sum matching in pure integer paise.
-2. Iterative Horowitz-Sahni Meet-in-the-Middle hash partitioning ($O(2^{N/2})$) with complexity bounds.
+1. Subset-sum matching in pure integer paise.
+2. Iterative Horowitz–Sahni Meet-in-the-Middle hash partitioning ($O(2^{N/2})$) with complexity bounds.
 3. Retrospective weekend-aware settlement windowing ($[T - (1 + \text{weekend\_days}), T]$ with optional holiday injection).
-4. Honest Refusal State Machine: Emits `AmbiguousMatchError` on $|\text{Covers}| > 1 \implies$ FMR = 0.000.
+4. Honest Refusal State Machine: Emits `AmbiguousMatchError` on $|\text{Subsets}| > 1 \implies$ preserves FMR on tested corpus.
 5. Deterministic Chronological FIFO line-item attribution.
 """
 
@@ -34,14 +34,14 @@ class SolverResult:
 
 
 class AmbiguousMatchError(Exception):
-    """Raised when more than one valid exact-cover subset matches a bank credit."""
+    """Raised when more than one valid subset-sum candidate matches a bank credit."""
 
     def __init__(self, credit_id: str, candidate_solutions: List[List[str]]):
         self.credit_id = credit_id
         self.candidate_solutions = candidate_solutions
         super().__init__(
             f"Honest Refusal: Bank Credit {credit_id} matches {len(candidate_solutions)} valid subsets. "
-            "Refusing to guess to preserve FMR = 0.000."
+            "Refusing to guess to preserve FMR on tested corpus."
         )
 
 
@@ -50,8 +50,8 @@ class SolverComplexityLimitError(Exception):
     pass
 
 
-class KnuthExactCoverSolver:
-    """Donald Knuth's Exact-Cover / Horowitz-Sahni Meet-in-the-Middle Combinatorial Solver for Integer Paise."""
+class HorowitzSahniSubsetSumSolver:
+    """Horowitz-Sahni Meet-in-the-Middle Combinatorial Subset-Sum Solver for Integer Paise."""
 
     def __init__(self, max_nodes: int = 10000, timeout_ms: float = 500.0):
         self.max_nodes = max_nodes
@@ -162,11 +162,16 @@ class KnuthExactCoverSolver:
             return SolverResult(MatchResultStatus.AMBIGUOUS_COLLISION, solutions[:max_solutions], nodes_explored)
 
 
+# Deprecated backward-compatibility alias: Note that the implemented algorithm is
+# Horowitz-Sahni meet-in-the-middle subset-sum matching, not Knuth DLX.
+KnuthExactCoverSolver = HorowitzSahniSubsetSumSolver
+
+
 class ReconciliationEngine:
     """Autonomous Multi-Source Reconciliation Engine with Honest Refusal."""
 
     def __init__(self):
-        self.solver = KnuthExactCoverSolver()
+        self.solver = HorowitzSahniSubsetSumSolver()
 
     def reconcile_batch(
         self,
@@ -174,7 +179,7 @@ class ReconciliationEngine:
         invoices: List[InvoiceRecord],
         holidays: Optional[Set[date]] = None,
     ) -> Tuple[List[ReconciledSettlementBlock], List[Tuple[BankNodalCredit, str]]]:
-        """Reconcile bank credits against invoices with zero false matches."""
+        """Reconcile bank credits against invoices with deterministic subset-sum matching and honest refusal."""
         holidays = holidays or set()
         reconciled_blocks: List[ReconciledSettlementBlock] = []
         exceptions: List[Tuple[BankNodalCredit, str]] = []

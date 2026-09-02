@@ -48,7 +48,7 @@ export default function TwinPage() {
               APEX Causal Twin Invariant:
             </div>
             <p className="text-foreground/90 leading-relaxed">
-              Runs Monte Carlo stress simulations before disbursement — calculating liquidity survival horizons and preemptively dynamically withholding high-risk tax liability.
+              Runs deterministic causal stress simulations before disbursement — calculating liquidity survival horizons and preemptively dynamically withholding high-risk tax liability.
             </p>
           </div>
         </div>

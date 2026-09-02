@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { lineage, inr, type LineageNode } from '@/lib/kuber-data'
-import { getApiUrl } from '@/lib/api-client'
+import { getApiUrl, DEFAULT_AUTH_HEADERS } from '@/lib/api-client'
 
 const NODE_W = 168
 const NODE_H = 62
@@ -27,7 +27,7 @@ interface ReconcileProof {
   exceptions: number
   fmr: string
   latency_ms: number
-  knuth_dlx_solve_ms: number
+  solver_solve_ms?: number
   unexplained_delta_paise: number
   proof_hash: string
 }
@@ -67,7 +67,7 @@ export function LineageDag() {
       const apiUrl = getApiUrl()
       const res = await fetch(`${apiUrl}/api/reconcile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: DEFAULT_AUTH_HEADERS,
         body: JSON.stringify({ records: 100, seed: 42 }),
       })
       if (res.ok) {
@@ -93,7 +93,7 @@ export function LineageDag() {
       const apiUrl = getApiUrl()
       const res = await fetch(`${apiUrl}/api/reconcile/ambiguous`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: DEFAULT_AUTH_HEADERS,
       })
       if (res.ok) {
         const data: AmbiguousRefusalProof = await res.json()
@@ -111,9 +111,9 @@ export function LineageDag() {
           ['INV-A1 (₹60,000)', 'INV-A2 (₹40,000)'],
           ['INV-B1 (₹70,000)', 'INV-B2 (₹30,000)'],
         ],
-        reason: 'Honest Refusal: Bank Credit matches 2 valid exact-cover subsets. Refusing to guess to preserve FMR = 0.000.',
+        reason: 'Honest Refusal: Bank Credit matches 2 valid subset-sum candidate sets. Refusing to guess to prevent false matches (0 False Matches on Tested Corpus).',
         action_taken: 'Settlement halted. Routed to CFO Exception Queue.',
-        fmr_preserved: '0.000',
+        fmr_preserved: '0.000 (Tested Corpus)',
         latency_ms: 1.42,
       })
     }
@@ -126,7 +126,7 @@ export function LineageDag() {
       <div className="flex flex-wrap items-center justify-between border-b border-border p-5 gap-3">
         <div>
           <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            Money Lineage DAG · Knuth Algorithm X
+            Money Lineage DAG · Horowitz–Sahni Meet-in-the-Middle
           </h2>
           <div className="mt-1 font-mono text-xs text-muted-foreground">{lineage.utr}</div>
         </div>
@@ -145,12 +145,12 @@ export function LineageDag() {
             {solving ? (
               <>
                 <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-gold" />
-                DLX Solving…
+                Solving…
               </>
             ) : solved ? (
-              <>✓ Exact Cover Proved</>
+              <>✓ Subset-Sum Proved</>
             ) : (
-              <>▶ Run Knuth DLX</>
+              <>▶ Run Subset-Sum Solver</>
             )}
           </button>
 
@@ -183,11 +183,11 @@ export function LineageDag() {
           <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-gain animate-pulse" />
-              <span className="font-bold text-gain">PYTHON KNUTH DLX SOLVER COMPLETE</span>
+              <span className="font-bold text-gain">HOROWITZ–SAHNI SUBSET-SUM COMPLETE</span>
               <span className="text-muted-foreground">| {proof.proof_hash}</span>
             </div>
             <div className="flex items-center gap-4 text-muted-foreground">
-              <span>Solve time: <strong className="text-gold">{proof.knuth_dlx_solve_ms} ms</strong></span>
+              <span>Solve time: <strong className="text-gold">{proof.solver_solve_ms ?? 0} ms</strong></span>
               <span>Reconciled: <strong className="text-foreground">{proof.settlements_reconciled} settlements</strong></span>
               <span>Exceptions: <strong className="text-gain">0</strong></span>
             </div>
@@ -325,13 +325,13 @@ export function LineageDag() {
             {solved && (
               <span className="ml-auto flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-gain">
                 <span className="h-1.5 w-1.5 rounded-full bg-gain" />
-                Exact-cover verified · ₹0.00 residual
+                Subset-sum verified · ₹0.00 residual
               </span>
             )}
             {ambiguityProof && (
               <span className="ml-auto flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-danger">
                 <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
-                Refused: Multiple candidate covers · Routed to CFO
+                Refused: Multiple candidate subsets · Routed to CFO
               </span>
             )}
           </div>

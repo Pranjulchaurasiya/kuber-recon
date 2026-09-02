@@ -58,9 +58,9 @@ export function LiveDashboard() {
           tone="gain"
         />
         <Metric
-          label="FMR"
+          label="False Match Rate"
           value="0.000"
-          delta="mathematical certainty"
+          delta="tested synthetic corpus"
           tone="gain"
         />
       </div>

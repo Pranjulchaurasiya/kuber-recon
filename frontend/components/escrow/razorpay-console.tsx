@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getApiUrl } from '@/lib/api-client'
+import { getApiUrl, DEFAULT_AUTH_HEADERS } from '@/lib/api-client'
 import { paiseToInr } from '@/lib/kuber-data'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export function RazorpayRouteConsole() {
       const apiUrl = getApiUrl()
       const res = await fetch(`${apiUrl}/api/razorpay/route-transfer`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: DEFAULT_AUTH_HEADERS,
         body: JSON.stringify({
           account_id: 'acc_merchant_demo_001',
           amount_paise: Number(paisePreview),   // integer — already BigInt-derived
@@ -146,7 +146,7 @@ export function RazorpayRouteConsole() {
       const apiUrl = getApiUrl()
 
       // Step 1: fetch a correctly-signed payload from the server
-      const fixtureRes = await fetch(`${apiUrl}/api/webhook/test-payload`)
+      const fixtureRes = await fetch(`${apiUrl}/api/sandbox/webhook/fixture`)
       if (!fixtureRes.ok) {
         const err = await fixtureRes.json().catch(() => ({ detail: fixtureRes.statusText }))
         setWebhookError({ type: 'server', detail: err.detail ?? fixtureRes.statusText })

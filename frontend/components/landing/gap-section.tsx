@@ -94,8 +94,8 @@ export function GapSection() {
           <div className="text-xs text-muted-foreground mt-1">Underserved Indian MSME Credit Gap</div>
         </div>
         <div>
-          <div className="font-mono text-2xl font-extrabold text-gain">0.000 FMR</div>
-          <div className="text-xs text-muted-foreground mt-1">False Match Rate Across 11,100 Logs</div>
+          <div className="font-mono text-2xl font-extrabold text-gain">0.000</div>
+          <div className="text-xs text-muted-foreground mt-1">Measured FMR (Tested Synthetic Corpus)</div>
         </div>
         <div>
           <div className="font-mono text-2xl font-extrabold text-primary">₹0.00</div>

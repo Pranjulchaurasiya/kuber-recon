@@ -199,8 +199,8 @@ export function SettlementForecastCard() {
               <span>3. Merkle Validation</span>
               <span>T+1</span>
             </div>
-            <div className="text-sm font-bold text-foreground">Knuth DLX Check</div>
-            <p className="text-[10px] text-muted-foreground font-medium">FMR 0.000 exact cover certification</p>
+            <div className="text-sm font-bold text-foreground">Subset-Sum Check</div>
+            <p className="text-[10px] text-muted-foreground font-medium">0 false matches in subset-sum validation (tested corpus)</p>
           </div>
 
           {/* Step 4 */}

@@ -6,20 +6,20 @@ export default function LineagePage() {
   return (
     <div className="mx-auto max-w-[1400px] px-5 py-8">
       <header className="mb-6">
-        <Pill tone="gold">Knuth Algorithm X · Combinatorial Exact Cover</Pill>
+        <Pill tone="gold">Horowitz–Sahni Meet-in-the-Middle · Exact Subset-Sum</Pill>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Money Lineage</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          A single bank lump-sum can hide dozens of invoices. KuberRecon uses Donald Knuth&apos;s
-          Algorithm X to solve the exact cover — proving how one UTR decomposes into gross GMV, MDR,
+          A single bank lump-sum can hide dozens of invoices. KuberRecon uses a bounded Horowitz–Sahni
+          meet-in-the-middle subset-sum algorithm to solve exact matching — proving how one UTR decomposes into gross GMV, MDR,
           GST and TDS with a False Match Rate of{' '}
-          <span className="font-mono text-gain">0.000</span>.
+          <span className="font-mono text-gain">0.000</span> on measured synthetic corpus fixtures.
         </p>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Settlement (UTR)" value={inr(lineage.settlement, { compact: true })} hint="HDFC lump-sum" />
-        <StatTile label="Invoices covered" value={lineage.invoices} accent="gold" hint="Exact cover solved" />
-        <StatTile label="False Match Rate" value={lineage.fmr.toFixed(3)} accent="gain" hint="Mathematical certainty" />
+        <StatTile label="Invoices covered" value={lineage.invoices} accent="gold" hint="Subset-sum solved" />
+        <StatTile label="False Match Rate" value={lineage.fmr.toFixed(3)} accent="gain" hint="Measured synthetic corpus" />
         <StatTile label="Unexplained delta" value="₹0.00" accent="gain" hint="Every paisa attributed" />
       </div>
 
@@ -30,7 +30,7 @@ export default function LineagePage() {
 
         <div className="flex flex-col gap-4">
           <Panel>
-            <SectionLabel right={<Pill tone="gain">exact cover</Pill>}>Invoice Set</SectionLabel>
+            <SectionLabel right={<Pill tone="gain">subset-sum</Pill>}>Invoice Set</SectionLabel>
             <div className="flex flex-col divide-y divide-border">
               {lineageInvoices.map((iv) => (
                 <div key={iv.inv} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
@@ -48,14 +48,13 @@ export default function LineagePage() {
           <Panel>
             <SectionLabel>Reconciliation Proof</SectionLabel>
             <dl className="flex flex-col gap-3 font-mono text-xs">
-              <ProofRow k="Method" v="Knuth Algorithm X (DLX)" />
+              <ProofRow k="Method" v="Horowitz–Sahni Subset-Sum" />
               <ProofRow k="Cover type" v="Exact · non-overlapping" />
               <ProofRow k="Residual" v="₹0.00" accent />
-              <ProofRow k="Certainty" v="FMR = 0.000" accent />
+              <ProofRow k="Certainty" v="0 False Matches (synthetic corpus)" accent />
             </dl>
             <div className="mt-4 rounded-md border border-gain/30 bg-gain/5 p-3 text-xs leading-relaxed text-muted-foreground">
-              The engine proves lineage rather than estimating it — no heuristic matching, no guessed
-              math. Each node above is a verifiable link from bank root to statutory leaf.
+              The engine verifies lineage deterministically rather than estimating it — no heuristic guessing. Each node above is a verifiable link from bank root to statutory leaf.
             </div>
           </Panel>
         </div>

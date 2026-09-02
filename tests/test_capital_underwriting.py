@@ -83,7 +83,7 @@ def test_split_settlement_repayment_amortization_exact_paise(underwriter, facili
         requested_advance_paise=target_advance_paise,
     )
     
-    facility = facility_manager.disburse_advance(offer)
+    facility = facility_manager.disburse_advance(offer, tenant_id="merch_tech_solutions")
     assert facility.status == FacilityStatus.ACTIVE
     assert facility.principal_paise == 5000000
     assert facility.factor_fee_paise == offer.factor_fee_paise
@@ -108,7 +108,7 @@ def test_split_settlement_repayment_amortization_exact_paise(underwriter, facili
     )
     from decimal import ROUND_FLOOR
     expected_day1_sweep = int((Decimal("2000000") * facility.sweep_rate).to_integral_value(rounding=ROUND_FLOOR))
-    fac, ev1 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_1)
+    fac, ev1 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_1, tenant_id="merch_tech_solutions")
     assert fac.status == FacilityStatus.AMORTIZING
     assert ev1.sweep_deduction_paise == expected_day1_sweep
     assert ev1.net_merchant_payout_paise == 2000000 - expected_day1_sweep
@@ -131,7 +131,7 @@ def test_split_settlement_repayment_amortization_exact_paise(underwriter, facili
         proof_hash="hash2",
     )
     remaining_before_day2 = fac.remaining_balance_paise
-    fac, ev2 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_2)
+    fac, ev2 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_2, tenant_id="merch_tech_solutions")
     
     # Sweep cannot over-deduct: capped precisely at remaining balance
     assert ev2.sweep_deduction_paise == remaining_before_day2
@@ -152,21 +152,21 @@ def test_stagnancy_and_fldg_failure_state_transitions(underwriter, facility_mana
     blocks, _ = engine.reconcile_batch(bank_credits, invoices)
     
     offer = underwriter.generate_offer("merch_dormant", blocks, invoices, requested_advance_paise=1000000)
-    facility = facility_manager.disburse_advance(offer)
+    facility = facility_manager.disburse_advance(offer, tenant_id="merch_dormant")
     
     t0 = datetime(2026, 8, 1, tzinfo=timezone.utc)
-    facility.last_settlement_at = t0
+    facility_manager.update_last_settlement_time(facility.facility_id, "merch_dormant", t0)
     
     # Check at Day 5: Active
-    fac = facility_manager.evaluate_stagnancy(facility.facility_id, current_time=t0 + timedelta(days=5))
+    fac = facility_manager.evaluate_stagnancy(facility.facility_id, tenant_id="merch_dormant", current_time=t0 + timedelta(days=5))
     assert fac.status == FacilityStatus.ACTIVE
     
     # Check at Day 15: STAGNANT_RECOVERY
-    fac = facility_manager.evaluate_stagnancy(facility.facility_id, current_time=t0 + timedelta(days=15))
+    fac = facility_manager.evaluate_stagnancy(facility.facility_id, tenant_id="merch_dormant", current_time=t0 + timedelta(days=15))
     assert fac.status == FacilityStatus.STAGNANT_RECOVERY
     
     # Check at Day 31: FLDG_REVIEW (capped at 5% portfolio FLDG under RBI norms)
-    fac = facility_manager.evaluate_stagnancy(facility.facility_id, current_time=t0 + timedelta(days=31))
+    fac = facility_manager.evaluate_stagnancy(facility.facility_id, tenant_id="merch_dormant", current_time=t0 + timedelta(days=31))
     assert fac.status == FacilityStatus.FLDG_REVIEW
 
 

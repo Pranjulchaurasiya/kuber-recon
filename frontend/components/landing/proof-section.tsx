@@ -129,14 +129,14 @@ export function ProofSection() {
               </span>
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">APEX Knuth + Bayesian SRI</h3>
+              <h3 className="text-lg font-bold text-foreground">APEX Combinatorial + Bayesian SRI</h3>
               <p className="text-xs text-muted-foreground mt-1">Paise-exact combinatorial subset solver & Route sweeps.</p>
             </div>
 
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">False Match Rate (FMR)</span>
-                <span className="font-mono font-extrabold text-gain">0.000 (Exact 0/11,100)</span>
+                <span className="font-mono font-extrabold text-gain">0.000 (Tested Fixtures)</span>
               </div>
               <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                 <div className="bg-gain h-full rounded-full" style={{ width: '100%' }} />

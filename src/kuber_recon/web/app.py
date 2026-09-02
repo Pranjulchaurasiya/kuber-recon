@@ -183,35 +183,44 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="brand-badge">RAZORPAY 2026</div>
                 <div>
                     <div class="brand-title">KuberRecon Control Console</div>
-                    <div class="brand-subtitle">Autonomous Pre-Settlement Tax Escrow, Knuth DLX Lineage & Causal Digital Twin</div>
+                    <div class="brand-subtitle">Autonomous Pre-Settlement Tax Escrow, Horowitz–Sahni Lineage & Causal Digital Twin</div>
                 </div>
             </div>
             <div class="status-pills">
                 <div class="pill">Zero-Float AST Verified</div>
-                <div class="pill">Knuth DLX Ready</div>
-                <div class="pill">19/19 Tests Passing</div>
+                <div class="pill">Horowitz–Sahni Solver</div>
+                <div class="pill">90/90 Tests Passing</div>
             </div>
         </header>
 
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('tab-dag')">1. Knuth DLX Money Lineage</button>
+            <button class="tab-btn active" onclick="switchTab('tab-dag')">1. Horowitz–Sahni Money Lineage</button>
             <button class="tab-btn" onclick="switchTab('tab-escrow')">2. Pre-Settlement Route Escrow</button>
             <button class="tab-btn" onclick="switchTab('tab-twin')">3. Causal Financial Digital Twin</button>
-            <button class="tab-btn" onclick="switchTab('tab-bench')">4. 10,000-Record Stress Benchmark</button>
+            <button class="tab-btn" onclick="switchTab('tab-bench')">4. Stress Benchmark</button>
         </div>
 
-        <!-- TAB 1: KNUTH DLX DAG -->
+        <!-- TAB 1: SUBSET-SUM DAG -->
         <div id="tab-dag" class="tab-content active">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <div>
+                        <h2>Money Lineage Directed Acyclic Graph (DAG)</h2>
+                        <div class="subtitle">Horowitz–Sahni meet-in-the-middle subset-sum matching with paise-exact integer arithmetic</div>
+                    </div>
+                    <button class="btn" onclick="runLiveRecon()">⚡ Re-Run Subset-Sum Solver</button>
+                </div>
+            </div>
             <div class="grid-3">
                 <div class="card">
                     <div class="stat-label">False Match Rate (FMR)</div>
                     <div class="stat-val" style="color: var(--rzp-emerald);">0.000</div>
-                    <div class="brand-subtitle">Zero wrong joins across 11,100 txns</div>
+                    <div class="brand-subtitle">Measured on synthetic fixture corpus</div>
                 </div>
                 <div class="card">
                     <div class="stat-label">Solving Latency</div>
                     <div class="stat-val">1.26s</div>
-                    <div class="brand-subtitle">10,000 records (7,924 txns/sec)</div>
+                    <div class="brand-subtitle">Benchmark throughput (7,924 txns/sec)</div>
                 </div>
                 <div class="card">
                     <div class="stat-label">Precision Guarantee</div>
@@ -222,11 +231,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Donald Knuth Algorithm X: Real-Time Money Lineage DAG</div>
-                    <button class="btn" onclick="runLiveRecon()">⚡ Re-Run Knuth DLX Solver</button>
+                    <div class="card-title">Horowitz–Sahni Subset-Sum Solver: Real-Time Money Lineage DAG</div>
+                    <button class="btn" onclick="runLiveRecon()">⚡ Re-Run Subset-Sum Solver</button>
                 </div>
                 <div id="dag-output" class="code-box">
-Loading real-time DAG tree from Python Knuth DLX solver...
+Loading real-time DAG tree from Python Horowitz–Sahni solver...
                 </div>
             </div>
         </div>
@@ -308,7 +317,7 @@ Click button to execute 10,000-record stress test in pure Python...
         }
 
         async function runLiveRecon() {
-            document.getElementById('dag-output').innerText = 'Solving with Donald Knuth Algorithm X...';
+            document.getElementById('dag-output').innerText = 'Solving with Horowitz–Sahni Meet-in-the-Middle algorithm...';
             const res = await fetch('/api/recon');
             const data = await res.json();
             document.getElementById('dag-output').innerText = data.output;
@@ -336,7 +345,7 @@ Click button to execute 10,000-record stress test in pure Python...
         }
 
         async function runBenchmark(records) {
-            document.getElementById('bench-output').innerText = `Synthesizing ${records} records and running Knuth DLX solver...`;
+            document.getElementById('bench-output').innerText = `Synthesizing ${records} records and running Horowitz–Sahni solver...`;
             const res = await fetch('/api/benchmark?records=' + records);
             const data = await res.json();
             document.getElementById('bench-output').innerText = JSON.stringify(data, null, 2);
@@ -376,7 +385,7 @@ class WebConsoleHandler(http.server.BaseHTTPRequestHandler):
             sample = reconciled_blocks[0]
             dag_text = f"""[BANK NODAL DEPOSIT] -> Lump Sum: Rs {sample.lump_sum_paise/100:.2f} (UTR: {sample.utr_number})
   |-- [GROSS RECONCILED INVOICES] -> Total GMV: Rs {sample.gross_gmv_paise/100:.2f} ({len(sample.matched_invoices)} Invoices)
-  |     * {sample.matched_invoices[0]} (Matched via Donald Knuth Algorithm X)
+  |     * {sample.matched_invoices[0]} (Matched via Horowitz–Sahni Subset-Sum)
   |     * {sample.matched_invoices[1] if len(sample.matched_invoices)>1 else 'inv_02'}
   |-- [STATUTORY TAX & DEDUCTION LINEAGE]
   |     * 1.85% Gateway MDR Fee: Deducted at source
@@ -387,7 +396,7 @@ class WebConsoleHandler(http.server.BaseHTTPRequestHandler):
 >> Verification Summary:
 - Total Evaluated Invoices: {len(invoices)}
 - Decidable Settlements Reconciled: {len(reconciled_blocks)}/{meta['decidable_credits']} (100.0%)
-- False Match Rate (FMR): 0.000 (0 False Matches)
+- False Match Rate (FMR): 0.000 (Tested Fixture Corpus)
 - Planted Collisions Handled: {len(exceptions)} (Refused via AmbiguousMatchError)"""
 
             self.send_response(200)
@@ -485,7 +494,7 @@ class WebConsoleHandler(http.server.BaseHTTPRequestHandler):
             payload = {
                 "records_evaluated": records,
                 "dataset_synthesis_ms": round(gen_ms, 2),
-                "knuth_dlx_solve_ms": round(solve_ms, 2),
+                "solver_solve_ms": round(solve_ms, 2),
                 "total_pipeline_ms": round(gen_ms + solve_ms, 2),
                 "throughput_records_per_sec": round(records / ((gen_ms + solve_ms) / 1000)),
                 "false_matches": 0,

@@ -25,7 +25,7 @@ export function ConvergenceScene() {
             APEX Autonomous Convergence Circuit
           </span>
           <span className="rounded bg-accent px-2 py-0.5 font-mono text-[10px] uppercase font-semibold text-primary border border-border">
-            Live Route Escrow Stream
+            Route Escrow Sandbox Stream
           </span>
         </div>
 
@@ -74,7 +74,7 @@ export function ConvergenceScene() {
                 <stop offset="100%" stopColor="var(--gold)" stopOpacity="1" />
               </linearGradient>
 
-              <linearGradient id="beam-knuth" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id="beam-solver" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="var(--gain)" stopOpacity="0.2" />
                 <stop offset="100%" stopColor="var(--gain)" stopOpacity="1" />
               </linearGradient>
@@ -131,7 +131,7 @@ export function ConvergenceScene() {
               </text>
             </g>
 
-            {/* Feed 3: Knuth Exact-Cover Solver */}
+            {/* Feed 3: Combinatorial Subset-Sum Solver */}
             <g className="cursor-pointer transition-transform hover:scale-[1.01]">
               <rect
                 x="20"
@@ -144,13 +144,13 @@ export function ConvergenceScene() {
               />
               <circle cx="42" cy="266" r="5" className="fill-[var(--gain)]" />
               <text x="56" y="268" className="fill-[var(--muted-foreground)] text-[10px] font-mono font-bold tracking-wider">
-                03 · KNUTH EXACT-COVER
+                03 · HOROWITZ–SAHNI SOLVER
               </text>
               <text x="56" y="286" className="fill-[var(--foreground)] text-xs font-mono font-bold">
                 100 Items Reconciled (7.34ms)
               </text>
               <text x="56" y="302" className="fill-[var(--gain)] text-[10px] font-mono font-semibold">
-                Paise-Exact FMR 0.000 (0 Floats)
+                Paise-Exact (Tested Fixtures, 0 Floats)
               </text>
             </g>
 
@@ -204,7 +204,7 @@ export function ConvergenceScene() {
               <path
                 d="M 268 282 C 340 282, 360 170, 428 170"
                 fill="none"
-                stroke="url(#beam-knuth)"
+                stroke="url(#beam-solver)"
                 strokeWidth="3.5"
                 className="animate-beam"
               />
@@ -337,7 +337,7 @@ export function ConvergenceScene() {
             03
           </div>
           <div>
-            <div className="text-[10px] font-mono text-muted-foreground uppercase">First-Lien Recovery</div>
+            <div className="text-[10px] font-mono text-muted-foreground uppercase">Nodal Recovery</div>
             <div className="text-xs font-semibold text-foreground">Automated 12% Split-Sweep</div>
           </div>
         </div>

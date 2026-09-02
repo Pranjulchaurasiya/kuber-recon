@@ -54,7 +54,7 @@ export default function LedgerPage() {
               KuberRecon Invariant Guarantees:
             </div>
             <p className="text-foreground/90 leading-relaxed">
-              Knuth DLX Exact-Cover math guarantees FMR = 0.000. All currency is calculated in base-10 paise integers. Every reconciliation block is sealed with RFC 6962 Merkle proofs.
+              Horowitz–Sahni meet-in-the-middle subset-sum solver achieves 0 false matches on the measured synthetic/planted fixture corpus. All currency is calculated in base-10 paise integers without floating-point math.
             </p>
           </div>
         </div>

@@ -10,14 +10,14 @@ Test Matrix (3 Categories x 3 Parameterized Variations = 9 Adversarial Cases):
      -> Must be isolated to exceptions queue without false match.
   3. Complexity-DoS Adversarial Inputs (equal micro-credits, power-of-two, high-cardinality).
      -> Must respect max_nodes / timeout bounds without hanging.
-  4. Formal Measurement: FMR = 0.000 across all tested adversarial cases.
+  4. Measured Metric: FMR = 0.000 across all tested adversarial fixture cases.
 """
 
 from datetime import date, datetime, timezone
 import pytest
 from kuber_recon.engine import (
     AmbiguousMatchError,
-    KnuthExactCoverSolver,
+    HorowitzSahniSubsetSumSolver,
     ReconciliationEngine,
     SolverComplexityLimitError,
 )
@@ -147,7 +147,7 @@ def test_planted_undecidable_03_complexity_dos_bounded(dos_idx, target_paise, ca
     import time
     candidates = [(f"INV-MICRO-{dos_idx}-{i}", unit_amount) for i in range(candidate_count)]
 
-    solver = KnuthExactCoverSolver(max_nodes=5000, timeout_ms=300.0)
+    solver = HorowitzSahniSubsetSumSolver(max_nodes=5000, timeout_ms=300.0)
     t0 = time.perf_counter()
     solutions = solver.solve_exact_subsets(target_paise, candidates, max_solutions=3)
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -158,12 +158,12 @@ def test_planted_undecidable_03_complexity_dos_bounded(dos_idx, target_paise, ca
         assert total == target_paise
 
 
-# ── 4. Formal False Match Rate (FMR) Guarantee ───────────────────────────────────
+# ── 4. False Match Rate (FMR) Measurement on Planted Fixtures ──────────────────────
 
-def test_formal_fmr_zero_measurement():
+def test_fmr_zero_measurement_on_planted_corpus():
     """
-    Formal proof: Across all 9 planted adversarial variations, False Matches = 0.
-    FMR = (False Matches) / (Total Decisions) = 0.000.
+    Measured result: Across all 9 planted adversarial variations, False Matches = 0.
+    FMR = (False Matches) / (Total Decisions) = 0.000 on tested fixtures.
     """
     false_matches = 0
     total_adversarial_instances = 9

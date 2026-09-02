@@ -14,10 +14,10 @@
 ├───────────────┬──────────────────────────────────────────┬─────────────────────────────┤
 │ 00:00 - 00:45 │ The Core Hook & Unified Thesis           │ Slide / Hero Screen         │
 │ 00:45 - 02:00 │ Live Underwriting & Split-Sweep Demo     │ `run-capital-demo` Terminal │
-│ 02:00 - 03:00 │ Exact-Cover Verification & Webhook CAS   │ `run-demo` Terminal         │
+│ 02:00 - 03:00 │ Subset-Sum Verification & Webhook CAS   │ `run-demo` Terminal         │
 │ 03:00 - 03:45 │ The Ownership Triple-Test & Moat         │ Architecture / Pitch Slide  │
-│ 03:45 - 04:00 │ Closing Invariants & Q&A Handoff         │ 80/80 Tests Screen          │
-└───────────────┴──────────────────────────────────────────┴─────────────────────────────┘
+│ 03:45 - 04:00 │ Closing Invariants & Q&A Handoff         │ 122/122 Tests Screen        │
+├───────────────┴──────────────────────────────────────────┴─────────────────────────────┤
 ```
 
 ---
@@ -31,7 +31,7 @@
 > *Payment gateways authorize an agent’s spend at transaction time, but they have no way of knowing whether the seller actually delivered before the money settles out.*
 > 
 > *Here is our single thesis:*
-> **APEX turns verified agentic commerce into instant working capital for merchants, using deterministic delivery verification as its underwriting moat and Razorpay Route split-settlements for zero-default recovery.**
+> **APEX turns verified agentic commerce into instant working capital for merchants, using deterministic delivery verification as its underwriting moat and Razorpay Route split-settlements for automated recovery.**
 > 
 > *Let’s see both halves of this system work live on this machine."*
 
@@ -55,7 +55,7 @@ python -m kuber_recon.cli run-capital-demo
 
 ---
 
-### Phase 3: Exact-Cover Verification & Webhook CAS Finality (2:00 – 3:00)
+### Phase 3: Subset-Sum Verification & Webhook CAS Finality (2:00 – 3:00)
 
 **[Action: In Terminal, run:]**
 ```bash
@@ -70,7 +70,7 @@ python -m kuber_recon.cli run-demo
 > 
 > *Our verification kernel runs 3 deterministic checks without any probabilistic LLM hallucinations in the financial path:*
 > 1. **Mod-36 GSTIN Checksum Verification:** *Validating official Indian tax identity format.*
-> 2. **Knuth Exact-Cover Subset Matcher:** *Matching lump-sum bank clearing UTRs against individual line items while withholding Section 194-O TDS and gateway MDR in pure integer paise.*
+> 2. **Horowitz–Sahni Subset-Sum Matcher:** *Matching lump-sum bank clearing UTRs against individual line items while withholding Section 194-O TDS and gateway MDR in pure integer paise.*
 > 3. **Single-Source Webhook Finality:** *State transitions (`HELD` $\to$ `RELEASING` $\to$ `RELEASED`) occur exclusively upon signed HMAC-SHA256 Razorpay webhooks using optimistic CAS database locking."*
 
 ---
@@ -85,7 +85,7 @@ python -m kuber_recon.cli run-demo
 > 
 > 1. **Ground-Truth Line-Item Visibility:** *HDFC, ICICI, and external NBFCs only see lump-sum bank deposits. Only Razorpay sees the line-item invoice data, GSTIN verification, and delivery completion.*
 > 2. **Pre-Settlement Hold Gating:** *External SaaS lenders cannot intercept settlement payouts. Razorpay Route provides native `on_hold` primitives to freeze funds before payout.*
-> 3. **First-Lien Source Deduction:** *Because Razorpay controls the nodal settlement pipeline, capital advances are recovered before money ever leaves the payment gateway—giving Razorpay first-lien priority with near-zero default risk.*"
+> 3. **Source-Split Settlement Deduction:** *Because Razorpay controls the nodal settlement pipeline, capital advances are recovered before money ever leaves the payment gateway—mitigating default risk through automated recovery.*"
 
 ---
 
@@ -96,7 +96,7 @@ python -m kuber_recon.cli run-demo
 python -m pytest -p no:deepeval -p no:langsmith tests/ -q
 ```
 
-> *"Every claim we’ve demonstrated is backed by **80 automated invariant tests** running across 14 modules—including AST scanners enforcing zero floats, multi-threaded concurrency suites proving zero over-recovery, and formal proofs of a 0.000 False Match Rate.*
+> *"Every claim we’ve demonstrated is backed by **122 automated invariant tests** running across 16 modules—including AST scanners enforcing zero floats, multi-threaded concurrency suites proving zero over-recovery, and 0.000 False Match Rate verification on our synthetic benchmark fixture corpus.*
 > 
 > *Thank you. We are happy to take your questions."*
 

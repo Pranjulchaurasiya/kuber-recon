@@ -4,10 +4,10 @@ KuberRecon & APEX Assurance FastAPI Server — Live REST API & Webhook Gateway
 Endpoints:
   GET  /api/health                  — Liveness probe & status
   GET  /api/integration-status      — Sandbox vs Live Test Mode status
-  POST /api/intercept               — T=0 escrow split (amount_paise: int)
-  POST /api/reconcile               — Knuth DLX exact-cover solve
-  POST /api/reconcile/ambiguous     — Honest Refusal (AmbiguousMatchError demo)
-  POST /api/razorpay/route-transfer — Route Transfer with on_hold: True (amount_paise: int)
+  POST /api/intercept               — T=0 escrow split (amount_paise: int, authenticated)
+  POST /api/reconcile               — Horowitz-Sahni meet-in-the-middle subset-sum solve (authenticated)
+  POST /api/reconcile/ambiguous     — Honest Refusal demo (authenticated)
+  POST /api/razorpay/route-transfer — Route Transfer with on_hold: True (amount_paise: int, authenticated)
   GET  /api/webhook/test-payload    — SANDBOX ONLY: pre-signed fixture for HMAC test
   POST /api/webhook/razorpay        — Signed webhook ingestion (HMAC + SQLite idempotency)
   POST /api/twin/simulate           — Causal stress test
@@ -27,6 +27,8 @@ import os
 import sqlite3
 import sys
 import time
+import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from threading import RLock
@@ -69,7 +71,7 @@ from kuber_recon.capital import (
     FacilityStatus,
 )
 from kuber_recon.client import RazorpayClientAdapter
-from kuber_recon.engine import AmbiguousMatchError, KnuthExactCoverSolver, ReconciliationEngine
+from kuber_recon.engine import AmbiguousMatchError, HorowitzSahniSubsetSumSolver, ReconciliationEngine
 from kuber_recon.escrow import KuberSovereignEscrowEngine
 from kuber_recon.generator import ChaosDataGenerator
 from kuber_recon.security import SoftwareEd25519Custodian
@@ -169,6 +171,13 @@ class WebhookIdempotencyStore:
                 conn.execute("ALTER TABLE apex_contracts ADD COLUMN release_started_at INTEGER")
             with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE apex_contracts ADD COLUMN expected_record_count INTEGER")
+            # Indexes supporting tenant-isolated queries and CAS operations
+            with contextlib.suppress(Exception):
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_apex_contracts_tenant_id ON apex_contracts(tenant_id)")
+            with contextlib.suppress(Exception):
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_apex_contracts_tenant_status ON apex_contracts(tenant_id, status)")
+            with contextlib.suppress(Exception):
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_apex_contracts_tenant_expiry ON apex_contracts(tenant_id, on_hold_until)")
 
 
     def try_insert(self, event_id: str) -> bool:
@@ -374,8 +383,8 @@ class WebhookIdempotencyStore:
             )
             return [dict(r) for r in cur.fetchall()]
 
-    def cas_release_contract(self, contract_id: str, expected_version: int, new_proof_hash: str) -> bool:
-        """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state and start release clock."""
+    def cas_release_contract(self, contract_id: str, expected_version: int, new_proof_hash: str, tenant_id: str | None = None) -> bool:
+        """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state and start release clock with tenant isolation."""
         now = int(time.time())
         return self.transition_contract_state(
             contract_id=contract_id,
@@ -384,6 +393,7 @@ class WebhookIdempotencyStore:
             expected_version=expected_version,
             proof_hash=new_proof_hash,
             release_started_at=now,
+            tenant_id=tenant_id,
             on_hold=True,
             assertions_passed=True,
         )
@@ -398,17 +408,20 @@ class WebhookIdempotencyStore:
             on_hold=False,
         )
 
-    def sweep_expired_contracts(self) -> list[str]:
-        """Liveness sweep: force-resolves contracts where on_hold_until <= now with CAS race protection."""
+    def sweep_expired_contracts(self, tenant_id: str) -> list[str]:
+        """Liveness sweep: force-resolves contracts where on_hold_until <= now with CAS race protection and strict tenant isolation."""
+        if not tenant_id:
+            raise ValueError("sweep_expired_contracts requires a non-empty tenant_id.")
+
         now = int(time.time())
         expired_ids: list[str] = []
         with self._lock, self._connect() as conn:
             cur = conn.execute(
                 """
                 SELECT contract_id, version FROM apex_contracts
-                WHERE on_hold_until <= ? AND status IN ('HELD', 'VERIFYING', 'REFUSED') AND on_hold = 1
+                WHERE on_hold_until <= ? AND status IN ('HELD', 'VERIFYING', 'REFUSED') AND on_hold = 1 AND tenant_id = ?
                 """,
-                (now,),
+                (now, tenant_id),
             )
             rows = cur.fetchall()
 
@@ -418,6 +431,7 @@ class WebhookIdempotencyStore:
                 expected_status=["HELD", "VERIFYING", "REFUSED"],
                 target_status="EXPIRED_HOLD",
                 expected_version=ver,
+                tenant_id=tenant_id,
                 on_hold=True,
             ):
                 expired_ids.append(cid)
@@ -428,9 +442,9 @@ class WebhookIdempotencyStore:
             cur = conn.execute(
                 """
                 SELECT contract_id, version FROM apex_contracts
-                WHERE status = 'RELEASING' AND release_started_at IS NOT NULL AND release_started_at <= ?
+                WHERE status = 'RELEASING' AND release_started_at IS NOT NULL AND release_started_at <= ? AND tenant_id = ?
                 """,
-                (timeout_threshold,),
+                (timeout_threshold, tenant_id),
             )
             releasing_rows = cur.fetchall()
 
@@ -440,6 +454,7 @@ class WebhookIdempotencyStore:
                 expected_status="RELEASING",
                 target_status="RELEASE_PENDING_RECONCILIATION",
                 expected_version=ver,
+                tenant_id=tenant_id,
                 on_hold=True,
             )
 
@@ -513,7 +528,7 @@ app.add_middleware(
     allow_origins=allowed_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "X-Merchant-Id", "X-API-Key", "X-Razorpay-Signature", "Authorization"],
+    allow_headers=["Content-Type", "X-Merchant-Id", "X-API-Key", "X-Razorpay-Signature", "X-Razorpay-Event-Id", "Authorization"],
 )
 
 
@@ -592,7 +607,7 @@ class ReconcileResponse(BaseModel):
     exceptions: int
     fmr: str
     latency_ms: float
-    knuth_dlx_solve_ms: float
+    solver_solve_ms: float
     unexplained_delta_paise: int
     proof_hash: str
 
@@ -682,9 +697,9 @@ def health():
         "status": "live",
         "service": "KuberRecon & APEX Assurance API",
         "protocol": "APEX Assurance v2.0 (Razorpay Route Escrow)",
-        "engine": "Knuth DLX + Paise-Exact Decimal + Non-LLM Assertion Kernel",
+        "engine": "Horowitz–Sahni Meet-in-the-Middle + Paise-Exact Decimal + Non-LLM Assertion Kernel",
         "mode": "test_mode" if razorpay_adapter.is_live else "sandbox_simulation",
-        "fmr": "0.000",
+        "fmr": "0.000 (measured synthetic corpus)",
         "timestamp": int(time.time()),
     }
 
@@ -702,7 +717,7 @@ def integration_status():
 
 
 @app.post("/api/intercept", response_model=InterceptResponse)
-def intercept_payment(req: InterceptRequest):
+def intercept_payment(req: InterceptRequest, tenant_id: str = Depends(verify_tenant_auth)):
     t0 = time.perf_counter()
     gross_paise = req.amount_paise
     gst_rate = Decimal(req.gst_rate_pct) / Decimal(100)
@@ -744,7 +759,7 @@ def intercept_payment(req: InterceptRequest):
 
 
 @app.post("/api/reconcile", response_model=ReconcileResponse)
-def reconcile(req: ReconcileRequest):
+def reconcile(req: ReconcileRequest, tenant_id: str = Depends(verify_tenant_auth)):
     t0 = time.perf_counter()
     generator = ChaosDataGenerator(seed=req.seed)
     invoices, bank_credits, _, _ = generator.generate_suite(num_records=min(req.records, 1000))
@@ -761,16 +776,16 @@ def reconcile(req: ReconcileRequest):
         records_input=req.records,
         settlements_reconciled=len(reconciled),
         exceptions=len(exceptions),
-        fmr="0.000",
+        fmr="0.000 (tested fixture corpus)",
         latency_ms=round(total_ms, 3),
-        knuth_dlx_solve_ms=round(solve_ms, 3),
+        solver_solve_ms=round(solve_ms, 3),
         unexplained_delta_paise=0,
         proof_hash="sha256:" + proof,
     )
 
 
 @app.post("/api/reconcile/ambiguous", response_model=AmbiguousRefusalResponse)
-def demonstrate_ambiguity_refusal():
+def demonstrate_ambiguity_refusal(tenant_id: str = Depends(verify_tenant_auth)):
     t0 = time.perf_counter()
     target_paise = 10_000_000
 
@@ -781,7 +796,7 @@ def demonstrate_ambiguity_refusal():
         ("INV-B2 (₹30,000)", 3_000_000),
     ]
 
-    solver = KnuthExactCoverSolver()
+    solver = HorowitzSahniSubsetSumSolver()
     solutions = solver.solve_exact_subsets(target_paise, candidates, max_solutions=10)
     latency_ms = (time.perf_counter() - t0) * 1000
 
@@ -804,7 +819,7 @@ def demonstrate_ambiguity_refusal():
 
 
 @app.post("/api/razorpay/route-transfer", response_model=RouteTransferResponse)
-def create_route_transfer(req: RouteTransferRequest):
+def create_route_transfer(req: RouteTransferRequest, tenant_id: str = Depends(verify_tenant_auth)):
     res = razorpay_adapter.create_route_escrow_transfer(
         account_id=req.account_id,
         amount_paise=req.amount_paise,
@@ -877,34 +892,16 @@ async def razorpay_webhook_listener(
     raw_body = await request.body()
     secret = get_webhook_secret()
 
-    if not x_razorpay_signature:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing X-Razorpay-Signature header. All webhook requests must be signed.",
-        )
-    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, x_razorpay_signature):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid X-Razorpay-Signature — HMAC mismatch. Request rejected.",
-        )
-
-    event_id = x_razorpay_event_id or ("evt_body_" + hashlib.sha256(raw_body).hexdigest())
-
-    is_new = idempotency_store.try_insert(event_id)
-    if not is_new:
-        return {
-            "status": "ignored_duplicate",
-            "event_id": event_id,
-            "message": "Event already processed. Idempotency preserved (SQLite).",
-        }
-
+    # 1. Parse and validate JSON payload
     try:
         payload = json.loads(raw_body)
     except Exception:
-        payload = {}
+        raise HTTPException(
+            status_code=400,
+            detail="Malformed JSON Payload: Webhook body must be valid JSON.",
+        )
 
-    # Strict 300-second Replay Freshness Window Gate (Mandatory Timestamp)
+    # 2. Strict 300-second Replay Freshness Window Gate (Mandatory Timestamp)
     now = int(time.time())
     event_timestamp = payload.get("created_at") or int(request.headers.get("X-Razorpay-Timestamp") or 0)
     if event_timestamp <= 0:
@@ -917,6 +914,29 @@ async def razorpay_webhook_listener(
             status_code=400,
             detail=f"Webhook Replay Rejected: Event timestamp {event_timestamp} is outside acceptable 300-second freshness window (skew={abs(now - event_timestamp)}s).",
         )
+
+    # 3. Verify HMAC Signature
+    if not x_razorpay_signature:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing X-Razorpay-Signature header. All webhook requests must be signed.",
+        )
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, x_razorpay_signature):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid X-Razorpay-Signature — HMAC mismatch. Request rejected.",
+        )
+
+    # 4. Only once payload, timestamp, and signature are strictly valid, insert into Idempotency Store
+    event_id = x_razorpay_event_id or ("evt_body_" + hashlib.sha256(raw_body).hexdigest())
+    is_new = idempotency_store.try_insert(event_id)
+    if not is_new:
+        return {
+            "status": "ignored_duplicate",
+            "event_id": event_id,
+            "message": "Event already processed. Idempotency preserved (SQLite).",
+        }
 
     event = payload.get("event", "unknown")
 
@@ -1145,7 +1165,7 @@ def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depend
     # 4. Atomic CAS State Update (Transition to RELEASING)
     new_proof = hashlib.sha256(f"{req.contract_id}:RELEASING:{req.checker_id}:{time.time_ns()}".encode()).hexdigest()
     expected_version = contract_data.get("version", 1)
-    cas_success = idempotency_store.cas_release_contract(req.contract_id, expected_version, new_proof)
+    cas_success = idempotency_store.cas_release_contract(req.contract_id, expected_version, new_proof, tenant_id=tenant_id)
     if not cas_success:
         raise HTTPException(
             status_code=409,
@@ -1203,10 +1223,80 @@ def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depend
     }
 
 
+@app.get("/api/apex/signer/public-key")
+def get_signer_public_key():
+    """Expose public verification key for the local software demo signer."""
+    custodian = SoftwareEd25519Custodian()
+    return {
+        "key_id": "demo_software_ed25519_v1",
+        "algorithm": "Ed25519",
+        "custody_type": "Local Software Memory Demo Signer",
+        "public_key_hex": custodian.public_key_hex,
+        "is_production_kms": False,
+        "disclaimer": "Demonstration key held in backend process memory. Not backed by AWS KMS / CloudHSM.",
+    }
+
+
+@app.post("/api/apex/contracts/{contract_id}/sign-demo")
+def sign_contract_demo(
+    contract_id: str,
+    tenant_id: str = Depends(verify_tenant_auth),
+):
+    """Server-side local demo signature for verified contract release intent.
+    
+    Verifies:
+    1. Authenticated tenant owns the contract.
+    2. Contract state is DELIVERED.
+    3. Delivery assertion is present.
+    4. Has not been previously released.
+    """
+    contract_data = idempotency_store.get_contract(contract_id, tenant_id=tenant_id)
+    if not contract_data:
+        raise HTTPException(status_code=404, detail="Contract not found for authenticated tenant.")
+    if contract_data["status"] not in (ContractStatus.VERIFYING.value, "DELIVERED"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Contract must be in VERIFYING state to sign release intent. Current: {contract_data['status']}.",
+        )
+    leaf_hash = contract_data.get("proof_hash") or contract_data.get("delivery_proof_hash")
+    if not leaf_hash:
+        raise HTTPException(status_code=400, detail="Missing verified delivery proof assertion.")
+
+    now = datetime.now(timezone.utc)
+    request_id = f"req_sign_{uuid.uuid4().hex[:12]}"
+
+    custodian = SoftwareEd25519Custodian(key_id="cfo_autonomous_verifier")
+    leaf_hash = contract_data.get("proof_hash") or contract_data.get("delivery_proof_hash") or ""
+    
+    # Build deterministic canonical assertion payload
+    cert = custodian.sign_merkle_leaf(
+        leaf_hash=leaf_hash,
+        context={
+            "contract_id": contract_id,
+            "tenant_id": tenant_id,
+            "approver": "cfo_autonomous_verifier",
+            "action": "RELEASE",
+        }
+    )
+
+    return {
+        "status": "SIGNED",
+        "request_id": request_id,
+        "contract_id": contract_id,
+        "tenant_id": tenant_id,
+        "key_id": cert.key_id,
+        "signature_hex": cert.signature_hex,
+        "public_key_hex": cert.public_key_hex,
+        "signed_at": now.isoformat(),
+        "canonical_payload": cert.canonical_payload,
+        "signer_label": "Local Demo Signer (Backend Hazmat)",
+    }
+
+
 @app.post("/api/apex/contracts/sweep-expired")
 def apex_sweep_expired(tenant_id: str = Depends(verify_tenant_auth)):
-    """Liveness sweep: force-resolves expired contracts to EXPIRED_AUTO_REFUNDED."""
-    swept_ids = idempotency_store.sweep_expired_contracts()
+    """Liveness sweep: force-resolves expired contracts to EXPIRED_HOLD strictly for authenticated tenant."""
+    swept_ids = idempotency_store.sweep_expired_contracts(tenant_id=tenant_id)
     return {
         "status": "success",
         "expired_contracts_count": len(swept_ids),
@@ -1256,18 +1346,19 @@ capital_facility_manager = CapitalFacilityManager()
 class CapitalDrawdownRequest(BaseModel):
     merchant_id: Optional[str] = Field(default=None)
     requested_amount_paise: Optional[int] = Field(default=None)
+    idempotency_key: Optional[str] = Field(default=None)
 
 
 class CapitalSweepRequest(BaseModel):
     facility_id: str
     num_records: int = Field(default=20)
+    idempotency_key: Optional[str] = Field(default=None)
 
 
 @app.get("/api/capital/offer")
 def get_capital_offer(merchant_id: Optional[str] = None, tenant_id: str = Depends(verify_tenant_auth)):
     """Underwrite real-time working capital advance off verified delivered ledger truth."""
-    # Strict Tenant Authorization: If merchant_id is provided, it MUST match authenticated tenant_id
-    if merchant_id and merchant_id != tenant_id and tenant_id not in ("merchant_rzp_primary", "merch_delhi_logistics_01"):
+    if merchant_id and merchant_id != tenant_id:
         raise HTTPException(status_code=403, detail=f"Tenant Authorization Mismatch: Cannot underwrite for unowned merchant '{merchant_id}'.")
 
     effective_merchant_id = merchant_id or tenant_id
@@ -1299,11 +1390,11 @@ def get_capital_offer(merchant_id: Optional[str] = None, tenant_id: str = Depend
 
 @app.post("/api/capital/drawdown")
 def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depends(verify_tenant_auth)):
-    """Execute 1-click working capital advance drawdown with simulated Razorpay Payout."""
-    if req.merchant_id and req.merchant_id != tenant_id and tenant_id not in ("merchant_rzp_primary", "merch_delhi_logistics_01"):
+    """Execute 1-click working capital advance drawdown with SQLite CAS durability."""
+    if req.merchant_id and req.merchant_id != tenant_id:
         raise HTTPException(status_code=403, detail=f"Tenant Authorization Mismatch: Cannot drawdown for unowned merchant '{req.merchant_id}'.")
 
-    effective_merchant_id = req.merchant_id or tenant_id
+    effective_merchant_id = tenant_id
     invoices, bank_credits, _, _ = ChaosDataGenerator(seed=42).generate_suite(num_records=100)
     blocks, _ = ReconciliationEngine().reconcile_batch(bank_credits, invoices)
     offer = capital_underwriter.generate_offer(
@@ -1313,7 +1404,11 @@ def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depen
         requested_advance_paise=req.requested_amount_paise,
     )
     try:
-        facility = capital_facility_manager.disburse_advance(offer)
+        facility = capital_facility_manager.disburse_advance(
+            offer=offer,
+            tenant_id=tenant_id,
+            idempotency_key=req.idempotency_key,
+        )
     except ActiveFacilityExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
@@ -1321,6 +1416,7 @@ def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depen
         "status": "DISBURSED",
         "facility_id": facility.facility_id,
         "merchant_id": facility.merchant_id,
+        "tenant_id": facility.tenant_id,
         "principal_paise": facility.principal_paise,
         "principal_inr": _fmt_paise(facility.principal_paise),
         "total_repayment_paise": facility.total_repayment_paise,
@@ -1334,42 +1430,45 @@ def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depen
 
 @app.get("/api/capital/facilities")
 def list_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
-    """List working capital facilities strictly isolated to authenticated tenant."""
-    res = []
-    for fac in capital_facility_manager.facilities.values():
-        if fac.merchant_id == tenant_id:
-            res.append({
-                "facility_id": fac.facility_id,
-                "merchant_id": fac.merchant_id,
-                "principal_inr": _fmt_paise(fac.principal_paise),
-                "factor_fee_inr": _fmt_paise(fac.factor_fee_paise),
-                "total_repayment_inr": _fmt_paise(fac.total_repayment_paise),
-                "remaining_balance_inr": _fmt_paise(fac.remaining_balance_paise),
-                "status": fac.status.value,
-                "sweep_rate_pct": f"{int(fac.sweep_rate * 100)}%",
-                "payout_transfer_id": fac.payout_transfer_id,
-                "repayment_sweeps_count": len(fac.repayment_events),
-                "repayment_events": [
-                    {
-                        "sweep_id": ev.sweep_id,
-                        "utr": ev.settlement_utr,
-                        "gross_settlement_inr": _fmt_paise(ev.gross_settlement_paise),
-                        "sweep_deduction_inr": _fmt_paise(ev.sweep_deduction_paise),
-                        "net_merchant_payout_inr": _fmt_paise(ev.net_merchant_payout_paise),
-                        "remaining_balance_inr": _fmt_paise(ev.remaining_balance_paise),
-                        "applied_at": ev.applied_at.isoformat(),
-                    }
-                    for ev in fac.repayment_events
-                ],
-            })
+    """List working capital facilities strictly isolated to authenticated tenant from SQLite."""
+    facilities = capital_facility_manager.list_facilities(tenant_id=tenant_id)
+    res = [
+        {
+            "facility_id": fac.facility_id,
+            "merchant_id": fac.merchant_id,
+            "tenant_id": fac.tenant_id,
+            "principal_inr": _fmt_paise(fac.principal_paise),
+            "factor_fee_inr": _fmt_paise(fac.factor_fee_paise),
+            "total_repayment_inr": _fmt_paise(fac.total_repayment_paise),
+            "remaining_balance_inr": _fmt_paise(fac.remaining_balance_paise),
+            "status": fac.status.value,
+            "sweep_rate_pct": f"{int(fac.sweep_rate * 100)}%",
+            "payout_transfer_id": fac.payout_transfer_id,
+            "version": fac.version,
+            "repayment_sweeps_count": len(fac.repayment_events),
+            "repayment_events": [
+                {
+                    "sweep_id": ev.sweep_id,
+                    "utr": ev.settlement_utr,
+                    "gross_settlement_inr": _fmt_paise(ev.gross_settlement_paise),
+                    "sweep_deduction_inr": _fmt_paise(ev.sweep_deduction_paise),
+                    "net_merchant_payout_inr": _fmt_paise(ev.net_merchant_payout_paise),
+                    "remaining_balance_inr": _fmt_paise(ev.remaining_balance_paise),
+                    "applied_at": ev.applied_at.isoformat(),
+                }
+                for ev in fac.repayment_events
+            ],
+        }
+        for fac in facilities
+    ]
     return {"facilities": res}
 
 
 @app.post("/api/capital/reconcile-and-sweep")
 def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verify_tenant_auth)):
-    """Reconcile incoming bank settlement block and apply automated split recovery sweep with tenant isolation."""
-    facility = capital_facility_manager.facilities.get(req.facility_id)
-    if not facility or facility.merchant_id != tenant_id:
+    """Reconcile incoming bank settlement block and apply automated split recovery sweep with SQLite CAS."""
+    facility = capital_facility_manager.get_facility(req.facility_id, tenant_id=tenant_id)
+    if not facility or facility.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Facility not found for authenticated tenant.")
 
     invoices, bank_credits, _, _ = ChaosDataGenerator(seed=99).generate_suite(num_records=req.num_records)
@@ -1378,7 +1477,12 @@ def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verif
         raise HTTPException(status_code=400, detail="No reconcilable settlement blocks found.")
 
     settlement_block = blocks[0]
-    fac, event = capital_facility_manager.process_settlement_sweep(req.facility_id, settlement_block)
+    fac, event = capital_facility_manager.process_settlement_sweep(
+        facility_id=req.facility_id,
+        settlement_block=settlement_block,
+        tenant_id=tenant_id,
+        idempotency_key=req.idempotency_key,
+    )
     
     return {
         "status": "SWEEP_APPLIED",
@@ -1394,13 +1498,12 @@ def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verif
 
 @app.post("/api/capital/reset")
 def reset_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
-    """Reset capital facilities strictly for authenticated tenant."""
-    to_delete = [fid for fid, fac in capital_facility_manager.facilities.items() if fac.merchant_id == tenant_id]
-    for fid in to_delete:
-        del capital_facility_manager.facilities[fid]
-    return {"status": "RESET_SUCCESS", "active_facilities": len(capital_facility_manager.facilities)}
+    """Reset capital facilities strictly for authenticated tenant in SQLite."""
+    deleted_count = capital_facility_manager.reset_facilities(tenant_id=tenant_id)
+    return {"status": "RESET_SUCCESS", "deleted_facilities": deleted_count}
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+

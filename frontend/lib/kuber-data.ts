@@ -39,7 +39,7 @@ export const inr = (rupees: number, opts?: { compact?: boolean; paise?: boolean 
 /* ---------------------------------------------------------------- Overview */
 
 export const systemStats = {
-  fmr: 0.0, // False Match Rate — the headline mathematical guarantee
+  fmr: 0.0, // False Match Rate — measured on synthetic fixture corpus
   protectedToday: 4_28_15_640,
   ordersProcessed: 18_442,
   escrowHeld: 1_92_44_180,
@@ -52,7 +52,7 @@ export const systemStats = {
 export type Health = { label: string; value: string; status: 'ok' | 'warn' | 'danger' }
 export const railHealth: Health[] = [
   { label: 'Gateway Escrow Rail', value: 'ACTIVE', status: 'ok' },
-  { label: 'Reconciliation Engine', value: 'FMR 0.000', status: 'ok' },
+  { label: 'Reconciliation Engine', value: '0 False Matches (Test Corpus)', status: 'ok' },
   { label: 'GSTR-2B Sync', value: 'T-3 days', status: 'warn' },
   { label: 'Vendor GSTR-1 Feed', value: '2 defaults', status: 'danger' },
 ]
@@ -108,14 +108,14 @@ export const lineage = {
   invoices: 34,
   nodes: [
     { id: 'utr', label: 'Bank Lump-Sum UTR', sub: 'HDFC · 0093412771', amount: 1462400, kind: 'root', x: 40, y: 190 },
-    { id: 'gmv', label: 'Gross GMV', sub: '34 invoices · exact cover', amount: 1800000, kind: 'gmv', x: 300, y: 190 },
+    { id: 'gmv', label: 'Gross GMV', sub: '34 invoices · subset-sum', amount: 1800000, kind: 'gmv', x: 300, y: 190 },
     { id: 'mdr', label: 'MDR 1.85%', sub: 'Gateway fee', amount: 33300, kind: 'deduction', x: 570, y: 50 },
     { id: 'gst', label: 'GST 18%', sub: 'on MDR', amount: 5994, kind: 'deduction', x: 570, y: 145 },
     { id: 'tds', label: 'TDS 1%', sub: 'Sec 194-O', amount: 18000, kind: 'deduction', x: 570, y: 240 },
     { id: 'net', label: 'Net Settlement', sub: 'reconciled', amount: 1462400, kind: 'net', x: 570, y: 335 },
   ] as LineageNode[],
   edges: [
-    { from: 'utr', to: 'gmv', label: 'Algorithm X' },
+    { from: 'utr', to: 'gmv', label: 'Horowitz–Sahni' },
     { from: 'gmv', to: 'mdr' },
     { from: 'gmv', to: 'gst' },
     { from: 'gmv', to: 'tds' },
@@ -176,7 +176,7 @@ export const ledgerEntries: LedgerEntry[] = [
 export const guardrails = [
   { label: 'Per-action spend cap', value: '₹200', ok: true },
   { label: 'KYC payee whitelist', value: 'Enforced', ok: true },
-  { label: 'Merkle chain (RFC 6962)', value: 'Verified', ok: true },
+  { label: 'Audit hash-chain integrity', value: 'Verified', ok: true },
   { label: 'Ed25519 signatures', value: 'Required', ok: true },
 ]
 

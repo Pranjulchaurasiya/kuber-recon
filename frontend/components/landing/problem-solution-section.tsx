@@ -98,7 +98,7 @@ export function ProblemSolutionSection() {
               <div className="space-y-1">
                 <h4 className="text-sm font-bold text-foreground">2. Dual-Layer: AI Agent Intelligence + Zero-Float Kernel</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  AI handles autonomous order orchestration and CFO copilot insights, while financial clearing is locked to <span className="text-foreground font-semibold">Donald Knuth&apos;s Exact-Cover algorithm</span> and <span className="text-foreground font-semibold">GSTIN Mod-36 checksums</span> in exact base-10 paise. Zero false matches.
+                  AI handles autonomous order orchestration and CFO copilot insights, while financial clearing is locked to <span className="text-foreground font-semibold">Horowitz–Sahni Subset-Sum algorithm</span> and <span className="text-foreground font-semibold">GSTIN Mod-36 checksums</span> in exact base-10 paise with zero false matches on the verified fixture corpus.
                 </p>
               </div>
             </div>
@@ -108,7 +108,7 @@ export function ProblemSolutionSection() {
               <div className="space-y-1">
                 <h4 className="text-sm font-bold text-foreground">3. 1-Click Capital with 12% Nodal Recovery</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Converts verified delivery revenue into instant working capital advances, automatically recovered through a <span className="text-primary font-semibold">12% First-Lien Nodal Sweep</span> from future daily sales.
+                  Converts verified delivery revenue into instant working capital advances, automatically recovered through a <span className="text-primary font-semibold">12% Split-Settlement Nodal Sweep</span> from future daily sales.
                 </p>
               </div>
             </div>

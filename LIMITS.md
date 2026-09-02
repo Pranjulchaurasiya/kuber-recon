@@ -10,7 +10,7 @@
 | Dimension | Mechanism / Invariant | Hard Limit / Enforcement Behavior |
 |---|---|---|
 | **Currency Arithmetic** | Pure Base-10 Integer (Paise) | Python `Decimal` and integer paise. Prohibits IEEE-754 floats in financial paths. |
-| **Ambiguous Combinations** | Exact-Cover Subset Matcher | Emits `AmbiguousMatchError` when $>1$ valid subset covers a credit. Refuses to guess. |
+| **Ambiguous Combinations** | Bounded Subset-Sum Matcher | Emits `AmbiguousMatchError` when $>1$ valid subset covers a credit. Refuses to guess. |
 | **Delivery Verification** | Deterministic Checksums | Validates 15-char GSTIN check-digit (Mod-36 custom weights) and 500-record bounds. |
 | **Pre-Settlement Gating** | Razorpay Route `on_hold: true` | Payout funds remain in nodal hold until delivery assertions and maker-checker pass. |
 | **Webhook Delivery Race** | Idempotent Ingestion | Atomic SQLite CAS transition on single authoritative `transfer.processed` webhook. |
@@ -37,7 +37,7 @@
 
 ## ⚡ 3. Algorithmic Bounds & Performance Scope
 
-1. **Exact-Cover Matching Bounds:**
+1. **Subset-Sum Matching Bounds:**
    * For candidate invoice subsets $N \le 24$, iterative Horowitz-Sahni meet-in-the-middle hash partitioning solves in $<10\text{ms}$.
    * For dense candidate pools ($N > 24$), the candidate list is bounded to the top 24 items with strict complexity caps (`max_nodes = 10,000`, `timeout = 500ms`) to prevent combinatorial DoS.
    * If combinations cannot be uniquely resolved or multi-subset collisions occur, the engine emits `AmbiguousMatchError` (honest refusal) rather than making probabilistic guesses.

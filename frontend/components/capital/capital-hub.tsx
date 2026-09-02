@@ -56,7 +56,7 @@ export function CapitalHub() {
   // 1-Click Disburse Advance (Live API + Failure Guard)
   const handleDisburse = async () => {
     setIsDisbursing(true)
-    const res = await executeCapitalDrawdown('merch_delhi_hyperlocal_01', 5976478)
+    const res = await executeCapitalDrawdown('merchant_rzp_primary', 5976478)
     setIsDisbursing(false)
 
     if (res.ok && res.data) {
@@ -275,7 +275,7 @@ export function CapitalHub() {
           </div>
           <div className="text-2xl font-bold font-mono text-foreground">₹2,47,089.55</div>
           <div className="text-xs text-gain flex items-center gap-1">
-            <ShieldCheck className="h-3 w-3" /> Exact-Cover Reconciled
+            <ShieldCheck className="h-3 w-3" /> Subset-Sum Reconciled
           </div>
         </div>
 

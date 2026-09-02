@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { paiseToInr } from '@/lib/kuber-data'
-import { getApiUrl, checkBackendHealth } from '@/lib/api-client'
+import { getApiUrl, checkBackendHealth, DEFAULT_AUTH_HEADERS } from '@/lib/api-client'
 
 const GST_SLABS = [
   { label: '0% GST (Exempt)', ratePct: 0 },
@@ -101,7 +101,7 @@ export function SplitEngine() {
         const apiUrl = getApiUrl()
         const res = await fetch(`${apiUrl}/api/intercept`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: DEFAULT_AUTH_HEADERS,
           body: JSON.stringify({
             order_id: `ord_${Math.random().toString(36).substring(2, 9)}`,
             amount_paise: grossPaise,           // integer paise — no float division
@@ -413,7 +413,7 @@ export function SplitEngine() {
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Real Intercept Log · Paise-Exact Audited
             </h2>
-            <span className="font-mono text-[10px] text-gain">FMR = 0.000 (Base-10 Integer)</span>
+            <span className="font-mono text-[10px] text-gain">0 False Matches (Tested Fixtures · Base-10 Integer)</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[650px] text-sm">

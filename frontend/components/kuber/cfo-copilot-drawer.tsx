@@ -113,11 +113,11 @@ export function executeDeterministicCopilotQuery(prompt: string): CopilotRespons
 
     return {
       query: prompt,
-      summary: `The Knuth DLX Exact-Cover solver and KYC guardrails isolated ${blockedEntries.length} non-reconciled actions. Zero ambiguous guesses were committed to the ledger, enforcing the hard False Match Rate (FMR) = 0.000 invariant.`,
+      summary: `The Horowitz–Sahni subset-sum solver and KYC guardrails isolated ${blockedEntries.length} non-reconciled actions. Zero ambiguous guesses were committed to the ledger, enforcing 0 false matches across tested fixture cases.`,
       metricHighlighted: {
         label: 'Isolated Ambiguous Exceptions',
         value: `${blockedEntries.length} Records Isolated`,
-        subtext: 'FMR = 0.000 (Guaranteed Honest Refusal)',
+        subtext: '0 False Matches on Test Corpus',
         tone: 'warn',
       },
       breakdown: [
@@ -137,8 +137,8 @@ export function executeDeterministicCopilotQuery(prompt: string): CopilotRespons
       citations: [
         {
           type: 'MERKLE_PROOF',
-          reference: 'KuberRecon DLX Invariant #1',
-          label: 'Knuth DLX All-Solution Enumerator',
+          reference: 'KuberRecon Solver Invariant #1',
+          label: 'Horowitz–Sahni All-Solution Enumerator',
           detail: 'When |Solutions| > 1, solver halts mutation and routes payload to Human-in-the-Loop triage.',
         },
         {
@@ -210,7 +210,7 @@ export function executeDeterministicCopilotQuery(prompt: string): CopilotRespons
       tone: 'gain',
     },
     breakdown: [
-      { field: 'Gross GMV (34 Invoices)', paise: gmv * 100, inr: inr(gmv), note: 'Verified by Knuth DLX Exact Cover' },
+      { field: 'Gross GMV (34 Invoices)', paise: gmv * 100, inr: inr(gmv), note: 'Verified by Horowitz–Sahni Subset-Sum' },
       { field: 'MDR Gateway Processing (1.85%)', paise: mdr * 100, inr: inr(mdr), note: 'Razorpay Route contract rate' },
       { field: 'GST on MDR (18%)', paise: gst * 100, inr: inr(gst), note: 'Input tax credit claimed in GSTR-2B' },
       { field: 'TDS Withholding (Sec 194-O 1%)', paise: tds * 100, inr: inr(tds), note: 'Remitted directly to CBDT pool' },
@@ -301,7 +301,7 @@ export function CfoCopilotDrawer({
               <MessageSquare className="h-3.5 w-3.5 text-primary" />
               Verified Financial Queries
             </span>
-            <span className="font-mono text-[10px] text-gain font-bold">FMR: 0.000</span>
+            <span className="font-mono text-[10px] text-gain font-bold">Deterministic Engine</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {SAMPLE_PROMPTS.map((prompt) => (

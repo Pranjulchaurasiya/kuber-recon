@@ -32,14 +32,14 @@ function randHash(len = 4) {
   )
 }
 
-export type ReconFilterTab = 'ALL' | 'EXACT_DLX' | 'GSTR_2B' | 'TDS_194O' | 'AMBIGUOUS_HITL'
+export type ReconFilterTab = 'ALL' | 'EXACT_SUBSET_SUM' | 'GSTR_2B' | 'TDS_194O' | 'AMBIGUOUS_HITL'
 
 export function LedgerConsole() {
   const [entries, setEntries] = useState<LedgerEntry[]>([
     ...seed,
     {
       seq: 10437,
-      action: 'Exact Cover Match (Knuth DLX)',
+      action: 'Subset-Sum Match (Horowitz–Sahni)',
       payee: 'Meridian Retail · INV-2291',
       amount: 96380,
       cap: 100000,
@@ -96,9 +96,9 @@ export function LedgerConsole() {
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
       // 1. Tab filtering
-      if (activeTab === 'EXACT_DLX') {
-        const isDlx = e.action.includes('Exact') || e.action.includes('Rounding') || e.action.includes('Adjustment')
-        if (!isDlx) return false
+      if (activeTab === 'EXACT_SUBSET_SUM') {
+        const isMatch = e.action.includes('Exact') || e.action.includes('Rounding') || e.action.includes('Adjustment')
+        if (!isMatch) return false
       } else if (activeTab === 'GSTR_2B') {
         const isGst = e.action.includes('GST')
         if (!isGst) return false
@@ -130,7 +130,7 @@ export function LedgerConsole() {
     const exportPayload = {
       exportTimestamp: new Date().toISOString(),
       statutoryStandard: 'CBIC GST Rule 36(4) & Section 194-O TDS',
-      merkleStandard: 'RFC 6962 Certificate Transparency',
+      merkleStandard: 'Prototype Merkle Audit Root',
       arithmeticStandard: 'Base-10 Integer Paise (Zero IEEE-754 Floats)',
       totalRecords: filteredEntries.length,
       activeFilter: activeTab,
@@ -143,7 +143,7 @@ export function LedgerConsole() {
         spendCapPaise: e.cap * 100,
         spendCapInr: inr(e.cap),
         statutoryStatus: e.status,
-        rfc6962BlockHash: e.hash,
+        blockHash: e.hash,
         ed25519Signature: e.sig,
         recordedTimestampUtc: e.ts,
       })),
@@ -186,7 +186,7 @@ export function LedgerConsole() {
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-gain" />
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-bold">
-              Immutable Settlement Audit Chain · RFC 6962 Verified
+              Immutable Settlement Audit Chain · Prototype Merkle Verified
             </h2>
           </div>
           <Pill tone="gain">chain verified</Pill>
@@ -261,14 +261,14 @@ export function LedgerConsole() {
               All Transactions ({entries.length})
             </button>
             <button
-              onClick={() => setActiveTab('EXACT_DLX')}
+              onClick={() => setActiveTab('EXACT_SUBSET_SUM')}
               className={`rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition ${
-                activeTab === 'EXACT_DLX'
+                activeTab === 'EXACT_SUBSET_SUM'
                   ? 'bg-gain text-primary-foreground shadow'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground'
               }`}
             >
-              Exact Covers (DLX)
+              Subset-Sum Candidates
             </button>
             <button
               onClick={() => setActiveTab('GSTR_2B')}
@@ -436,7 +436,7 @@ export function LedgerConsole() {
                   }
                 />
                 <Check ok label="Payee on KYC whitelist" detail="Verified merchant nodal record" />
-                <Check ok label="Merkle predecessor valid" detail="RFC 6962 inclusion proof verified" />
+                <Check ok label="Merkle predecessor valid" detail="Audit hash-chain integrity verified" />
                 <Check ok label="Ready for Ed25519 signature" detail="Awaiting CFO key authorization" />
               </div>
 

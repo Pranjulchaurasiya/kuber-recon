@@ -1,10 +1,10 @@
-"""Razorpay Live Production API Client & Gateway Adapter.
+"""Razorpay Test Mode & Sandbox Gateway Adapter.
 
 Supports:
-1. Fetching live settlement reconciliation rows (`fetch_settlement_recon`).
-2. Creating live Route Transfers with `on_hold: True` and optional `on_hold_until` TTL.
+1. Fetching settlement reconciliation rows (`fetch_settlement_recon`).
+2. Creating Route Transfers with `on_hold: True` and optional `on_hold_until` TTL.
 3. Modifying settlement hold status via `PATCH /v1/transfers/{id}` (`on_hold: False`).
-4. Seamless fallback to Zero-Key Sandbox Engine if keys are unset.
+4. Seamless fallback to Zero-Key Sandbox Engine if live API keys are unset.
 """
 
 import os
@@ -24,7 +24,7 @@ from kuber_recon.types import BankNodalCredit, InvoiceRecord, PaymentMethod
 
 
 class RazorpayClientAdapter:
-    """Production Adapter for Live Razorpay API Integration."""
+    """Adapter for Razorpay API Test Mode & Sandbox Simulation."""
 
     def __init__(
         self,

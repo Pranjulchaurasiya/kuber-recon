@@ -35,8 +35,12 @@ def underwriter():
 
 
 @pytest.fixture
-def facility_manager():
-    return CapitalFacilityManager()
+def facility_manager(tmp_path):
+    import gc
+    db_file = tmp_path / "test_concurrency.db"
+    mgr = CapitalFacilityManager(db_path=db_file)
+    yield mgr
+    gc.collect()
 
 
 def test_concurrent_double_drawdown_race_protection(underwriter, facility_manager):
@@ -60,7 +64,7 @@ def test_concurrent_double_drawdown_race_protection(underwriter, facility_manage
 
     def attempt_drawdown(idx: int):
         try:
-            fac = facility_manager.disburse_advance(offer)
+            fac = facility_manager.disburse_advance(offer, tenant_id="merchant_rzp_primary")
             return ("SUCCESS", fac)
         except ActiveFacilityExistsError:
             return ("REJECTED", None)
@@ -96,7 +100,7 @@ def test_concurrent_settlement_sweeps_zero_over_recovery(underwriter, facility_m
         invoices=invoices,
         requested_advance_paise=3000000,  # Rs 30,000
     )
-    facility = facility_manager.disburse_advance(offer)
+    facility = facility_manager.disburse_advance(offer, tenant_id="merchant_rzp_primary")
     total_obligation_paise = facility.total_repayment_paise  # 30,000 + 4% = 31,200 (3,120,000 paise)
 
     deductions = []
@@ -120,7 +124,7 @@ def test_concurrent_settlement_sweeps_zero_over_recovery(underwriter, facility_m
             proof_hash=f"hash_{idx}",
         )
         try:
-            _, event = facility_manager.process_settlement_sweep(facility.facility_id, block)
+            _, event = facility_manager.process_settlement_sweep(facility.facility_id, block, tenant_id="merchant_rzp_primary")
             return ("DEDUCTED", event.sweep_deduction_paise)
         except TerminalFacilitySweepError:
             return ("TERMINAL", 0)
@@ -140,7 +144,8 @@ def test_concurrent_settlement_sweeps_zero_over_recovery(underwriter, facility_m
     assert total_recovered == total_obligation_paise, f"Expected {total_obligation_paise}, got {total_recovered}"
 
     # 2. Final facility state must be REPAID with exactly 0 remaining balance
-    final_fac = facility_manager.facilities[facility.facility_id]
+    final_fac = facility_manager.get_facility(facility.facility_id, tenant_id="merchant_rzp_primary")
+    assert final_fac is not None
     assert final_fac.status == FacilityStatus.REPAID
     assert final_fac.remaining_balance_paise == 0
 
@@ -157,7 +162,7 @@ def test_redrawdown_allowed_after_repaid(underwriter, facility_manager):
         invoices=invoices,
         requested_advance_paise=2000000,  # Rs 20,000
     )
-    fac1 = facility_manager.disburse_advance(offer)
+    fac1 = facility_manager.disburse_advance(offer, tenant_id="merchant_rzp_primary")
 
     # Pay off facility #1 with a single large settlement
     large_block = ReconciledSettlementBlock(
@@ -175,7 +180,7 @@ def test_redrawdown_allowed_after_repaid(underwriter, facility_manager):
         evidence_tier=EvidenceTier.TIER_A,
         proof_hash="hash_l",
     )
-    fac1_updated, ev = facility_manager.process_settlement_sweep(fac1.facility_id, large_block)
+    fac1_updated, ev = facility_manager.process_settlement_sweep(fac1.facility_id, large_block, tenant_id="merchant_rzp_primary")
     assert fac1_updated.status == FacilityStatus.REPAID
     assert fac1_updated.remaining_balance_paise == 0
 
@@ -186,10 +191,10 @@ def test_redrawdown_allowed_after_repaid(underwriter, facility_manager):
         invoices=invoices,
         requested_advance_paise=2500000,  # Rs 25,000
     )
-    fac2 = facility_manager.disburse_advance(offer2)
+    fac2 = facility_manager.disburse_advance(offer2, tenant_id="merchant_rzp_primary")
     assert fac2.facility_id != fac1.facility_id
     assert fac2.status == FacilityStatus.ACTIVE
-    assert fac2.principal_paise == 2500000
+    assert fac2.principal_paise == offer2.offered_principal_paise
 
 
 def test_overshoot_sweep_capped_at_exact_remaining_balance(underwriter, facility_manager):
@@ -204,10 +209,17 @@ def test_overshoot_sweep_capped_at_exact_remaining_balance(underwriter, facility
         invoices=invoices,
         requested_advance_paise=1000000,  # Rs 10,000
     )
-    fac = facility_manager.disburse_advance(offer)
+    fac = facility_manager.disburse_advance(offer, tenant_id="merchant_rzp_primary")
 
     # Artificially set remaining balance to Rs 35.50 (3550 paise)
-    fac.remaining_balance_paise = 3550
+    with facility_manager._lock:
+        conn = facility_manager._get_connection()
+        try:
+            conn.execute("UPDATE capital_facilities SET remaining_balance_paise = 3550 WHERE facility_id = ? AND tenant_id = ?", (fac.facility_id, "merchant_rzp_primary"))
+            conn.commit()
+        finally:
+            if facility_manager.db_path != ":memory:":
+                conn.close()
 
     # Settlement of Rs 100,000 (12% would be Rs 12,000 = 1,200,000 paise)
     block = ReconciledSettlementBlock(
@@ -226,7 +238,7 @@ def test_overshoot_sweep_capped_at_exact_remaining_balance(underwriter, facility
         proof_hash="hash_b",
     )
 
-    fac_after, ev = facility_manager.process_settlement_sweep(fac.facility_id, block)
+    fac_after, ev = facility_manager.process_settlement_sweep(fac.facility_id, block, tenant_id="merchant_rzp_primary")
     assert ev.sweep_deduction_paise == 3550  # Capped at remaining balance
     assert ev.net_merchant_payout_paise == 10000000 - 3550  # Rs 99,964.50
     assert fac_after.remaining_balance_paise == 0
@@ -234,7 +246,7 @@ def test_overshoot_sweep_capped_at_exact_remaining_balance(underwriter, facility
 
     # Subsequent sweep on REPAID facility must raise TerminalFacilitySweepError
     with pytest.raises(TerminalFacilitySweepError):
-        facility_manager.process_settlement_sweep(fac.facility_id, block)
+        facility_manager.process_settlement_sweep(fac.facility_id, block, tenant_id="merchant_rzp_primary")
 
 
 def test_rest_api_drawdown_conflict_on_duplicate():
@@ -246,16 +258,18 @@ def test_rest_api_drawdown_conflict_on_duplicate():
             "X-API-Key": "kuber_sandbox_key_primary_2026",
         },
     )
+    # Reset any existing facility for primary tenant first
+    client.post("/api/capital/reset")
     
     # 1. First drawdown succeeds
-    res1 = client.post("/api/capital/drawdown", json={"merchant_id": "merch_api_dup_01", "requested_amount_paise": 2000000})
+    res1 = client.post("/api/capital/drawdown", json={"merchant_id": "merchant_rzp_primary", "requested_amount_paise": 2000000})
     assert res1.status_code == 200
     data1 = res1.json()
     assert data1["status"] == "DISBURSED"
     assert "facility_id" in data1
 
     # 2. Duplicate concurrent drawdown for the same merchant fails with 409 Conflict
-    res2 = client.post("/api/capital/drawdown", json={"merchant_id": "merch_api_dup_01", "requested_amount_paise": 2000000})
+    res2 = client.post("/api/capital/drawdown", json={"merchant_id": "merchant_rzp_primary", "requested_amount_paise": 2000000})
     assert res2.status_code == 409
     assert "already has an active facility" in res2.json()["detail"]
 

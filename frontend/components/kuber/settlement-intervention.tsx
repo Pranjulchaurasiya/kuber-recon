@@ -51,7 +51,7 @@ export function SettlementIntervention() {
 
           <div className={`border p-5 transition-colors ${refused ? 'border-danger/50 bg-danger/[0.06]' : 'border-gold/35 bg-background/45'}`}>
             <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">02 / Exact-cover evidence</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">02 / Subset-sum evidence</span>
               <span className={`font-mono text-[10px] uppercase tracking-widest ${refused ? 'text-danger' : 'text-gold'}`}>
                 {refused ? '2 covers found' : 'awaiting solve'}
               </span>
@@ -68,7 +68,7 @@ export function SettlementIntervention() {
               ))}
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-              <span className="text-xs text-muted-foreground">Knuth DLX will accept only one provable cover.</span>
+              <span className="text-xs text-muted-foreground">Horowitz–Sahni subset-sum solver will accept only one provable cover.</span>
               <button
                 onClick={() => setStage('refused')}
                 className="border border-danger/50 bg-danger/10 px-4 py-2 font-mono text-[11px] font-semibold uppercase tracking-widest text-danger transition-colors hover:bg-danger/20"
@@ -102,7 +102,7 @@ export function SettlementIntervention() {
           <div className="mt-3 grid gap-3 border border-danger/40 bg-danger/10 p-4 md:grid-cols-[1fr_auto] md:items-center">
             <div>
               <div className="font-mono text-xs font-semibold uppercase tracking-widest text-danger">AmbiguousMatchError · honest refusal enforced</div>
-              <p className="mt-1 text-sm text-foreground">Two exact covers are valid. Guessing would create a false match; the release is blocked at ₹0 residual.</p>
+              <p className="mt-1 text-sm text-foreground">Two subset-sum solutions are valid. Guessing would create a false match; the release is blocked at ₹0 residual.</p>
             </div>
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">proof sha256:9c7a…e21b</div>
           </div>

@@ -153,10 +153,17 @@ def test_integration_status_sandbox(client):
 
 # ── 6. Route transfer accepts amount_paise:int ────────────────────────────────
 
+AUTH_HEADERS = {
+    "X-Merchant-Id": "merchant_rzp_primary",
+    "X-API-Key": "kuber_sandbox_key_primary_2026",
+}
+
+
 def test_route_transfer_paise_contract(client):
     resp = client.post(
         "/api/razorpay/route-transfer",
         json={"account_id": "acc_mock_001", "amount_paise": 118000},
+        headers=AUTH_HEADERS,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -169,6 +176,7 @@ def test_route_transfer_rejects_zero_paise(client):
     resp = client.post(
         "/api/razorpay/route-transfer",
         json={"account_id": "acc_mock_001", "amount_paise": 0},
+        headers=AUTH_HEADERS,
     )
     assert resp.status_code == 422  # Pydantic validation: gt=0
 
@@ -179,6 +187,7 @@ def test_intercept_paise_contract_18pct(client):
     resp = client.post(
         "/api/intercept",
         json={"order_id": "ord_pytest_001", "amount_paise": 118000, "gst_rate_pct": 18},
+        headers=AUTH_HEADERS,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -194,6 +203,7 @@ def test_intercept_rejects_float_in_amount_paise(client):
     resp = client.post(
         "/api/intercept",
         json={"order_id": "ord_float_test", "amount_paise": 1180.50, "gst_rate_pct": 18},
+        headers=AUTH_HEADERS,
     )
     # FastAPI/Pydantic will coerce or reject — either way the response must be
     # a valid integer paise (no fractional value slips through)

@@ -1,7 +1,7 @@
 """Multi-Tier Chaos Benchmark Test Suite.
 
 Tests 100, 1,000, and 10,000 record runs, verifying:
-1. 0 False Matches across all runs (FMR = 0.000).
+1. 0 False Matches across all tested benchmark fixtures (FMR = 0.000).
 2. Explicit refusal (`AmbiguousMatchError`) on planted collisions.
 3. 100% precision on decidable credits.
 4. High-throughput execution latency on 10,000 records (< 3.5s in single-threaded Python).

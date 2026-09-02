@@ -85,7 +85,7 @@ export interface CapitalSweepResponse {
   is_fully_repaid: boolean
 }
 
-export async function fetchCapitalOffer(merchantId = 'merch_delhi_hyperlocal_01'): Promise<CapitalOfferResponse> {
+export async function fetchCapitalOffer(merchantId = 'merchant_rzp_primary'): Promise<CapitalOfferResponse> {
   const res = await fetch(`${getApiUrl()}/api/capital/offer?merchant_id=${merchantId}`, {
     method: 'GET',
     headers: DEFAULT_AUTH_HEADERS,
@@ -97,7 +97,7 @@ export async function fetchCapitalOffer(merchantId = 'merch_delhi_hyperlocal_01'
   return res.json()
 }
 
-export async function executeCapitalDrawdown(merchantId = 'merch_delhi_hyperlocal_01', requestedAmountPaise = 5976478): Promise<{ ok: boolean; data?: CapitalDrawdownResponse; error?: string; status?: number }> {
+export async function executeCapitalDrawdown(merchantId = 'merchant_rzp_primary', requestedAmountPaise = 5976478): Promise<{ ok: boolean; data?: CapitalDrawdownResponse; error?: string; status?: number }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/capital/drawdown`, {
       method: 'POST',

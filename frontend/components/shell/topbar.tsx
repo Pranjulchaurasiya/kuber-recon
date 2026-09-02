@@ -124,7 +124,7 @@ export function Topbar() {
               href="/ledger"
               className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition"
             >
-              <span>Merkle Block: #8492</span>
+              <span>Audit Block: #8492</span>
               <span className="text-gain font-semibold">✓ Verified</span>
             </Link>
           </div>
@@ -178,8 +178,8 @@ function LiveWebhookTicker() {
       tone: 'text-primary',
     },
     {
-      badge: 'KNUTH✓ 00:20:20',
-      text: 'exact_cover.solved · 4 Invoices · UTR HDFCN24942603 · FMR 0.000',
+      badge: 'SUBSET-SUM✓ 00:20:20',
+      text: 'subset_sum.solved · 4 Invoices · UTR HDFCN24942603 · 0 Residual',
       tone: 'text-gain',
     },
     {

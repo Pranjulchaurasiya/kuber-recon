@@ -13,10 +13,10 @@ export function HowItWorksSection() {
     },
     {
       num: '02',
-      title: 'Mod-36 GSTIN & Knuth Exact Cover',
+      title: 'Mod-36 GSTIN & Horowitz–Sahni Subset-Sum',
       code: 'src/kuber_recon/engine.py',
-      desc: 'Our Dancing Links (DLX) exact-cover solver matches incoming lump-sum UTRs against line-item invoices, subtracting Section 194-O TDS and GST with 0 floating-point operations.',
-      tag: 'Combinatorial DLX',
+      desc: 'Our Horowitz–Sahni meet-in-the-middle subset-sum solver matches incoming lump-sum UTRs against line-item invoices, subtracting Section 194-O TDS and GST with 0 floating-point operations.',
+      tag: 'Horowitz–Sahni Subset-Sum',
     },
     {
       num: '03',
@@ -29,15 +29,15 @@ export function HowItWorksSection() {
       num: '04',
       title: 'Continuous Pricing & 1-Click Advance',
       code: 'POST /api/capital/drawdown',
-      desc: 'Linear interpolation across SRI [0.9300, 0.9700] eliminates cliff-edge jumps. The merchant draws down up to ₹59,764.78 instantly via Razorpay Payouts.',
+      desc: 'Linear interpolation across SRI [0.9300, 0.9700] eliminates cliff-edge jumps. The merchant draws down up to ₹59,764.78 instantly via simulated Razorpay Payouts.',
       tag: 'Zero Cliff-Edge',
     },
     {
       num: '05',
       title: 'Automated Split-Settlement Recovery',
       code: 'POST /api/capital/reconcile-and-sweep',
-      desc: 'As new delivery-verified settlements clear, Razorpay Route automatically sweeps 12.0% at the nodal source, amortizing the advance down to exactly ₹0.00.',
-      tag: 'First-Lien Nodal',
+      desc: 'As new delivery-verified settlements clear, Razorpay Route simulated hooks sweep 12.0% at the nodal source, amortizing the advance down to exactly ₹0.00.',
+      tag: 'Split-Settlement Recovery',
     },
     {
       num: '06',

@@ -93,7 +93,7 @@ export function ProductConsoleSection() {
               <div>
                 <h3 className="text-lg font-bold text-foreground">APEX Pre-Settlement Escrow Console</h3>
                 <p className="text-xs text-muted-foreground">
-                  Cryptographic delivery gating & Knuth exact-cover settlement matching
+                  Cryptographic delivery gating & Horowitz–Sahni subset-sum settlement matching
                 </p>
               </div>
               <Link
@@ -115,9 +115,9 @@ export function ProductConsoleSection() {
               </div>
 
               <div className="rounded-xl border border-border bg-background p-4 space-y-2">
-                <div className="text-xs text-muted-foreground font-mono">Knuth Exact-Cover Invariant</div>
-                <div className="text-2xl font-bold font-mono text-gain">0.000 FMR</div>
-                <div className="text-[11px] text-muted-foreground">Sub-10ms DLX branch & bound</div>
+                <div className="text-xs text-muted-foreground font-mono">Combinatorial Subset Invariant</div>
+                <div className="text-2xl font-bold font-mono text-gain">0.000</div>
+                <div className="text-[11px] text-muted-foreground">Measured FMR (Synthetic Corpus)</div>
               </div>
 
               <div className="rounded-xl border border-border bg-background p-4 space-y-2">

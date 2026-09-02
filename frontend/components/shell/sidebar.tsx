@@ -107,7 +107,7 @@ export function Sidebar() {
         {/* Bottom Merkle Root Verification Box */}
         <div className="border-t border-border p-4 space-y-2 bg-background/50">
           <div className="flex items-center justify-between font-mono text-xs uppercase tracking-wider text-muted-foreground font-bold">
-            <span>RFC 6962 Root</span>
+            <span>Prototype Merkle Root</span>
             <span className="text-gain font-bold flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-gain animate-status-dot" />
               Verified
@@ -116,7 +116,7 @@ export function Sidebar() {
           <div className="truncate font-mono text-xs text-foreground font-bold">0x8f3a…d41c</div>
           <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground pt-1 border-t border-border/60">
             <span className="font-medium">Assertions: 6/6</span>
-            <span className="text-gain font-bold">FMR: 0.000</span>
+            <span className="text-gain font-bold" title="0 false matches on synthetic fixtures">0 False Matches (Tested)</span>
           </div>
         </div>
       </aside>

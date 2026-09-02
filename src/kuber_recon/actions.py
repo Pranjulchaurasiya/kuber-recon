@@ -4,7 +4,7 @@ Implements:
 1. Itemized Razorpay Adjustment Draft generator (`DRAFT_MODE` default).
 2. Hard-coded ₹200/txn non-AI spend cap & KYC Payee Whitelist validator.
 3. Strict Zero-Silent-Mutation guard on approval state drift.
-4. IETF `draft-sharif` Ed25519 asymmetric manifest signer & RFC 6962 Merkle Hash Chain.
+4. IETF `draft-sharif` Ed25519 asymmetric manifest signer & Prototype Merkle Tree Audit Chain.
 """
 
 from datetime import datetime, timezone
@@ -136,7 +136,7 @@ class ActionGuardrailEngine:
         }
 
     def get_merkle_root(self) -> str:
-        """Compute RFC 6962 Merkle Root Hash across all executed audit blocks."""
+        """Compute prototype Merkle Root Hash across all executed audit blocks."""
         if not self.merkle_leaves:
             return hashlib.sha256(b"EMPTY_LEDGER").hexdigest()
 
