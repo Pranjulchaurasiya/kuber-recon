@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'kuber_recon_api'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['backend:8000']

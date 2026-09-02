@@ -21,17 +21,25 @@
 
 ## 🔒 2. Security Posture & Key Custody Model
 
-### 1. Prototype Browser Signer vs. Production Key Custody
-* **Prototype Implementation:** The frontend sandbox implements client-side Ed25519 signing using the Web Crypto API to demonstrate the protocol flow (canonical manifest serialization, asymmetric signature generation, and backend public key verification).
-* **Empirical Production Bundle Finding:** In the Next.js production build (`npm run build`), the CFO seed string `"kuber_cfo_autonomous_verifier_sec_key_v1"` is bundled directly into the static chunk [`frontend/.next/static/chunks/2yct_1fd1glis.js:1`](file:///c:/Users/pranj/Documents/Razorpay-Buildthon/kuber-recon/frontend/.next/static/chunks/2yct_1fd1glis.js#L1). This confirms the known prototype boundary: client-side derived private keys are not a substitute for hardware key custody.
-* **Production Architecture:**
-  1. Private keys must never reside in client-side JavaScript bundles.
-  2. The CFO / Arbiter signing key is stored in an **AWS KMS Asymmetric Key (ECC_NIST_P256 / Ed25519)** or **FIPS 140-2 Level 3 HSM**.
-  3. The browser uses **WebAuthn / FIDO2 hardware tokens** (Touch ID, YubiKey) or authenticated OAuth2 bearer sessions to authorize the backend KMS proxy to sign the release instruction.
+### 1. Storage Backend Abstraction: Sandbox SQLite WAL vs Production PostgreSQL
+* **Runtime Storage Factory:** `get_storage_backend()` in `kuber_recon/storage.py` dynamically resolves the storage tier:
+  1. `SANDBOX_DEMO`: Employs `SQLiteStorageBackend` configured with Write-Ahead Logging (`PRAGMA journal_mode=WAL`), schema triggers prohibiting row mutation on audit logs, and `PRAGMA busy_timeout=5000` for deterministic, zero-dependency local testing.
+  2. `STAGING` / `PRODUCTION`: Strictly selects `PostgreSQLStorageBackend` using connection pooling, transactional `SELECT FOR UPDATE` row locks, and unique multi-column constraints `(tenant_id, contract_id)` and `(tenant_id, webhook_event_id)`. Attempting to boot production with SQLite fails immediately at application startup.
 
-### 2. State Store Architecture: Prototype vs Production
-* **Prototype State Store:** **SQLite with WAL Mode** (`PRAGMA busy_timeout = 5000`) and schema triggers for atomic CAS transitions and append-only audit logging. This provides zero-dependency local reproducibility for judges.
-* **Production State Store:** Core ledger state requires a distributed transactional database with serializable isolation (e.g., **PostgreSQL with PgBouncer** or **Google Cloud Spanner**).
+### 2. Key Custody: Server-Side Ed25519 Custodian vs Production AWS KMS
+* **Runtime Key Custodian Factory:** `get_key_custodian()` in `kuber_recon/security.py` resolves cryptographic signing custody:
+  1. `SANDBOX_DEMO`: `SoftwareEd25519Custodian` uses Python's `cryptography` hazmat library to execute Ed25519 signatures on the backend. The browser holds zero private keys.
+  2. `STAGING` / `PRODUCTION`: `AWSKMSKeyCustodian` binds to AWS KMS asymmetric key endpoints (`ECC_NIST_P256` / `Ed25519`) using AWS SDK / SigV4, implementing fail-closed error handling (KmsTimeout, MalformedPayload, AccessDenied). In production mode, software key fallbacks are strictly prohibited.
+
+### 3. Durable Transactional Outbox & Kafka Publisher Boundary
+* **Runtime Publisher Interface:** `MessagePublisher` and `OutboxPublisher` in `kuber_recon/events.py` decouple database mutations from event broadcast:
+  1. State transitions are committed transactionally to the outbox with status `PENDING`.
+  2. The background outbox publisher transitions events to `IN_FLIGHT`, pushes to `KafkaTopicPublisher` (or `DeterministicFakePublisher` in sandbox), and marks them `PUBLISHED` upon broker ACK.
+  3. Events exceeding max retries are automatically routed to the Dead Letter Queue (`DLQ`) for operator remediation.
+
+### 4. Global Multi-Cluster Ambiguity Detection
+* **Cross-Cluster Conflict Resolution:** Rather than greedily accepting matches in the first alphabetical partition cluster, `ClusteredReconciliationPipeline` in `kuber_recon/engine.py` probes candidate subsets across all clusters (cross-GSTIN and cross-date windows).
+* **Deterministic Refusal:** If a bank credit matches valid candidate subsets across $>1$ cluster, both matches are rejected with `AMBIGUOUS_COLLISION`, preventing wrong joins across corporate branches.
 
 ---
 

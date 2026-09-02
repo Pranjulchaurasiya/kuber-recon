@@ -131,4 +131,4 @@ The threat model mitigations are continuously verified via two independent autom
    ```powershell
    python -m kuber_recon.judge_demo
    ```
-   *Executes complete settlement lifecycle and proves all 9 adversarial attack vectors are blocked with 100% invariant passes.*
+   *Executes complete settlement lifecycle and proves all 10 adversarial attack vectors are blocked with 100% invariant passes.*

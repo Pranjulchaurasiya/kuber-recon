@@ -40,10 +40,10 @@ def execute_judge_suite(iteration: int = 1, total_iterations: int = 1) -> bool:
         temp_capital_db = temp_path / f"judge_capital_run{iteration}.db"
 
         # Explicitly rewire server global stores to pristine temporary databases
-        srv.WebhookIdempotencyStore.DB_FILE = temp_idemp_db
-        srv.idempotency_store = WebhookIdempotencyStore()
+        srv.idempotency_store = WebhookIdempotencyStore(db_path=temp_idemp_db)
         srv.capital_facility_manager = CapitalFacilityManager(db_path=temp_capital_db)
         srv.razorpay_adapter.is_live = False
+
 
         if iteration == 1:
             print("=" * 80)

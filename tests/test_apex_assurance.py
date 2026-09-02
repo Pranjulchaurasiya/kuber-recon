@@ -35,6 +35,9 @@ def _tmp_db(tmp_path, monkeypatch):
     import kuber_recon.server as srv
     monkeypatch.setattr(srv.razorpay_adapter, "is_live", False)
     srv.idempotency_store = WebhookIdempotencyStore()
+    import sys
+    this_mod = sys.modules[__name__]
+    monkeypatch.setattr(this_mod, "idempotency_store", srv.idempotency_store)
     yield
 
 
@@ -480,6 +483,8 @@ def test_apex_contract_lifecycle_polling_to_released(client):
         },
     )
     assert d_resp.status_code == 200
+
+
     assert d_resp.json()["assertions_passed"] is True
 
     # 3. Release Hold (Sign with CFO key)

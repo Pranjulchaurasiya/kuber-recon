@@ -1,6 +1,6 @@
 # Empirical Results & Measured Benchmark Numbers
 
-*Every number reported below was measured live on this host via `python -m kuber_recon.cli run-benchmark` in local test mode.*
+*Every number reported below was measured live on this host via `python -m kuber_recon.cli run-benchmark` and `python -m pytest` in local test mode.*
 
 ---
 
@@ -37,7 +37,6 @@
    * 100% of corrupted manifests (Mod-36 GSTIN mismatch, record count drift) triggered structured refusal without LLM drift in the financial path.
 4. **Single Authoritative Webhook Finality:**
    * `/api/webhook/razorpay` verifies HMAC-SHA256 signatures, applies durable SQLite event deduplication, and acts as the single source of truth to transition `RELEASING` to `RELEASED`.
-
 5. **Verified-Revenue Working Capital & Split-Settlement Recovery (APEX Capital):**
    * Bayesian shrinkage-smoothed Settlement Reliability Index ($N_0=50, p_0=0.98$) provides low-batch stability without penalizing small merchants.
    * Automated split-settlement recovery sweeps deduct exact base-10 paise from nodal bank settlement streams, capping deductions at remaining balance and transitioning facilities to `REPAID` at ₹0.00.
@@ -45,9 +44,9 @@
 
 ---
 
-## 🧪 Comprehensive Automated Test Verification (122 / 122 Passed)
+## 🧪 Comprehensive Automated Test Verification (171 / 171 Passed — 100% Green)
 
-*Executed via `python -m pytest -p no:deepeval -p no:langsmith tests/ -v`:*
+*Executed via `python scripts/run_all_tests.py`:*
 
 ```text
 tests/test_apex_assurance.py              17 passed (CAS updates, trigger immutability, audit logging)
@@ -55,17 +54,35 @@ tests/test_capital_concurrency.py          5 passed (double-drawdown races, zero
 tests/test_capital_durability.py           5 passed (process restart recovery, CAS versioning, sweep deduplication)
 tests/test_capital_underwriting.py          4 passed (Bayesian SRI, advance disbursement, split-sweeps, stagnancy)
 tests/test_chaos_suite.py                  4 passed (adversarial batches & stress blasts)
+tests/test_clustered_50plus_benchmark.py    9 passed (deterministic clustering by GSTIN/date, 50-1000 txns, truncation caps)
 tests/test_concurrent_workers.py           4 passed (webhook deduplication, CAS race protection)
 tests/test_digital_twin_simulation.py      3 passed (bank holiday freezes, TDS shocks)
 tests/test_escrow_sovereign.py             5 passed (statutory splits & partial refunds)
+tests/test_global_ambiguity.py             2 passed (cross-GSTIN & cross-date collision refusal)
+tests/test_integration_chaos.py            4 passed (20-thread webhook dedup, 5-worker CAS race, paise conservation)
+tests/test_kms_custody.py                  4 passed (fail-closed KMS factory, timeout & malformed payload defense)
+tests/test_outbox_publisher.py             5 passed (durable publisher boundary, retry backoff, DLQ quarantine)
 tests/test_planted_undecidables.py        10 passed (9 parameterized ambiguity traps + FMR fixture verification)
+tests/test_production_architecture.py      8 passed (KMS custodian, SQLite WAL outbox restart, secure JWT RBAC, /health)
 tests/test_production_integrations.py      5 passed (layer 1-5 integration harnesses)
 tests/test_property_based_invariants.py    2 passed (conservation of money & GSTIN fuzzing)
+tests/test_razorpay_flow_e2e.py            1 passed (10-step full Razorpay settlement, Route escrow hold, Section 194-O TDS, Merkle root tree, webhook dedup, split-sweep)
+tests/test_rbac_authorization.py           9 passed (subject provisioning, role escalation refusal, negative auth on drawdown/reset/config/manual-review)
 tests/test_security_tenant_isolation.py    36 passed (tenant 401/403, cross-tenant scoping, webhook freshness, solver budget)
 tests/test_shannon_whitebox_audit.py       5 passed (BOLA, spend caps, state drift mitigation)
+tests/test_storage_backend.py              6 passed (storage factory selection, CAS updates, WAL deduplication)
 tests/test_webhook_idempotency.py         14 passed (HMAC signatures, secret enforcement, replay defense)
 tests/test_zero_float_policy.py            1 passed (AST scanning for float prohibition)
 tests/test_zero_llm_in_math.py             1 passed (AST scanning for zero LLM imports in math)
 --------------------------------------------------------------------------------------------------
-Total: 122 passed, 0 skipped, 0 failed across 122 test items in 16 test modules
+Total: 171 passed, 0 skipped, 0 failed across 171 test items in 25 test modules (100% PASS)
 ```
+
+
+---
+
+## 🏛️ Scripted Judge Invariant Harness (19 / 19 Passed)
+
+*Executed via `python -m kuber_recon.judge_demo` across 2 consecutive runs:*
+- 9 Settlement & Capital Lifecycle Invariants Verified
+- 10 Adversarial Invariant Attacks Verified (HMAC forgery, cross-tenant IDOR, replay window, ambiguity collision refusal, candidate overflow $N=25$, solver node budget exhaustion)

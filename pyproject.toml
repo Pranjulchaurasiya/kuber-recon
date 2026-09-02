@@ -17,6 +17,7 @@ dependencies = [
     "requests>=2.31.0",
     "httpx>=0.27.0",
     "python-dotenv>=1.0.0",
+    "psycopg2-binary>=2.9.0",
 ]
 
 [project.optional-dependencies]
@@ -49,3 +50,5 @@ packages = ["src/kuber_recon"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
+addopts = "-p no:deepeval -p no:langsmith"
+

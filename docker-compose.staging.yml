@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # ── Multi-AZ / PostgreSQL Database ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: kuber_postgres_staging
+    environment:
+      POSTGRES_USER: kuber_admin
+      POSTGRES_PASSWORD: kuber_secure_staging_password_2026
+      POSTGRES_DB: kuber_recon_staging
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kuber_admin -d kuber_recon_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Distributed Lock & Cache Layer ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: kuber_redis_staging
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── KuberRecon FastAPI Engine ──────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kuber_backend_staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      KUBER_ENV: STAGING
+      DATABASE_URL: postgresql+psycopg2://kuber_admin:kuber_secure_staging_password_2026@postgres:5432/kuber_recon_staging
+      REDIS_URL: redis://redis:6379/0
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_staging_dummy}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_secret_staging_dummy}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-whsec_staging_controlled_secret}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-staging_jwt_signing_secret_hmac_256}
+      USE_AWS_KMS: "false"
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://frontend:3000"
+    ports:
+      - "8000:8000"
+    restart: on-failure
+
+  # ── Next.js Console & Merchant Dashboard ────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kuber_frontend_staging
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    restart: on-failure
+
+  # ── Observability: Prometheus Metric Scraper ────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kuber_prometheus_staging
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - backend
+
+volumes:
+  postgres_staging_data:

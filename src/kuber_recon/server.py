@@ -48,7 +48,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import traceback
 
 try:
-    from fastapi import FastAPI, Header, HTTPException, Request, status
+    from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
     from pydantic import BaseModel, Field
@@ -71,125 +71,63 @@ from kuber_recon.capital import (
     FacilityStatus,
 )
 from kuber_recon.client import RazorpayClientAdapter
-from kuber_recon.engine import AmbiguousMatchError, HorowitzSahniSubsetSumSolver, ReconciliationEngine
+from kuber_recon.config import EnvironmentMode, config
+from kuber_recon.engine import (
+    AmbiguousMatchError,
+    ClusteredReconciliationPipeline,
+    HorowitzSahniSubsetSumSolver,
+    ReconciliationBatchMetrics,
+    ReconciliationEngine,
+)
 from kuber_recon.escrow import KuberSovereignEscrowEngine
 from kuber_recon.generator import ChaosDataGenerator
-from kuber_recon.security import SoftwareEd25519Custodian
+from kuber_recon.metrics import metrics
+from kuber_recon.security import (
+    DualAuthorizationEngine,
+    PROVISIONED_SUBJECTS,
+    SoftwareEd25519Custodian,
+    UserRole,
+    create_access_token,
+    decode_access_token,
+    get_key_custodian,
+)
 from kuber_recon.simulation import FinancialDigitalTwin
-from kuber_recon.types import paise_to_inr_decimal
+from kuber_recon.storage import SQLiteStorageBackend, StorageBackend, get_storage_backend
+from kuber_recon.types import InvoiceRecord, BankNodalCredit, paise_to_inr_decimal
 
-# ── SQLite-Backed Durable Idempotency & Contract Store ────────────────────────
+# ── Unified Durable Storage & Idempotency Store ───────────────────────────────
 
 class WebhookIdempotencyStore:
     """
-    Durable SQLite idempotency guard for Razorpay webhooks & APEX contracts.
-    Uses atomic INSERT & UNIQUE constraints to prevent race conditions.
+    Unified idempotency & contract store for Razorpay webhooks & APEX contracts.
+    Delegates 100% of persistence to StorageBackend (SQLite WAL in sandbox, PostgreSQL in staging/production).
+    Contains zero direct SQLite driver dependencies.
     """
 
     DB_FILE = Path(__file__).parent / "kuber_idempotency.db"
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        backend: Optional[StorageBackend] = None,
+        db_path: Optional[Union[str, Path]] = None,
+    ) -> None:
         self._lock = RLock()
-        self._init_db()
+        if backend is not None:
+            self.backend = backend
+        elif db_path is not None:
+            self.backend = SQLiteStorageBackend(str(db_path))
+        else:
+            self.backend = get_storage_backend(str(self.DB_FILE) if self.DB_FILE else None)
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.DB_FILE), check_same_thread=False)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")  # 5s busy timeout for concurrent writers
-        return conn
-
-    def _init_db(self) -> None:
-        with self._lock, self._connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS processed_events (
-                    event_id TEXT PRIMARY KEY,
-                    received_at INTEGER NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS apex_contracts (
-                    contract_id TEXT PRIMARY KEY,
-                    tenant_id TEXT DEFAULT 'merchant_rzp_primary',
-                    buyer_agent_id TEXT NOT NULL,
-                    seller_agent_id TEXT NOT NULL,
-                    seller_account_id TEXT NOT NULL,
-                    amount_paise INTEGER NOT NULL,
-                    expected_record_count INTEGER,
-                    status TEXT NOT NULL,
-                    payment_id TEXT,
-                    transfer_id TEXT,
-                    webhook_event_id TEXT,
-                    on_hold INTEGER NOT NULL,
-                    on_hold_until INTEGER NOT NULL,
-                    assertions_passed INTEGER NOT NULL,
-                    refusal_reason TEXT,
-                    proof_hash TEXT,
-                    version INTEGER DEFAULT 1,
-                    created_at INTEGER NOT NULL,
-                    release_started_at INTEGER
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS apex_contract_audit_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    contract_id TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    proof_hash TEXT,
-                    assertions_passed INTEGER,
-                    timestamp INTEGER NOT NULL
-                )
-                """
-            )
-            # Enforce append-only immutability at SQLite engine level
-            conn.execute(
-                """
-                CREATE TRIGGER IF NOT EXISTS abort_audit_log_update
-                BEFORE UPDATE ON apex_contract_audit_log
-                BEGIN
-                    SELECT RAISE(ABORT, 'apex_contract_audit_log is append-only: mutations prohibited');
-                END;
-                """
-            )
-            conn.execute(
-                """
-                CREATE TRIGGER IF NOT EXISTS abort_audit_log_delete
-                BEFORE DELETE ON apex_contract_audit_log
-                BEGIN
-                    SELECT RAISE(ABORT, 'apex_contract_audit_log is append-only: deletions prohibited');
-                END;
-                """
-            )
-            # Migration checks: add tenant_id, release_started_at, expected_record_count if missing
-            with contextlib.suppress(Exception):
-                conn.execute("ALTER TABLE apex_contracts ADD COLUMN tenant_id TEXT DEFAULT 'merchant_rzp_primary'")
-            with contextlib.suppress(Exception):
-                conn.execute("ALTER TABLE apex_contracts ADD COLUMN release_started_at INTEGER")
-            with contextlib.suppress(Exception):
-                conn.execute("ALTER TABLE apex_contracts ADD COLUMN expected_record_count INTEGER")
-            # Indexes supporting tenant-isolated queries and CAS operations
-            with contextlib.suppress(Exception):
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_apex_contracts_tenant_id ON apex_contracts(tenant_id)")
-            with contextlib.suppress(Exception):
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_apex_contracts_tenant_status ON apex_contracts(tenant_id, status)")
-            with contextlib.suppress(Exception):
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_apex_contracts_tenant_expiry ON apex_contracts(tenant_id, on_hold_until)")
-
+    def _connect(self):
+        if hasattr(self.backend, "_connect"):
+            return self.backend._connect()
+        raise AttributeError("StorageBackend does not expose direct connection")
 
     def try_insert(self, event_id: str) -> bool:
-        with self._lock, self._connect() as conn:
-            try:
-                conn.execute(
-                    "INSERT INTO processed_events (event_id, received_at) VALUES (?, ?)",
-                    (event_id, int(time.time())),
-                )
-                return True
-            except sqlite3.IntegrityError:
-                return False
+
+
+        return self.backend.try_insert_webhook_event(event_id)
 
     def transition_contract_state(
         self,
@@ -209,184 +147,78 @@ class WebhookIdempotencyStore:
         release_started_at: int | None = None,
         expected_record_count: int | None = None,
     ) -> bool:
-        """
-        Centralized, CAS-protected state transition for apex_contracts with tenant isolation.
-        Appends atomically to apex_contract_audit_log in the same transaction.
-        All lifecycle mutations (HELD, VERIFYING, REFUSED, RELEASING, RELEASED,
-        RELEASE_PENDING_RECONCILIATION, EXPIRED_HOLD) must use this function.
-        Validates expected_status and expected_version, performs conditional CAS update,
-        increments version exactly once, and rolls back both operations on failure.
-        """
-        now = int(time.time())
-        with self._lock, self._connect() as conn:
-            where_check = "SELECT version, status, proof_hash, assertions_passed, on_hold FROM apex_contracts WHERE contract_id = ?"
-            params_check = [contract_id]
-            if tenant_id is not None:
-                where_check += " AND tenant_id = ?"
-                params_check.append(tenant_id)
-            cur = conn.execute(where_check, tuple(params_check))
-            row = cur.fetchone()
-            if not row:
-                return False
-            curr_ver, curr_status, curr_proof, curr_assertions, curr_on_hold = row
-
-            if expected_version is not None and curr_ver != expected_version:
-                return False
-
-            if expected_status is not None:
-                if isinstance(expected_status, (list, tuple, set)):
-                    if curr_status not in expected_status:
-                        return False
-                else:
-                    if curr_status != expected_status:
-                        return False
-
-            set_clauses = ["status = ?", "version = version + 1"]
-            params: list[Any] = [target_status]
-
-            if transfer_id is not None:
-                set_clauses.append("transfer_id = ?")
-                params.append(transfer_id)
-            if webhook_event_id is not None:
-                set_clauses.append("webhook_event_id = ?")
-                params.append(webhook_event_id)
-            if on_hold is not None:
-                set_clauses.append("on_hold = ?")
-                params.append(1 if on_hold else 0)
-            if on_hold_until is not None:
-                set_clauses.append("on_hold_until = ?")
-                params.append(on_hold_until)
-            if assertions_passed is not None:
-                set_clauses.append("assertions_passed = ?")
-                params.append(1 if assertions_passed else 0)
-            if refusal_reason is not None:
-                set_clauses.append("refusal_reason = ?")
-                params.append(refusal_reason)
-            if proof_hash is not None:
-                set_clauses.append("proof_hash = ?")
-                params.append(proof_hash)
-            if release_started_at is not None:
-                set_clauses.append("release_started_at = ?")
-                params.append(release_started_at)
-            if expected_record_count is not None:
-                set_clauses.append("expected_record_count = ?")
-                params.append(expected_record_count)
-
-            where_clauses = ["contract_id = ?"]
-            params.append(contract_id)
-            if tenant_id is not None:
-                where_clauses.append("tenant_id = ?")
-                params.append(tenant_id)
-            if expected_version is not None:
-                where_clauses.append("version = ?")
-                params.append(expected_version)
-            if expected_status is not None:
-                if isinstance(expected_status, (list, tuple, set)):
-                    placeholders = ",".join("?" for _ in expected_status)
-                    where_clauses.append(f"status IN ({placeholders})")
-                    params.extend(expected_status)
-                else:
-                    where_clauses.append("status = ?")
-                    params.append(expected_status)
-
-            update_sql = f"UPDATE apex_contracts SET {', '.join(set_clauses)} WHERE {' AND '.join(where_clauses)}"
-            update_cur = conn.execute(update_sql, tuple(params))
-            if update_cur.rowcount == 0:
-                return False
-
-            final_proof = proof_hash if proof_hash is not None else curr_proof
-            final_assertions = (1 if assertions_passed else 0) if assertions_passed is not None else curr_assertions
-
-            # Append immutable audit entry
-            conn.execute(
-                """
-                INSERT INTO apex_contract_audit_log (
-                    contract_id, status, proof_hash, assertions_passed, timestamp
-                ) VALUES (?, ?, ?, ?, ?)
-                """,
-                (contract_id, target_status, final_proof or "", final_assertions, now),
-            )
-            return True
+        return self.backend.transition_contract_state(
+            contract_id=contract_id,
+            expected_status=expected_status,
+            target_status=target_status,
+            expected_version=expected_version,
+            tenant_id=tenant_id,
+            transfer_id=transfer_id,
+            webhook_event_id=webhook_event_id,
+            on_hold=on_hold,
+            on_hold_until=on_hold_until,
+            assertions_passed=assertions_passed,
+            refusal_reason=refusal_reason,
+            proof_hash=proof_hash,
+            release_started_at=release_started_at,
+            expected_record_count=expected_record_count,
+        )
 
     def save_contract(self, c: AssuranceContract, tenant_id: str = "merchant_rzp_primary") -> None:
         """Create a new contract or update an existing contract with audit logging and tenant isolation."""
-        with self._lock, self._connect() as conn:
-            cur = conn.execute("SELECT contract_id, version FROM apex_contracts WHERE contract_id = ?", (c.contract_id,))
-            row = cur.fetchone()
-            if row:
-                # If updating existing contract, route through transition_contract_state
-                curr_ver = row[1]
-                self.transition_contract_state(
-                    contract_id=c.contract_id,
-                    expected_status=None,
-                    target_status=c.status.value,
-                    expected_version=curr_ver,
-                    tenant_id=tenant_id,
-                    transfer_id=c.transfer_id,
-                    webhook_event_id=c.webhook_event_id,
-                    on_hold=c.on_hold,
-                    on_hold_until=c.on_hold_until,
-                    assertions_passed=c.assertions_passed,
-                    refusal_reason=c.refusal_reason,
-                    proof_hash=c.proof_hash,
-                    release_started_at=c.release_started_at,
-                    expected_record_count=c.expected_record_count,
-                )
-            else:
-                now = int(time.time())
-                conn.execute(
-                    """
-                    INSERT INTO apex_contracts (
-                        contract_id, tenant_id, buyer_agent_id, seller_agent_id, seller_account_id,
-                        amount_paise, expected_record_count, status, payment_id, transfer_id, webhook_event_id, on_hold, on_hold_until,
-                        assertions_passed, refusal_reason, proof_hash, version, created_at, release_started_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        c.contract_id, tenant_id, c.buyer_agent_id, c.seller_agent_id, c.seller_account_id,
-                        c.amount_paise, c.expected_record_count, c.status.value, c.payment_id, c.transfer_id, c.webhook_event_id, 1 if c.on_hold else 0,
-                        c.on_hold_until, 1 if c.assertions_passed else 0, c.refusal_reason,
-                        c.proof_hash, c.version, c.created_at, c.release_started_at,
-                    ),
-                )
-                # Initial immutable audit log entry for contract creation (HELD)
-                conn.execute(
-                    """
-                    INSERT INTO apex_contract_audit_log (
-                        contract_id, status, proof_hash, assertions_passed, timestamp
-                    ) VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (c.contract_id, c.status.value, c.proof_hash or "", 1 if c.assertions_passed else 0, now),
-                )
+        existing = self.backend.get_contract(c.contract_id, tenant_id=tenant_id)
+        if existing:
+            curr_ver = existing.get("version", 1)
+            self.backend.transition_contract_state(
+                contract_id=c.contract_id,
+                expected_status=None,
+                target_status=c.status.value,
+                expected_version=curr_ver,
+                tenant_id=tenant_id,
+                transfer_id=c.transfer_id,
+                webhook_event_id=c.webhook_event_id,
+                on_hold=c.on_hold,
+                on_hold_until=c.on_hold_until,
+                assertions_passed=c.assertions_passed,
+                refusal_reason=c.refusal_reason,
+                proof_hash=c.proof_hash,
+                release_started_at=c.release_started_at,
+                expected_record_count=c.expected_record_count,
+            )
+        else:
+            self.backend.insert_contract(
+                contract_id=c.contract_id,
+                tenant_id=tenant_id,
+                status=c.status.value,
+                transfer_id=c.transfer_id,
+                amount_paise=c.amount_paise,
+                fee_paise=0,
+                on_hold=c.on_hold,
+                on_hold_until=c.on_hold_until,
+                settlement_id=None,
+                recipient_account=c.seller_account_id,
+                expected_record_count=c.expected_record_count,
+                buyer_agent_id=c.buyer_agent_id,
+                seller_agent_id=c.seller_agent_id,
+                seller_account_id=c.seller_account_id,
+            )
+
 
     def get_contract(self, contract_id: str, tenant_id: str | None = None) -> dict[str, Any] | None:
-        with self._lock, self._connect() as conn:
-            conn.row_factory = sqlite3.Row
-            if tenant_id:
-                cur = conn.execute("SELECT * FROM apex_contracts WHERE contract_id = ? AND tenant_id = ?", (contract_id, tenant_id))
-            else:
-                cur = conn.execute("SELECT * FROM apex_contracts WHERE contract_id = ?", (contract_id,))
-            row = cur.fetchone()
-            if not row:
-                return None
-            d = dict(row)
-            d["on_hold"] = bool(d.get("on_hold", 1))
-            d["assertions_passed"] = bool(d.get("assertions_passed", 0))
-            return d
+        c = self.backend.get_contract(contract_id, tenant_id=tenant_id)
+        if not c:
+            return None
+        c["on_hold"] = bool(c.get("on_hold", 1))
+        c["assertions_passed"] = bool(c.get("assertions_passed", 0))
+        return c
 
     def get_audit_trail(self, contract_id: str) -> list[dict[str, Any]]:
-        with self._lock, self._connect() as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.execute(
-                "SELECT id, contract_id, status, proof_hash, assertions_passed, timestamp FROM apex_contract_audit_log WHERE contract_id = ? ORDER BY id ASC",
-                (contract_id,)
-            )
-            return [dict(r) for r in cur.fetchall()]
+        return self.backend.list_audit_logs(contract_id)
 
     def cas_release_contract(self, contract_id: str, expected_version: int, new_proof_hash: str, tenant_id: str | None = None) -> bool:
-        """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state and start release clock with tenant isolation."""
+        """Atomic Compare-And-Swap (CAS) update to transition to RELEASING state with tenant isolation."""
         now = int(time.time())
-        return self.transition_contract_state(
+        return self.backend.transition_contract_state(
             contract_id=contract_id,
             expected_status=["HELD", "VERIFYING"],
             target_status="RELEASING",
@@ -400,7 +232,7 @@ class WebhookIdempotencyStore:
 
     def cas_finalize_release(self, contract_id: str, webhook_event_id: str) -> bool:
         """Finalize RELEASED state upon authoritative webhook confirmation."""
-        return self.transition_contract_state(
+        return self.backend.transition_contract_state(
             contract_id=contract_id,
             expected_status="RELEASING",
             target_status="RELEASED",
@@ -412,53 +244,8 @@ class WebhookIdempotencyStore:
         """Liveness sweep: force-resolves contracts where on_hold_until <= now with CAS race protection and strict tenant isolation."""
         if not tenant_id:
             raise ValueError("sweep_expired_contracts requires a non-empty tenant_id.")
+        return self.backend.sweep_expired_contracts(tenant_id=tenant_id)
 
-        now = int(time.time())
-        expired_ids: list[str] = []
-        with self._lock, self._connect() as conn:
-            cur = conn.execute(
-                """
-                SELECT contract_id, version FROM apex_contracts
-                WHERE on_hold_until <= ? AND status IN ('HELD', 'VERIFYING', 'REFUSED') AND on_hold = 1 AND tenant_id = ?
-                """,
-                (now, tenant_id),
-            )
-            rows = cur.fetchall()
-
-        for cid, ver in rows:
-            if self.transition_contract_state(
-                contract_id=cid,
-                expected_status=["HELD", "VERIFYING", "REFUSED"],
-                target_status="EXPIRED_HOLD",
-                expected_version=ver,
-                tenant_id=tenant_id,
-                on_hold=True,
-            ):
-                expired_ids.append(cid)
-
-        # Sweep stuck RELEASING contracts to RELEASE_PENDING_RECONCILIATION based on release_started_at (timeout > 5 mins)
-        timeout_threshold = now - 300
-        with self._lock, self._connect() as conn:
-            cur = conn.execute(
-                """
-                SELECT contract_id, version FROM apex_contracts
-                WHERE status = 'RELEASING' AND release_started_at IS NOT NULL AND release_started_at <= ? AND tenant_id = ?
-                """,
-                (timeout_threshold, tenant_id),
-            )
-            releasing_rows = cur.fetchall()
-
-        for cid, ver in releasing_rows:
-            self.transition_contract_state(
-                contract_id=cid,
-                expected_status="RELEASING",
-                target_status="RELEASE_PENDING_RECONCILIATION",
-                expected_version=ver,
-                tenant_id=tenant_id,
-                on_hold=True,
-            )
-
-        return expired_ids
 
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -481,15 +268,39 @@ REGISTERED_TENANTS: Dict[str, str] = {
     "merchant_agent_demo_01": hashlib.sha256("kuber_sandbox_key_agent_01_2026".encode()).hexdigest(),
 }
 
-def verify_tenant_auth(
+class AuthContext(BaseModel):
+    subject: str
+    tenant_id: str
+    roles: List[UserRole]
+
+
+def verify_authenticated_context(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-) -> str:
+) -> AuthContext:
     """
-    Authenticate tenant identity via constant-time hashed API key comparison.
-    Strictly enforces 401 Unauthorized if headers are missing or invalid.
+    Authenticate caller and produce structured AuthContext with verified roles:
+    1. Bearer JWT Token with validated claims.
+    2. API Key mapped to provisioned operator roles.
     """
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:].strip()
+        payload = decode_access_token(token)
+        if payload and payload.tenant_id:
+            return AuthContext(
+                subject=payload.sub,
+                tenant_id=payload.tenant_id,
+                roles=payload.roles,
+            )
+        metrics.record_security_event("unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication Failed: Invalid or expired Bearer JWT token.",
+        )
+
     if not x_merchant_id or not x_api_key:
+        metrics.record_security_event("unauthorized")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication Failed: Missing X-Merchant-Id or X-API-Key header.",
@@ -497,6 +308,7 @@ def verify_tenant_auth(
 
     expected_hash = REGISTERED_TENANTS.get(x_merchant_id)
     if not expected_hash:
+        metrics.record_security_event("unauthorized")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication Failed: Invalid merchant or tenant identifier.",
@@ -504,12 +316,49 @@ def verify_tenant_auth(
 
     provided_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
     if not hmac.compare_digest(provided_hash, expected_hash):
+        metrics.record_security_event("unauthorized")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication Failed: Invalid API key for specified merchant.",
         )
 
-    return x_merchant_id
+    # API key maps to provisioned operator roles
+    provisioned = PROVISIONED_SUBJECTS.get(x_merchant_id, {})
+    roles = provisioned.get("roles", [UserRole.MERCHANT_OPERATOR, UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR])
+    return AuthContext(
+        subject=x_merchant_id,
+        tenant_id=x_merchant_id,
+        roles=roles,
+    )
+
+
+def verify_tenant_auth(
+    auth: AuthContext = Depends(verify_authenticated_context),
+) -> str:
+    """Backward-compatible tenant identifier dependency returning authenticated tenant_id."""
+    return auth.tenant_id
+
+
+def require_roles(*allowed_roles: UserRole):
+    """RBAC Guard dependency requiring caller to possess at least one permitted role."""
+    def dependency(auth: AuthContext = Depends(verify_authenticated_context)) -> AuthContext:
+        if not any(r in auth.roles for r in allowed_roles):
+            metrics.record_security_event("unauthorized")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access Denied: Requires one of {[r.value for r in allowed_roles]}. Caller has {[r.value for r in auth.roles]}.",
+            )
+        return auth
+    return dependency
+
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Enforce strict production readiness invariants at application boot
+    config.validate_production_readiness()
+    logger.info("KuberRecon API Gateway initialized in environment mode: %s", config.environment)
+    yield
 
 
 # ── Singletons ────────────────────────────────────────────────────────────────
@@ -518,6 +367,7 @@ app = FastAPI(
     title="Kuber OS: Autonomous AI Finance Controller API",
     description="Multi-Source Reconciliation, Cryptographic Settlement Assurance & Nodal Recovery (Track 04: AI Finance Controller · Razorpay AI Buildathon 2026)",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 allowed_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://kuber-os.vercel.app")
@@ -691,6 +541,7 @@ def _fmt_paise(paise: int) -> str:
 
 # ── Core Endpoints ────────────────────────────────────────────────────────────
 
+@app.get("/health")
 @app.get("/api/health")
 def health():
     return {
@@ -704,16 +555,122 @@ def health():
     }
 
 
+@app.get("/metrics")
+def prometheus_metrics():
+    """Export Prometheus scrape metrics in line protocol."""
+    return Response(content=metrics.render_prometheus_text(), media_type="text/plain; version=0.0.4")
+
+
 @app.get("/api/integration-status", response_model=IntegrationStatusResponse)
 def integration_status():
     webhook_secret_set = os.getenv("RAZORPAY_WEBHOOK_SECRET") is not None
+    backend_info = idempotency_store.backend.health_check()
     return IntegrationStatusResponse(
         mode="test_mode" if razorpay_adapter.is_live else "sandbox_simulation",
         razorpay_api_live=razorpay_adapter.is_live,
         webhook_secret_configured=webhook_secret_set,
-        idempotency_backend=f"SQLite (local durable) — {WebhookIdempotencyStore.DB_FILE.name}",
+        idempotency_backend=f"{backend_info['backend']} ({backend_info['status']})",
         fmr="0.000",
     )
+
+
+class TokenIssueRequest(BaseModel):
+    subject: str = "cfo_demo_operator"
+    tenant_id: str = "merchant_rzp_primary"
+    roles: List[UserRole] = [UserRole.MERCHANT_OPERATOR, UserRole.FINANCE_REVIEWER]
+
+
+class TokenIssueResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in_seconds: int = 3600
+    tenant_id: str
+    roles: List[str]
+
+
+@app.post("/api/v2/auth/token", response_model=TokenIssueResponse)
+def issue_sandbox_jwt_token(
+    req: TokenIssueRequest,
+    auth: AuthContext = Depends(verify_authenticated_context),
+):
+    """Generate signed JWT access token based on provisioned identity registry."""
+    # Strict anti-spoofing: Caller can only mint tokens for their own authenticated tenant
+    if req.tenant_id != auth.tenant_id:
+        metrics.record_security_event("unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Authorization Error: Caller '{auth.tenant_id}' cannot mint tokens for tenant '{req.tenant_id}'.",
+        )
+
+    provisioned = PROVISIONED_SUBJECTS.get(req.subject)
+    if not provisioned:
+        metrics.record_security_event("unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Identity Error: Subject '{req.subject}' is not provisioned in identity registry.",
+        )
+
+    # Anti-cross-tenant: subject must belong to caller's authenticated tenant
+    if provisioned["tenant_id"] != auth.tenant_id:
+        metrics.record_security_event("unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Authorization Error: Caller '{auth.tenant_id}' cannot mint tokens for subject '{req.subject}' bound to '{provisioned['tenant_id']}'.",
+        )
+
+    # Strict RBAC boundary: caller cannot claim roles beyond what is provisioned for this subject
+    allowed_roles = set(provisioned["roles"])
+    requested_roles = set(req.roles) if req.roles else allowed_roles
+    unauthorized_roles = requested_roles - allowed_roles
+
+    if unauthorized_roles:
+        metrics.record_security_event("unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Role Escalation Denied: Subject '{req.subject}' is not provisioned for roles {[r.value for r in unauthorized_roles]}.",
+        )
+
+    granted_roles = list(requested_roles)
+    token = create_access_token(
+        subject=req.subject,
+        tenant_id=auth.tenant_id,
+        roles=granted_roles,
+    )
+    return TokenIssueResponse(
+        access_token=token,
+        tenant_id=auth.tenant_id,
+        roles=[r.value for r in granted_roles],
+    )
+
+
+class ClusteredBatchReconcileRequest(BaseModel):
+    records: int = Field(default=100, ge=10, le=10000)
+    seed: int = 42
+
+
+@app.post("/api/v2/reconcile/batch-clustered", response_model=ReconciliationBatchMetrics)
+def reconcile_large_batch_clustered(
+    req: ClusteredBatchReconcileRequest,
+    tenant_id: str = Depends(verify_tenant_auth),
+):
+    """
+    Process 50+ to 10,000+ record datasets using deterministic partition clustering &
+    Horowitz-Sahni Meet-in-the-Middle subset-sum matching.
+    """
+    generator = ChaosDataGenerator(seed=req.seed)
+    invoices, bank_credits, _, _ = generator.generate_suite(num_records=req.records)
+
+    pipeline = ClusteredReconciliationPipeline()
+    reconciled, exceptions, batch_metrics = pipeline.process_large_batch(bank_credits, invoices)
+    
+    # Record metrics in Prometheus registry
+    metrics.record_reconciliation(
+        paise=batch_metrics.total_reconciled_paise,
+        duration_ms=batch_metrics.total_runtime_ms,
+    )
+    
+    return batch_metrics
+
 
 
 @app.post("/api/intercept", response_model=InterceptResponse)
@@ -1109,11 +1066,16 @@ def apex_deliver_payload(req: DeliverContractRequest, tenant_id: str = Depends(v
 
 
 @app.post("/api/apex/contracts/release")
-def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depends(verify_tenant_auth)):
+def apex_release_settlement(
+    req: ReleaseContractRequest,
+    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR)),
+):
     """
     Step 3: Release Route Settlement with Anti-Collusion & CAS Concurrency Safety.
     Executes PATCH /v1/transfers/{id} with on_hold: false.
+    Requires role: FINANCE_REVIEWER, RISK_OFFICER, or ADMINISTRATOR.
     """
+    tenant_id = auth.tenant_id
     contract_data = idempotency_store.get_contract(req.contract_id, tenant_id=tenant_id)
     if not contract_data:
         raise HTTPException(status_code=404, detail="Contract not found for authenticated tenant.")
@@ -1147,8 +1109,9 @@ def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depend
             detail="Precondition Failed: Cannot release settlement: delivery assertions have not passed. Transfer remains on hold.",
         )
 
-    # 3. Cryptographic Maker/Checker Authentication (Strict RFC 8032 Client-Signed Verification)
-    is_verified = SoftwareEd25519Custodian.verify_client_signature(
+    # 3. Cryptographic Maker/Checker Authentication via Enterprise Key Custodian
+    custodian = get_key_custodian()
+    is_verified = custodian.verify_client_signature(
         checker_id=req.checker_id,
         contract_id=req.contract_id,
         leaf_hash=contract_data["proof_hash"],
@@ -1159,7 +1122,7 @@ def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depend
     if not is_verified:
         raise HTTPException(
             status_code=403,
-            detail="Ed25519 Cryptographic Verification Failed: Client-supplied signature is invalid, corrupted, or did not sign the canonical assertion payload.",
+            detail=f"Cryptographic Verification Failed ({custodian.algorithm}): Client-supplied signature is invalid, corrupted, or did not sign the canonical assertion payload.",
         )
 
     # 4. Atomic CAS State Update (Transition to RELEASING)
@@ -1199,7 +1162,7 @@ def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depend
             "public_key_hex": req.public_key_hex,
             "signature_hex": req.signature_hex,
             "signature_verified": True,
-            "algorithm": "Ed25519 (RFC 8032 - Client Verified)",
+            "algorithm": custodian.algorithm,
             "proof_hash": f"sha256:{new_proof}",
             "message": "Route Transfer hold release failed at gateway. Marked for manual reconciliation.",
         }
@@ -1217,7 +1180,7 @@ def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depend
         "public_key_hex": req.public_key_hex,
         "signature_hex": req.signature_hex,
         "signature_verified": True,
-        "algorithm": "RFC 8032 Ed25519",
+        "algorithm": custodian.algorithm,
         "proof_hash": f"sha256:{new_proof}",
         "message": "Razorpay Route hold release triggered (PATCH on_hold: false). Contract transitioned to RELEASING, awaiting final transfer.processed webhook.",
     }
@@ -1225,15 +1188,17 @@ def apex_release_settlement(req: ReleaseContractRequest, tenant_id: str = Depend
 
 @app.get("/api/apex/signer/public-key")
 def get_signer_public_key():
-    """Expose public verification key for the local software demo signer."""
-    custodian = SoftwareEd25519Custodian()
+    """Expose public verification key for the configured key custodian."""
+    custodian = get_key_custodian(key_id="demo_software_ed25519_v1")
+
+    is_prod_kms = custodian.algorithm == "ECDSA_SHA_256"
     return {
-        "key_id": "demo_software_ed25519_v1",
-        "algorithm": "Ed25519",
-        "custody_type": "Local Software Memory Demo Signer",
+        "key_id": getattr(custodian, "key_id", "kuber_signer_key"),
+        "algorithm": custodian.algorithm,
+        "custody_type": "Enterprise AWS KMS (FIPS 140-2 Level 3)" if is_prod_kms else "Local Software Memory Demo Signer",
         "public_key_hex": custodian.public_key_hex,
-        "is_production_kms": False,
-        "disclaimer": "Demonstration key held in backend process memory. Not backed by AWS KMS / CloudHSM.",
+        "is_production_kms": is_prod_kms,
+        "disclaimer": "Backed by AWS KMS HSM in PRODUCTION; Local demonstration key in SANDBOX_DEMO.",
     }
 
 
@@ -1246,10 +1211,17 @@ def sign_contract_demo(
     
     Verifies:
     1. Authenticated tenant owns the contract.
-    2. Contract state is DELIVERED.
+    2. Contract state is DELIVERED / VERIFYING.
     3. Delivery assertion is present.
     4. Has not been previously released.
+    5. Prohibited in PRODUCTION mode (fails closed with 403).
     """
+    if config.environment == EnvironmentMode.PRODUCTION:
+        raise HTTPException(
+            status_code=403,
+            detail="Demonstration signing is strictly disabled in PRODUCTION mode. Production requires authenticated AWS KMS signing.",
+        )
+
     contract_data = idempotency_store.get_contract(contract_id, tenant_id=tenant_id)
     if not contract_data:
         raise HTTPException(status_code=404, detail="Contract not found for authenticated tenant.")
@@ -1265,7 +1237,8 @@ def sign_contract_demo(
     now = datetime.now(timezone.utc)
     request_id = f"req_sign_{uuid.uuid4().hex[:12]}"
 
-    custodian = SoftwareEd25519Custodian(key_id="cfo_autonomous_verifier")
+    custodian = get_key_custodian(key_id="cfo_autonomous_verifier")
+
     leaf_hash = contract_data.get("proof_hash") or contract_data.get("delivery_proof_hash") or ""
     
     # Build deterministic canonical assertion payload
@@ -1289,13 +1262,19 @@ def sign_contract_demo(
         "public_key_hex": cert.public_key_hex,
         "signed_at": now.isoformat(),
         "canonical_payload": cert.canonical_payload,
-        "signer_label": "Local Demo Signer (Backend Hazmat)",
+        "signer_label": f"{custodian.algorithm} ({'AWS KMS' if custodian.algorithm == 'ECDSA_SHA_256' else 'Local Ed25519 Custodian'})",
     }
 
 
 @app.post("/api/apex/contracts/sweep-expired")
-def apex_sweep_expired(tenant_id: str = Depends(verify_tenant_auth)):
-    """Liveness sweep: force-resolves expired contracts to EXPIRED_HOLD strictly for authenticated tenant."""
+def apex_sweep_expired(
+    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.ADMINISTRATOR)),
+):
+    """
+    Liveness sweep: force-resolves expired contracts to EXPIRED_HOLD strictly for authenticated tenant.
+    Requires role: FINANCE_REVIEWER or ADMINISTRATOR.
+    """
+    tenant_id = auth.tenant_id
     swept_ids = idempotency_store.sweep_expired_contracts(tenant_id=tenant_id)
     return {
         "status": "success",
@@ -1389,8 +1368,15 @@ def get_capital_offer(merchant_id: Optional[str] = None, tenant_id: str = Depend
 
 
 @app.post("/api/capital/drawdown")
-def disburse_capital_advance(req: CapitalDrawdownRequest, tenant_id: str = Depends(verify_tenant_auth)):
-    """Execute 1-click working capital advance drawdown with SQLite CAS durability."""
+def disburse_capital_advance(
+    req: CapitalDrawdownRequest,
+    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR)),
+):
+    """
+    Execute 1-click working capital advance drawdown with SQLite CAS durability.
+    Requires role: FINANCE_REVIEWER, RISK_OFFICER, or ADMINISTRATOR.
+    """
+    tenant_id = auth.tenant_id
     if req.merchant_id and req.merchant_id != tenant_id:
         raise HTTPException(status_code=403, detail=f"Tenant Authorization Mismatch: Cannot drawdown for unowned merchant '{req.merchant_id}'.")
 
@@ -1465,8 +1451,14 @@ def list_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
 
 
 @app.post("/api/capital/reconcile-and-sweep")
-def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verify_tenant_auth)):
-    """Reconcile incoming bank settlement block and apply automated split recovery sweep with SQLite CAS."""
+def reconcile_and_sweep(
+    req: CapitalSweepRequest,
+    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.ADMINISTRATOR)),
+):
+    """Reconcile incoming bank settlement block and apply automated split recovery sweep with StorageBackend CAS.
+    Requires role: FINANCE_REVIEWER or ADMINISTRATOR.
+    """
+    tenant_id = auth.tenant_id
     facility = capital_facility_manager.get_facility(req.facility_id, tenant_id=tenant_id)
     if not facility or facility.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Facility not found for authenticated tenant.")
@@ -1497,13 +1489,91 @@ def reconcile_and_sweep(req: CapitalSweepRequest, tenant_id: str = Depends(verif
 
 
 @app.post("/api/capital/reset")
-def reset_capital_facilities(tenant_id: str = Depends(verify_tenant_auth)):
-    """Reset capital facilities strictly for authenticated tenant in SQLite."""
-    deleted_count = capital_facility_manager.reset_facilities(tenant_id=tenant_id)
+def reset_capital_facilities(
+    auth: AuthContext = Depends(require_roles(UserRole.ADMINISTRATOR)),
+):
+    """Reset capital facilities strictly for authenticated tenant.
+    Requires role: ADMINISTRATOR.
+    """
+    deleted_count = capital_facility_manager.reset_facilities(tenant_id=auth.tenant_id)
     return {"status": "RESET_SUCCESS", "deleted_facilities": deleted_count}
+
+
+# ── Manual Review Queue Routes ───────────────────────────────────────────────
+
+class ResolveManualReviewRequest(BaseModel):
+    item_id: str
+    resolution: str = "RESOLVED"
+    notes: Optional[str] = None
+
+
+@app.get("/api/reconcile/manual-review")
+def list_manual_review_items(
+    status: Optional[str] = None,
+    auth: AuthContext = Depends(require_roles(UserRole.MERCHANT_OPERATOR, UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR)),
+):
+    """List queued dense-cluster overflow items awaiting human/officer review."""
+    items = idempotency_store.backend.list_manual_review_items(tenant_id=auth.tenant_id, status=status)
+    return {"items": items, "count": len(items), "tenant_id": auth.tenant_id}
+
+
+@app.post("/api/reconcile/manual-review/resolve")
+def resolve_manual_review_item(
+    req: ResolveManualReviewRequest,
+    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.ADMINISTRATOR)),
+):
+    """Resolve an item in the manual review queue. Requires role: FINANCE_REVIEWER or ADMINISTRATOR."""
+    ok = idempotency_store.backend.resolve_manual_review_item(
+        item_id=req.item_id,
+        tenant_id=auth.tenant_id,
+        resolved_by=f"{auth.subject}:{auth.role.value}",
+        resolution_notes=req.notes or f"Resolution: {req.resolution}",
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="Manual review item not found or already resolved.")
+    return {"status": "SUCCESS", "item_id": req.item_id, "resolution": req.resolution}
+
+
+# ── Administrative Configuration Routes ──────────────────────────────────────
+
+class SystemConfigUpdateRequest(BaseModel):
+    dual_auth_threshold_paise: Optional[int] = None
+
+
+@app.get("/api/config/system")
+def get_system_config(
+    auth: AuthContext = Depends(require_roles(UserRole.MERCHANT_OPERATOR, UserRole.FINANCE_REVIEWER, UserRole.RISK_OFFICER, UserRole.ADMINISTRATOR)),
+):
+    """Get runtime operational configurations and active storage backend."""
+    custodian = get_key_custodian()
+    return {
+        "environment": config.environment.value,
+        "storage_backend": idempotency_store.backend.__class__.__name__,
+        "signer_algorithm": custodian.algorithm,
+        "dual_auth_threshold_paise": config.dual_auth_threshold_paise,
+        "dual_auth_threshold_inr": _fmt_paise(config.dual_auth_threshold_paise),
+        "authenticated_tenant": auth.tenant_id,
+        "authenticated_role": auth.role.value,
+    }
+
+
+@app.post("/api/config/system")
+def update_system_config(
+    req: SystemConfigUpdateRequest,
+    auth: AuthContext = Depends(require_roles(UserRole.ADMINISTRATOR)),
+):
+    """Update administrative configuration settings. Strictly requires role: ADMINISTRATOR."""
+    if req.dual_auth_threshold_paise is not None:
+        config.dual_auth_threshold_paise = req.dual_auth_threshold_paise
+    return {
+        "status": "UPDATED",
+        "updated_by": auth.subject,
+        "dual_auth_threshold_paise": config.dual_auth_threshold_paise,
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+
 
