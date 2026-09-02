@@ -39,7 +39,7 @@
    * `/api/webhook/razorpay` verifies HMAC-SHA256 signatures, applies durable SQLite event deduplication, and acts as the single source of truth to transition `RELEASING` to `RELEASED`.
 
 5. **Verified-Revenue Working Capital & Split-Settlement Recovery (APEX Capital):**
-   * Bayesian shrinkage-smoothed Settlement Reliability Index ($N_0=50, p_0=0.98$) guarantees low-batch stability without penalizing small merchants.
+   * Bayesian shrinkage-smoothed Settlement Reliability Index ($N_0=50, p_0=0.98$) provides low-batch stability without penalizing small merchants.
    * Automated split-settlement recovery sweeps deduct exact base-10 paise from nodal bank settlement streams, capping deductions at remaining balance and transitioning facilities to `REPAID` at ₹0.00.
    * Formal failure transitions: 14-day zero-settlement stagnancy to manual remediation queue, 30-day escalation to FLDG review (5% statutory portfolio cap under RBI DLG norms).
 

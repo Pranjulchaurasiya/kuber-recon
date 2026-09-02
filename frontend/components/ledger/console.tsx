@@ -229,7 +229,7 @@ export function LedgerConsole() {
               </h2>
             </div>
             <p className="mt-0.5 font-mono text-xs text-muted-foreground font-medium">
-              Filterable transaction ledger with zero-float paise integers &amp; statutory refusal guarantees
+              Filterable transaction ledger with zero-float paise integers &amp; statutory refusal rules
             </p>
           </div>
 

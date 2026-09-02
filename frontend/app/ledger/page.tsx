@@ -51,7 +51,7 @@ export default function LedgerPage() {
           <div className="rounded-lg border border-gain/40 bg-gain/5 p-4 space-y-2">
             <div className="font-bold text-gain uppercase text-[10px] tracking-wider flex items-center gap-1.5">
               <CheckCircle2 className="h-4 w-4" />
-              KuberRecon Invariant Guarantees:
+              KuberRecon Invariant Properties:
             </div>
             <p className="text-foreground/90 leading-relaxed">
               Horowitz–Sahni meet-in-the-middle subset-sum solver achieves 0 false matches on the measured synthetic/planted fixture corpus. All currency is calculated in base-10 paise integers without floating-point math.

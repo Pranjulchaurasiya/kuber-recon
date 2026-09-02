@@ -1,8 +1,7 @@
 """
 Layer 2: Event Sourcing & Transactional Outbox CDC
 --------------------------------------------------
-Standardized Financial Event Envelope and Transactional Outbox
-pattern to guarantee Zero-Loss event streaming to Kafka / Razorpay Metro.
+Transactional Outbox pattern for reliable event streaming to Kafka / Razorpay Metro.
 """
 
 from typing import Any, Dict, List, Optional

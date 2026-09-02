@@ -33,7 +33,7 @@ export interface BackendProof {
 }
 
 /**
- * Pure BigInt Paise-Exact Split Calculation (Zero-Float Guarantee).
+ * Pure BigInt Paise-Exact Split Calculation (Zero-Float Policy).
  * Enforces the base-10 integer rule when offline or fallback.
  */
 export function calcLocalSplit(grossPaise: number, gstRatePct: number, exempt194o: boolean) {
@@ -224,7 +224,7 @@ export function SplitEngine() {
           </span>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          {proof ? `Latency: ${proof.latency_ms}ms · ${proof.computed_by}` : 'Base-10 Integer Math Guarantee'}
+          {proof ? `Latency: ${proof.latency_ms}ms · ${proof.computed_by}` : 'Base-10 Integer Math Invariant'}
         </span>
       </div>
 

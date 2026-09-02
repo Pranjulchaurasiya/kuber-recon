@@ -223,7 +223,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <div class="brand-subtitle">Benchmark throughput (7,924 txns/sec)</div>
                 </div>
                 <div class="card">
-                    <div class="stat-label">Precision Guarantee</div>
+                    <div class="stat-label">Paise-Exact Invariant</div>
                     <div class="stat-val" style="color: var(--rzp-emerald);">Δ = ₹0.00</div>
                     <div class="brand-subtitle">Strict Base-10 Integer-Paise Math</div>
                 </div>

@@ -211,7 +211,7 @@ class WebhookIdempotencyStore:
     ) -> bool:
         """
         Centralized, CAS-protected state transition for apex_contracts with tenant isolation.
-        Guarantees atomic append to apex_contract_audit_log in the same transaction.
+        Appends atomically to apex_contract_audit_log in the same transaction.
         All lifecycle mutations (HELD, VERIFYING, REFUSED, RELEASING, RELEASED,
         RELEASE_PENDING_RECONCILIATION, EXPIRED_HOLD) must use this function.
         Validates expected_status and expected_version, performs conditional CAS update,

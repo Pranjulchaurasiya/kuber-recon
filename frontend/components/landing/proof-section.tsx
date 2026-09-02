@@ -153,7 +153,7 @@ export function ProofSection() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Over-Recovery Guarantee</span>
+                <span className="text-muted-foreground">Zero Over-Recovery Invariant</span>
                 <span className="font-mono font-bold text-gain">Strictly ₹0.00 Underflow</span>
               </div>
             </div>

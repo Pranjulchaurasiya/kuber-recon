@@ -24,7 +24,7 @@
 | # | 🔴 The Problem in AI Commerce | 🟢 The APEX Solution |
 |---|---|---|
 | **1** | **Blind Pre-Settlement Disbursals:** AI buyer agents order automatically, but legacy gateways disburse funds immediately before checking if goods actually arrived. | **Deterministic Escrow ([Razorpay Route](src/kuber_recon/server.py)):** Locks funds with `on_hold: true`. Settlement releases only after cryptographic proof of delivery. |
-| **2** | **AI Hallucinations & Float Drift:** Using LLMs to verify invoices causes phantom line items and floating-point errors (`0.1 + 0.2 != 0.3`). | **Zero-LLM Math Kernel:** Uses **Horowitz–Sahni Subset-Sum algorithm** and **GSTIN Mod-36 checksums** in exact base-10 paise. Zero false matches on tested fixtures. |
+| **2** | **AI Hallucinations & Float Drift:** Using LLMs to verify invoices causes phantom line items and floating-point errors (`0.1 + 0.2 != 0.3`). | **Zero-LLM Math Kernel:** Uses **Horowitz–Sahni Subset-Sum algorithm** and **GSTIN Mod-36 checksums** in exact base-10 paise. 0 false matches observed on tested synthetic fixtures. |
 | **3** | **Merchant Cash Crunch:** Small sellers face severe 30–45 day cash crunches while waiting for escrow and banking cycles. | **1-Click Capital + 12% Nodal Sweep:** Converts verified revenue into instant working capital, auto-recovering advances directly at the nodal gateway. |
 
 ```
@@ -48,7 +48,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 |---|---|---|
 | **OS & Intelligence Layer** | **Kuber OS** | CFO AI Copilot, Multi-Source Settlement Radar, Verified-Revenue Capital Hub, and 7-Day Forecasting. |
 | **Escrow Protocol Layer** | **APEX Protocol** | **A**utonomous **P**roof & **Ex**ecution engine gating Razorpay Route settlements (`on_hold: true`) behind delivery verification. |
-| **Mathematical Kernel** | **KuberRecon** | **Horowitz–Sahni Subset-Sum Solver**, **Indian GSTIN Mod-36 Checksums**, **Paise-Exact Zero-Float Policy**, and **Prototype Merkle Tree Audit Chains** (0 false matches across verified synthetic fixtures). |
+| **Mathematical Kernel** | **KuberRecon** | **Horowitz–Sahni Subset-Sum Solver**, **Indian GSTIN Mod-36 Checksums**, **Paise-Exact Zero-Float Policy**, and **Prototype Merkle Tree Audit Chains** (0 false matches observed on verified synthetic fixtures). |
 
 ---
 
