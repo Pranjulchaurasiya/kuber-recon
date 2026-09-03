@@ -5,16 +5,17 @@
 > *Powered by Horowitz–Sahni Meet-in-the-Middle Combinatorial Subset-Sum Matching, GSTIN Mod-36 Checksums, and Prototype Merkle Tree Audit Chains.*
 
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
-[![Tests Passing](https://img.shields.io/badge/pytest-171%20passed-brightgreen)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-275%20passed%20(0%20failures)-brightgreen)](tests/)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
+[![Official Benchmark](https://img.shields.io/badge/Track%2004-Official%20Benchmark%20Frozen-gold)](reports/official_track04_benchmark.md)
 
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
 [![Razorpay Route Integration](https://img.shields.io/badge/Razorpay%20Route-Transfer%20Hold%20Gating-gold)](src/kuber_recon/server.py)
-[![Whitebox Audit](https://img.shields.io/badge/Whitebox%20Audit-5%2F5%20Vectors%20Mitigated-purple)](tests/test_shannon_whitebox_audit.py)
+[![Whitebox Audit](https://img.shields.io/badge/Whitebox%20Audit-14%2F14%20Vectors%20Mitigated-purple)](tests/test_shannon_whitebox_audit.py)
 [![Security & Tenant Isolation](https://img.shields.io/badge/Tenant%20Auth-401%20Enforced%20%26%20Sanitized-purple)](tests/test_security_tenant_isolation.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-122-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
+[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Official Benchmark ](reports/official_track04_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-275-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
 
 ---
 
@@ -254,9 +255,14 @@ cd frontend && npm run dev
 # Open http://localhost:3000
 ```
 
-### 3. Run Automated Invariant Tests (122 Items)
+### 3. Run Automated Invariant Tests (275 Items)
 ```bash
-python -m pytest -p no:deepeval -p no:langsmith tests/ -q
+python -m pytest -q
+```
+
+### 4. Run Official Deterministic Benchmark Suite (Track 04)
+```bash
+python scripts/run_official_benchmark.py
 ```
 
 ---
