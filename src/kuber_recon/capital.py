@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from kuber_recon.types import ReconciledSettlementBlock, InvoiceRecord
 from kuber_recon.storage import StorageBackend, get_storage_backend
+from kuber_recon.distributed_lock import get_lock
 
 
 class ActiveFacilityExistsError(Exception):
@@ -335,7 +336,7 @@ class CapitalFacilityManager:
         if offer.offered_principal_paise <= 0:
             raise ValueError("Cannot disburse advance with 0 eligible principal.")
 
-        with self._lock:
+        with get_lock(resource_key=f"facility_disburse:{offer.merchant_id}", tenant_id=tenant_id):
             # 1. Idempotency Check
             if idempotency_key:
                 cached = self.backend.get_capital_idempotency(idempotency_key, tenant_id)
@@ -406,7 +407,7 @@ class CapitalFacilityManager:
         if not tenant_id:
             raise ValueError("tenant_id must be a non-empty string.")
 
-        with self._lock:
+        with get_lock(resource_key=f"facility_sweep:{facility_id}", tenant_id=tenant_id):
             # 1. Idempotency Check
             if idempotency_key:
                 cached = self.backend.get_capital_idempotency(idempotency_key, tenant_id)

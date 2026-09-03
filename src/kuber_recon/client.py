@@ -34,7 +34,13 @@ class RazorpayClientAdapter:
         self.key_id = key_id or os.getenv("RAZORPAY_KEY_ID")
         self.key_secret = key_secret or os.getenv("RAZORPAY_KEY_SECRET")
         self.base_url = "https://api.razorpay.com/v1"
-        self.is_live = bool(self.key_id and self.key_secret)
+        is_placeholder = (
+            not self.key_id
+            or not self.key_secret
+            or "placeholder" in self.key_id.lower()
+            or "placeholder" in self.key_secret.lower()
+        )
+        self.is_live = not is_placeholder
 
     @property
     def auth(self) -> Optional[HTTPBasicAuth]:

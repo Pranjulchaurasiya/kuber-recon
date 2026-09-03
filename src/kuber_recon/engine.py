@@ -17,23 +17,18 @@ import hashlib
 import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import BaseModel
+from kuber_recon.calendar import get_effective_settlement_dates
 from kuber_recon.tax import IndianTaxKernel
-from kuber_recon.types import BankNodalCredit, EvidenceTier, InvoiceRecord, ReconciledSettlementBlock, SettlementStatus
-
-
-class MatchResultStatus(str, Enum):
-    EXACT_MATCH = "EXACT_MATCH"
-    NO_MATCH = "NO_MATCH"
-    AMBIGUOUS_COLLISION = "AMBIGUOUS_COLLISION"
-    INCONCLUSIVE_TRUNCATED = "INCONCLUSIVE_TRUNCATED"
-
-
-class SolverResult:
-    def __init__(self, status: MatchResultStatus, solutions: List[List[str]], nodes_explored: int = 0, is_truncated: bool = False):
-        self.status = status
-        self.solutions = solutions
-        self.nodes_explored = nodes_explored
-        self.is_truncated = is_truncated
+from kuber_recon.types import (
+    BankNodalCredit,
+    EvidenceTier,
+    InvoiceRecord,
+    MatchResultStatus,
+    ReconciledSettlementBlock,
+    SettlementStatus,
+    SolverResult,
+)
+from kuber_recon.upi_presolver import UPIIdenticalAmountPreSolver
 
 
 class AmbiguousMatchError(Exception):
@@ -356,10 +351,17 @@ class ClusteredReconciliationPipeline:
     7. Completely isolates invoice consumption between distinct counterparty clusters.
     """
 
-    def __init__(self, max_cluster_size: int = 24, backend: Optional[Any] = None):
+    def __init__(
+        self,
+        max_cluster_size: int = 24,
+        backend: Optional[Any] = None,
+        enable_upi_multiset_presolve: bool = False,
+    ):
         self.max_cluster_size = max_cluster_size
         self.engine = ReconciliationEngine()
         self.backend = backend
+        self.enable_upi_multiset_presolve = enable_upi_multiset_presolve
+        self.upi_presolver = UPIIdenticalAmountPreSolver()
 
     def _get_backend(self):
         if self.backend is not None:
@@ -413,7 +415,10 @@ class ClusteredReconciliationPipeline:
         backend = self._get_backend()
         cluster_candidate_invoices: Dict[Tuple[str, date], List[InvoiceRecord]] = {}
         for (gstin, cap_date), cluster_invoices in sorted(invoices_by_cluster.items(), key=lambda x: (x[0][0], x[0][1])):
-            if len(cluster_invoices) > self.max_cluster_size:
+            distinct_amounts = len({inv.amount_in_paise for inv in cluster_invoices})
+            if self.enable_upi_multiset_presolve and distinct_amounts <= self.max_cluster_size:
+                active_invoices = cluster_invoices
+            elif len(cluster_invoices) > self.max_cluster_size:
                 excess_invoices = cluster_invoices[self.max_cluster_size:]
                 active_invoices = cluster_invoices[:self.max_cluster_size]
                 dense_credit_dummy = BankNodalCredit(
@@ -476,10 +481,10 @@ class ClusteredReconciliationPipeline:
                 continue
             gstin, cap_date = cluster_key
 
-            # Gather only credits within [cap_date, cap_date + 4 days]
+            # Gather credits within dynamically expanded banking settlement window
+            # across RBI RTGS/NEFT holidays and weekends (e.g. T+4 up to T+7)
             candidate_credits: List[BankNodalCredit] = []
-            for d_offset in range(5):
-                d = cap_date + timedelta(days=d_offset)
+            for d in get_effective_settlement_dates(cap_date, holidays=holidays):
                 if d in credits_by_date:
                     candidate_credits.extend(credits_by_date[d])
 

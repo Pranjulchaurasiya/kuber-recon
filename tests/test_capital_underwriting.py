@@ -77,13 +77,14 @@ def test_split_settlement_repayment_amortization_exact_paise(underwriter, facili
     # Generate offer for a specific Rs 50,000 advance
     target_advance_paise = 5000000  # Rs 50,000
     offer = underwriter.generate_offer(
-        merchant_id="merch_tech_solutions",
+        merchant_id="merch_tech_amortize_01",
         reconciled_blocks=blocks,
         invoices=invoices,
         requested_advance_paise=target_advance_paise,
+        as_of_date=date(2026, 8, 30),
     )
     
-    facility = facility_manager.disburse_advance(offer, tenant_id="merch_tech_solutions")
+    facility = facility_manager.disburse_advance(offer, tenant_id="merch_tech_amortize_01")
     assert facility.status == FacilityStatus.ACTIVE
     assert facility.principal_paise == 5000000
     assert facility.factor_fee_paise == offer.factor_fee_paise
@@ -108,7 +109,7 @@ def test_split_settlement_repayment_amortization_exact_paise(underwriter, facili
     )
     from decimal import ROUND_FLOOR
     expected_day1_sweep = int((Decimal("2000000") * facility.sweep_rate).to_integral_value(rounding=ROUND_FLOOR))
-    fac, ev1 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_1, tenant_id="merch_tech_solutions")
+    fac, ev1 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_1, tenant_id="merch_tech_amortize_01")
     assert fac.status == FacilityStatus.AMORTIZING
     assert ev1.sweep_deduction_paise == expected_day1_sweep
     assert ev1.net_merchant_payout_paise == 2000000 - expected_day1_sweep
@@ -131,7 +132,7 @@ def test_split_settlement_repayment_amortization_exact_paise(underwriter, facili
         proof_hash="hash2",
     )
     remaining_before_day2 = fac.remaining_balance_paise
-    fac, ev2 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_2, tenant_id="merch_tech_solutions")
+    fac, ev2 = facility_manager.process_settlement_sweep(facility.facility_id, dummy_block_2, tenant_id="merch_tech_amortize_01")
     
     # Sweep cannot over-deduct: capped precisely at remaining balance
     assert ev2.sweep_deduction_paise == remaining_before_day2

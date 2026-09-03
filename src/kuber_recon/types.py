@@ -46,6 +46,21 @@ class EvidenceTier(str, Enum):
     TIER_C = "tier_c_soft_entity"  # Fuzzy vendor name / unverified memo
 
 
+class MatchResultStatus(str, Enum):
+    EXACT_MATCH = "EXACT_MATCH"
+    NO_MATCH = "NO_MATCH"
+    AMBIGUOUS_COLLISION = "AMBIGUOUS_COLLISION"
+    INCONCLUSIVE_TRUNCATED = "INCONCLUSIVE_TRUNCATED"
+
+
+class SolverResult:
+    def __init__(self, status: MatchResultStatus, solutions: List[List[str]], nodes_explored: int = 0, is_truncated: bool = False):
+        self.status = status
+        self.solutions = solutions
+        self.nodes_explored = nodes_explored
+        self.is_truncated = is_truncated
+
+
 class InvoiceRecord(BaseModel):
     """Internal Merchant Invoice / Order Record."""
 
