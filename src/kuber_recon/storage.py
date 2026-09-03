@@ -515,8 +515,9 @@ class SQLiteStorageBackend(StorageBackend):
                         contract_id, tenant_id, status, transfer_id, amount_paise,
                         fee_paise, on_hold, on_hold_until, settlement_id,
                         recipient_account, created_at, updated_at, version, expected_record_count,
-                        buyer_agent_id, seller_agent_id, seller_account_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+                        buyer_agent_id, seller_agent_id, seller_account_id,
+                        assertions_passed, proof_hash
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 0, '')
                 """, (
                     contract_id, tenant_id, status, transfer_id, amount_paise,
                     fee_paise, 1 if on_hold else 0, on_hold_until, settlement_id,
@@ -529,7 +530,8 @@ class SQLiteStorageBackend(StorageBackend):
                 """, (contract_id, status, now))
                 conn.commit()
                 return True
-            except sqlite3.IntegrityError:
+            except Exception as e:
+                logger.error("Failed to insert SQLite apex_contract %s: %s", contract_id, e)
                 return False
 
 
@@ -1261,8 +1263,9 @@ class PostgreSQLStorageBackend(StorageBackend):
                             contract_id, tenant_id, status, transfer_id, amount_paise,
                             fee_paise, on_hold, on_hold_until, settlement_id,
                             recipient_account, created_at, updated_at, version, expected_record_count,
-                            buyer_agent_id, seller_agent_id, seller_account_id
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s)
+                            buyer_agent_id, seller_agent_id, seller_account_id,
+                            assertions_passed, proof_hash
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, 0, '')
                     """, (
                         contract_id, tenant_id, status, transfer_id, amount_paise,
                         fee_paise, on_hold, on_hold_until, settlement_id,
@@ -1275,7 +1278,8 @@ class PostgreSQLStorageBackend(StorageBackend):
                     """, (contract_id, status, now))
                 conn.commit()
                 return True
-            except Exception:
+            except Exception as e:
+                logger.error("Failed to insert postgres apex_contract %s: %s", contract_id, e)
                 conn.rollback()
                 return False
 
