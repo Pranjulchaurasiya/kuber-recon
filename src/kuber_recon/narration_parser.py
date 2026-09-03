@@ -13,7 +13,7 @@ Paise-Exact Rule: Zero IEEE-754 floats; pure base-10 integer paise.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 import re
 from typing import Dict, List, Optional, Tuple, Pattern
@@ -60,25 +60,25 @@ BANK_PROFILES: Dict[str, BankProfile] = {
     "ICICI": BankProfile(
         bank_code="ICICI",
         bank_name="ICICI Bank",
-        utr_pattern=re.compile(r"\b([0-9]{9,16}|ICIC[A-Z0-9]{8,18})\b", re.IGNORECASE),
-        aggregator_tokens=("RAZORPAY", "RZP", "NODAL", "CMS"),
+        utr_pattern=re.compile(r"\b(ICIC[A-Z0-9]{8,20}|[0-9]{12,18})\b", re.IGNORECASE),
+        aggregator_tokens=("RZP", "RAZORPAY", "NODAL"),
         bank_identifiers=("ICICI", "ICIC", "INF/"),
-        min_utr_len=9,
-        max_utr_len=22,
+        min_utr_len=12,
+        max_utr_len=24,
     ),
     "AXIS": BankProfile(
         bank_code="AXIS",
         bank_name="Axis Bank",
-        utr_pattern=re.compile(r"\b(AXIS[A-Z0-9]{10,20}|UTR[0-9]{5,16})\b", re.IGNORECASE),
-        aggregator_tokens=("RZPAY", "RAZORPAY", "CMS", "SETTLEMENT"),
+        utr_pattern=re.compile(r"\b(AXIS[0-9A-Z]{6,18}|UTR[0-9]{10,14})\b", re.IGNORECASE),
+        aggregator_tokens=("RZPAY", "RAZORPAY", "CMS"),
         bank_identifiers=("AXIS", "UTIB"),
         min_utr_len=10,
-        max_utr_len=24,
+        max_utr_len=22,
     ),
     "KOTAK": BankProfile(
         bank_code="KOTAK",
         bank_name="Kotak Mahindra Bank",
-        utr_pattern=re.compile(r"\b(KKBK[A-Z0-9]{10,18}|UTR[0-9]{5,16})\b", re.IGNORECASE),
+        utr_pattern=re.compile(r"\b(KKBK[0-9A-Z]{6,18}|UTR[0-9]{10,14})\b", re.IGNORECASE),
         aggregator_tokens=("KOTAK", "RAZORPAY", "CMS"),
         bank_identifiers=("KOTAK", "KKBK"),
         min_utr_len=10,
@@ -140,6 +140,8 @@ class TrustedProviderRecord:
     merchant_account_id: str
     settlement_status: str  # Must be 'processed' or 'settled'
     settlement_date: date
+    rail_type: str = "NEFT"
+    source: str = "webhook"
 
 
 @dataclass(frozen=True)
@@ -149,8 +151,35 @@ class RailSettlementConfig:
     allowed_date_variance_days: int = 2
 
 
+RAIL_SETTLEMENT_CONFIGS: Dict[str, RailSettlementConfig] = {
+    "RTGS": RailSettlementConfig(rail_name="RTGS", allowed_date_variance_days=1),
+    "IMPS": RailSettlementConfig(rail_name="IMPS", allowed_date_variance_days=1),
+    "UPI": RailSettlementConfig(rail_name="UPI", allowed_date_variance_days=1),
+    "NEFT": RailSettlementConfig(rail_name="NEFT", allowed_date_variance_days=2),
+}
+
+
+def get_rail_config(rail_name: Optional[str]) -> RailSettlementConfig:
+    """Derive rail configuration and allowed date variance dynamically."""
+    norm = (rail_name or "NEFT").strip().upper()
+    return RAIL_SETTLEMENT_CONFIGS.get(norm, RailSettlementConfig(rail_name=norm, allowed_date_variance_days=2))
+
+
 class IndianBankNarrationParser:
     """Deterministic parser normalizing bank clearing narrations into auditable candidate tiers."""
+
+    @staticmethod
+    def parse_date_token(token: Optional[str]) -> Optional[date]:
+        """Parse an extracted narration date token (YYYYMMDD, DDMMYYYY, YYYY-MM-DD, or DD-MM-YYYY) into a date object."""
+        if not token:
+            return None
+        clean_nodash = token.strip().replace("-", "").replace("/", "")
+        for fmt in ("%Y%m%d", "%d%m%Y"):
+            try:
+                return datetime.strptime(clean_nodash, fmt).date()
+            except ValueError:
+                continue
+        return None
 
     @staticmethod
     def parse_narration(raw_narration: str) -> ParsedNarrationCandidate:
@@ -192,8 +221,11 @@ class IndianBankNarrationParser:
             if gen_match:
                 candidate_utr = gen_match.group(1).upper()
 
-        # 3. Extract date token if present (YYYYMMDD or DDMMYYYY)
-        date_match = re.search(r"\b(202[5-7][01][0-9][0-3][0-9]|[0-3][0-9][01][0-9]202[5-7])\b", clean_text)
+        # 3. Extract date token if present (YYYYMMDD, DDMMYYYY, YYYY-MM-DD, DD-MM-YYYY)
+        date_match = re.search(
+            r"(?:^|[*\-/\s_])(202[5-7][01][0-9][0-3][0-9]|[0-3][0-9][01][0-9]202[5-7]|202[5-7]-[01][0-9]-[0-3][0-9]|[0-3][0-9]-[01][0-9]-202[5-7])(?:$|[*\-/\s_])",
+            clean_text
+        )
         extracted_date = date_match.group(1) if date_match else None
 
         # 4. Determine Evidence Tier with strict guardrails

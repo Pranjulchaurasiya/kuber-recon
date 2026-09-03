@@ -1,15 +1,19 @@
-"""End-to-End Tests for Strict Narration Release Guards and 5-Point Provider Join.
-================================================================================
+"""End-to-End Tests for Strict Narration Release Guards and Server-Side 5-Point Provider Join.
+================================================================================================
 Verifies that:
 1. Tier C (malformed narration) fails closed at release transition (HTTP 412).
 2. Tier B (non-authoritative missing aggregator token) fails closed at release transition (HTTP 412).
-3. Tier A (valid clean UTR) alone with ZERO provider records fails closed (HTTP 412).
-4. Tier A with MULTIPLE ambiguous provider records fails closed (HTTP 412).
+3. Tier A (valid clean UTR) alone with ZERO provider records in server-side store fails closed (HTTP 412).
+4. Tier A with MULTIPLE ambiguous server-side provider records fails closed (HTTP 412).
 5. Tier A with mismatched amount or account ID fails closed via 5-point join (HTTP 412).
-6. Tier A with valid 5-point join successfully triggers contract release (HTTP 200).
+6. Tier A with valid server-side 5-point join successfully triggers contract release (HTTP 200).
+7. Dedicated /auto-release-from-narration endpoint enforces server-side join without client records.
+8. Attacker exploit attempting to pass forged client-controlled `provider_records` is rejected (HTTP 422/412) and funds remain held.
+9. Narration memos without extractable statement dates are refused for automated release (HTTP 412).
+10. Rail-specific date variance limits (e.g. RTGS 1 day limit) are dynamically enforced against server records.
 """
 
-from datetime import date
+from datetime import date, timedelta
 import hashlib
 import json
 import pytest
@@ -18,13 +22,13 @@ from fastapi.testclient import TestClient
 
 from kuber_recon.narration_parser import NarrationEvidenceTier
 from kuber_recon.server import WebhookIdempotencyStore, app
+import kuber_recon.server as srv
 
 
 @pytest.fixture(autouse=True)
 def _tmp_db(tmp_path, monkeypatch):
     tmp_db = tmp_path / "test_narration_guard.db"
     monkeypatch.setattr(WebhookIdempotencyStore, "DB_FILE", tmp_db)
-    import kuber_recon.server as srv
     monkeypatch.setattr(srv.razorpay_adapter, "is_live", False)
     srv.idempotency_store = WebhookIdempotencyStore()
     yield
@@ -160,10 +164,11 @@ def test_tier_b_missing_aggregator_token_refused_at_release(client):
 
 
 def test_tier_a_alone_without_provider_match_refused(client):
-    """Invariant: Narration data alone cannot trigger release (zero matching provider records)."""
+    """Invariant: Narration data alone cannot trigger release when zero provider records exist server-side."""
     c_info = _setup_verified_contract(client)
 
-    clean_tier_a = "NFX-RZR*SETTL*ST9901*HDFCN009827163"
+    today_str = date.today().strftime("%Y%m%d")
+    clean_tier_a = f"NFX-RZR*SETTL*ST9901*HDFCN009827163*{today_str}"
 
     res = client.post(
         "/api/apex/contracts/release",
@@ -173,7 +178,7 @@ def test_tier_a_alone_without_provider_match_refused(client):
             "public_key_hex": c_info["public_key_hex"],
             "signature_hex": c_info["signature_hex"],
             "bank_narration": clean_tier_a,
-            "provider_records": [],
+            "require_narration_join": True,
         },
     )
     assert res.status_code == 412
@@ -186,27 +191,38 @@ def test_tier_a_with_multiple_ambiguous_provider_matches_refused(client):
     c_info = _setup_verified_contract(client)
 
     utr = "HDFCN009827163"
-    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}"
+    today_str = date.today().strftime("%Y%m%d")
+    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}*{today_str}"
 
-    provider_1 = {
+    # Seed 2 conflicting provider records into the server's authoritative store
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_hdfc_prov_001",
+        "transfer_id": "trf_prov_001",
         "expected_utr": utr,
         "amount_paise": c_info["amount_paise"],
         "currency": "INR",
         "merchant_account_id": c_info["seller_account_id"],
         "settlement_status": "processed",
         "settlement_date": str(date.today()),
-        "provider_transfer_id": "trf_prov_001",
-    }
-    provider_2 = {
+        "rail_type": "NEFT",
+        "source": "server_store",
+        "tenant_id": "merchant_rzp_primary",
+    })
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_hdfc_prov_002",
+        "transfer_id": "trf_prov_002",
         "expected_utr": utr,
         "amount_paise": c_info["amount_paise"],
         "currency": "INR",
         "merchant_account_id": c_info["seller_account_id"],
         "settlement_status": "processed",
         "settlement_date": str(date.today()),
-        "provider_transfer_id": "trf_prov_002",
-    }
+        "rail_type": "NEFT",
+        "source": "server_store",
+        "tenant_id": "merchant_rzp_primary",
+    })
 
+    # Client sends request WITHOUT any provider_records
     res = client.post(
         "/api/apex/contracts/release",
         json={
@@ -215,7 +231,7 @@ def test_tier_a_with_multiple_ambiguous_provider_matches_refused(client):
             "public_key_hex": c_info["public_key_hex"],
             "signature_hex": c_info["signature_hex"],
             "bank_narration": clean_tier_a,
-            "provider_records": [provider_1, provider_2],
+            "require_narration_join": True,
         },
     )
     assert res.status_code == 412
@@ -227,16 +243,23 @@ def test_tier_a_with_mismatched_amount_refused(client):
     c_info = _setup_verified_contract(client, contract_amount_paise=2500000)
 
     utr = "HDFCN009827163"
-    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}"
+    today_str = date.today().strftime("%Y%m%d")
+    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}*{today_str}"
 
-    provider = {
+    # Server store has mismatched amount (2000000 != 2500000)
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_hdfc_prov_mismatch_amt",
+        "transfer_id": "trf_prov_mismatch",
         "expected_utr": utr,
-        "amount_paise": 2000000,  # Mismatched amount
+        "amount_paise": 2000000,
         "currency": "INR",
         "merchant_account_id": c_info["seller_account_id"],
         "settlement_status": "processed",
         "settlement_date": str(date.today()),
-    }
+        "rail_type": "NEFT",
+        "source": "server_store",
+        "tenant_id": "merchant_rzp_primary",
+    })
 
     res = client.post(
         "/api/apex/contracts/release",
@@ -246,7 +269,7 @@ def test_tier_a_with_mismatched_amount_refused(client):
             "public_key_hex": c_info["public_key_hex"],
             "signature_hex": c_info["signature_hex"],
             "bank_narration": clean_tier_a,
-            "provider_records": [provider],
+            "require_narration_join": True,
         },
     )
     assert res.status_code == 412
@@ -258,16 +281,23 @@ def test_tier_a_with_mismatched_merchant_account_refused(client):
     c_info = _setup_verified_contract(client)
 
     utr = "HDFCN009827163"
-    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}"
+    today_str = date.today().strftime("%Y%m%d")
+    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}*{today_str}"
 
-    provider = {
+    # Server store has wrong merchant account
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_hdfc_prov_mismatch_acc",
+        "transfer_id": "trf_prov_mismatch_acc",
         "expected_utr": utr,
         "amount_paise": c_info["amount_paise"],
         "currency": "INR",
         "merchant_account_id": "acc_WRONG_MERCHANT_999",
         "settlement_status": "processed",
         "settlement_date": str(date.today()),
-    }
+        "rail_type": "NEFT",
+        "source": "server_store",
+        "tenant_id": "merchant_rzp_primary",
+    })
 
     res = client.post(
         "/api/apex/contracts/release",
@@ -277,7 +307,7 @@ def test_tier_a_with_mismatched_merchant_account_refused(client):
             "public_key_hex": c_info["public_key_hex"],
             "signature_hex": c_info["signature_hex"],
             "bank_narration": clean_tier_a,
-            "provider_records": [provider],
+            "require_narration_join": True,
         },
     )
     assert res.status_code == 412
@@ -285,21 +315,27 @@ def test_tier_a_with_mismatched_merchant_account_refused(client):
 
 
 def test_tier_a_with_valid_5_point_join_succeeds_and_releases(client):
-    """Invariant: Tier A narration joined to matching trusted provider record releases hold successfully."""
+    """Invariant: Tier A narration joined to matching server-side trusted provider record releases hold successfully."""
     c_info = _setup_verified_contract(client, contract_amount_paise=2500000)
 
     utr = "HDFCN009827163"
-    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}"
+    today_str = date.today().strftime("%Y%m%d")
+    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}*{today_str}"
 
-    valid_provider = {
+    # Seed authoritative server-side provider record
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_hdfc_verified_01",
+        "transfer_id": "trf_hdfc_verified_01",
         "expected_utr": utr,
         "amount_paise": 2500000,
         "currency": "INR",
         "merchant_account_id": c_info["seller_account_id"],
         "settlement_status": "processed",
         "settlement_date": str(date.today()),
-        "provider_transfer_id": "trf_hdfc_verified_01",
-    }
+        "rail_type": "NEFT",
+        "source": "webhook",
+        "tenant_id": "merchant_rzp_primary",
+    })
 
     res = client.post(
         "/api/apex/contracts/release",
@@ -309,7 +345,7 @@ def test_tier_a_with_valid_5_point_join_succeeds_and_releases(client):
             "public_key_hex": c_info["public_key_hex"],
             "signature_hex": c_info["signature_hex"],
             "bank_narration": clean_tier_a,
-            "provider_records": [valid_provider],
+            "require_narration_join": True,
         },
     )
     assert res.status_code == 200, res.text
@@ -319,24 +355,31 @@ def test_tier_a_with_valid_5_point_join_succeeds_and_releases(client):
     assert data["narration_join_audit"]["join_verified"] is True
     assert data["narration_join_audit"]["candidate_utr"] == utr
     assert data["narration_join_audit"]["evidence_tier"] == NarrationEvidenceTier.TIER_A_CANDIDATE.value
+    assert data["narration_join_audit"]["rail_type"] == "NEFT"
 
 
 def test_auto_release_from_narration_endpoint(client):
-    """Verify dedicated statement-clearing auto-release endpoint enforces 5-point join."""
+    """Verify dedicated statement-clearing auto-release endpoint enforces server-side 5-point join."""
     c_info = _setup_verified_contract(client, contract_amount_paise=2500000)
 
     utr = "HDFCN009827163"
-    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}"
+    today_str = date.today().strftime("%Y%m%d")
+    clean_tier_a = f"NFX-RZR*SETTL*ST9901*{utr}*{today_str}"
 
-    valid_provider = {
+    # Seed authoritative server-side provider record
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_hdfc_verified_auto_01",
+        "transfer_id": "trf_hdfc_verified_auto_01",
         "expected_utr": utr,
         "amount_paise": 2500000,
         "currency": "INR",
         "merchant_account_id": c_info["seller_account_id"],
         "settlement_status": "processed",
         "settlement_date": str(date.today()),
-        "provider_transfer_id": "trf_hdfc_verified_01",
-    }
+        "rail_type": "NEFT",
+        "source": "webhook",
+        "tenant_id": "merchant_rzp_primary",
+    })
 
     # 1. Invalid attempt with Tier C narration -> Fails closed 412
     res_fail = client.post(
@@ -347,13 +390,12 @@ def test_auto_release_from_narration_endpoint(client):
             "public_key_hex": c_info["public_key_hex"],
             "signature_hex": c_info["signature_hex"],
             "bank_narration": "INVALID RURAL MEMO",
-            "provider_records": [valid_provider],
         },
     )
     assert res_fail.status_code == 412
     assert "TIER_C_EXCEPTION" in res_fail.json()["detail"]
 
-    # 2. Valid attempt with clean Tier A narration + matching provider record -> Releases 200
+    # 2. Valid attempt with clean Tier A narration + server-side matching record -> Releases 200
     res_pass = client.post(
         "/api/apex/contracts/auto-release-from-narration",
         json={
@@ -362,10 +404,152 @@ def test_auto_release_from_narration_endpoint(client):
             "public_key_hex": c_info["public_key_hex"],
             "signature_hex": c_info["signature_hex"],
             "bank_narration": clean_tier_a,
-            "provider_records": [valid_provider],
         },
     )
     assert res_pass.status_code == 200, res_pass.text
     assert res_pass.json()["status"] == "RELEASING"
     assert res_pass.json()["narration_join_audit"]["join_verified"] is True
+
+
+def test_forged_client_provider_records_exploit_rejected(client):
+    """
+    SECURITY AUDIT EXPLOIT TEST:
+    Attacker crafts a fabricated `provider_records` payload in the release request
+    aiming to trick the 5-point join into verifying client-controlled data.
+    Invariant:
+    - The request MUST be rejected (HTTP 422 extra inputs forbidden or HTTP 412 provider join refusal).
+    - Under NO circumstances can funds be released.
+    - Contract state MUST remain HELD with on_hold == 1.
+    """
+    c_info = _setup_verified_contract(client, contract_amount_paise=5000000)
+
+    fake_utr = "FAKERZP999888777"
+    fake_narration = f"NFX-RZR*SETTL*ST9901*{fake_utr}*{date.today().strftime('%Y%m%d')}"
+
+    forged_provider = {
+        "expected_utr": fake_utr,
+        "amount_paise": 5000000,
+        "currency": "INR",
+        "merchant_account_id": c_info["seller_account_id"],
+        "settlement_status": "processed",
+        "settlement_date": str(date.today()),
+        "provider_transfer_id": "trf_forged_by_attacker_999",
+    }
+
+    # Attempt 1: Exploit against /api/apex/contracts/release
+    res_release = client.post(
+        "/api/apex/contracts/release",
+        json={
+            "contract_id": c_info["contract_id"],
+            "checker_id": c_info["checker_id"],
+            "public_key_hex": c_info["public_key_hex"],
+            "signature_hex": c_info["signature_hex"],
+            "bank_narration": fake_narration,
+            "require_narration_join": True,
+            "provider_records": [forged_provider],  # <--- Attacker injection
+        },
+    )
+    # Pydantic ConfigDict(extra="forbid") rejects extra inputs with 422
+    assert res_release.status_code in (412, 422)
+
+    # Attempt 2: Exploit against /api/apex/contracts/auto-release-from-narration
+    res_auto = client.post(
+        "/api/apex/contracts/auto-release-from-narration",
+        json={
+            "contract_id": c_info["contract_id"],
+            "checker_id": c_info["checker_id"],
+            "public_key_hex": c_info["public_key_hex"],
+            "signature_hex": c_info["signature_hex"],
+            "bank_narration": fake_narration,
+            "provider_records": [forged_provider],  # <--- Attacker injection
+        },
+    )
+    assert res_auto.status_code in (412, 422)
+
+    # Invariant check: Assert contract was NOT released and hold remains strictly active
+    contract = srv.idempotency_store.get_contract(c_info["contract_id"])
+    assert contract is not None
+    assert contract["status"] in ("HELD", "VERIFYING")
+    assert contract["status"] != "RELEASING"
+    assert contract["status"] != "RELEASED"
+    assert contract["on_hold"] == 1
+
+
+def test_tier_a_without_date_token_refused_for_automated_release(client):
+    """Invariant: Narration memos without extractable statement date token refuse automated release."""
+    c_info = _setup_verified_contract(client)
+
+    utr = "HDFCN009827163"
+    # Narration memo has UTR and aggregator tokens, but NO date token
+    narration_without_date = f"NFX-RZR*SETTL*ST9901*{utr}"
+
+    # Seed authoritative server record
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_hdfc_no_date_test",
+        "transfer_id": "trf_hdfc_no_date",
+        "expected_utr": utr,
+        "amount_paise": c_info["amount_paise"],
+        "currency": "INR",
+        "merchant_account_id": c_info["seller_account_id"],
+        "settlement_status": "processed",
+        "settlement_date": str(date.today()),
+        "rail_type": "NEFT",
+        "source": "server_store",
+        "tenant_id": "merchant_rzp_primary",
+    })
+
+    res = client.post(
+        "/api/apex/contracts/release",
+        json={
+            "contract_id": c_info["contract_id"],
+            "checker_id": c_info["checker_id"],
+            "public_key_hex": c_info["public_key_hex"],
+            "signature_hex": c_info["signature_hex"],
+            "bank_narration": narration_without_date,
+            "require_narration_join": True,
+        },
+    )
+    assert res.status_code == 412
+    assert "Narration Date Verification Refusal" in res.json()["detail"]
+
+
+def test_tier_a_date_variance_exceeds_rail_tolerance_refused(client):
+    """Invariant: Date variance exceeding rail-specific limits (RTGS: 1 day) fails closed."""
+    c_info = _setup_verified_contract(client)
+
+    utr = "HDFCN009827163"
+    # Narration date is 5 days after settlement date
+    narration_date = date.today() + timedelta(days=5)
+    narration_date_str = narration_date.strftime("%Y%m%d")
+    narration_with_stale_date = f"NFX-RZR*SETTL*ST9901*{utr}*{narration_date_str}"
+
+    # Seed RTGS record with strict 1-day variance limit
+    srv.idempotency_store.save_trusted_provider_record({
+        "provider_record_id": "rec_rtgs_variance_test",
+        "transfer_id": "trf_rtgs_variance",
+        "expected_utr": utr,
+        "amount_paise": c_info["amount_paise"],
+        "currency": "INR",
+        "merchant_account_id": c_info["seller_account_id"],
+        "settlement_status": "processed",
+        "settlement_date": str(date.today()),
+        "rail_type": "RTGS",  # 1-day limit
+        "source": "server_store",
+        "tenant_id": "merchant_rzp_primary",
+    })
+
+    res = client.post(
+        "/api/apex/contracts/release",
+        json={
+            "contract_id": c_info["contract_id"],
+            "checker_id": c_info["checker_id"],
+            "public_key_hex": c_info["public_key_hex"],
+            "signature_hex": c_info["signature_hex"],
+            "bank_narration": narration_with_stale_date,
+            "require_narration_join": True,
+        },
+    )
+    assert res.status_code == 412
+    assert "5-Point Provider Join Refusal" in res.json()["detail"]
+    assert "exceeds RTGS rail limit (1 days)" in res.json()["detail"]
 

@@ -16,6 +16,7 @@ Provides single, comprehensive persistence abstraction:
 from abc import ABC, abstractmethod
 import contextlib
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,8 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from kuber_recon.config import EnvironmentMode, SecurityConfigError, config
+
+logger = logging.getLogger("kuber_recon.storage")
 
 
 class StorageBackend(ABC):
@@ -220,6 +223,26 @@ class StorageBackend(ABC):
     @abstractmethod
     def list_dlq_records(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """List dead letter queue records."""
+        pass
+
+    # ── Trusted Provider Records (Authoritative Server-Side Join Store) ──────
+    @abstractmethod
+    def save_trusted_provider_record(self, record: Dict[str, Any]) -> bool:
+        """Persist an authoritative provider settlement/transfer record."""
+        pass
+
+    @abstractmethod
+    def get_trusted_provider_records_for_transfer(
+        self, transfer_id: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve authoritative provider records linked to a specific transfer_id."""
+        pass
+
+    @abstractmethod
+    def get_trusted_provider_records_by_utr(
+        self, expected_utr: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve authoritative provider records matching an expected UTR."""
         pass
 
     # ── Health Check ─────────────────────────────────────────────────────────
@@ -473,6 +496,27 @@ class SQLiteStorageBackend(StorageBackend):
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_outbox_tenant_status ON financial_outbox (tenant_id, status)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_dlq_tenant ON dead_letter_queue (tenant_id)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_manual_review_status ON manual_review_queue (tenant_id, status)")
+
+            # 10. Authoritative Trusted Provider Records (Server-Side Join Store)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS trusted_provider_records (
+                    provider_record_id TEXT PRIMARY KEY,
+                    transfer_id TEXT NOT NULL,
+                    expected_utr TEXT NOT NULL,
+                    amount_paise INTEGER NOT NULL,
+                    currency TEXT NOT NULL DEFAULT 'INR',
+                    merchant_account_id TEXT NOT NULL,
+                    settlement_status TEXT NOT NULL,
+                    settlement_date TEXT NOT NULL,
+                    rail_type TEXT NOT NULL DEFAULT 'NEFT',
+                    source TEXT NOT NULL DEFAULT 'webhook',
+                    verified_at INTEGER NOT NULL,
+                    tenant_id TEXT NOT NULL DEFAULT 'merchant_rzp_primary'
+                )
+            """)
+            with contextlib.suppress(Exception):
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_tprov_trans ON trusted_provider_records(tenant_id, transfer_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_tprov_utr ON trusted_provider_records(tenant_id, expected_utr)")
 
             conn.commit()
 
@@ -1051,6 +1095,67 @@ class SQLiteStorageBackend(StorageBackend):
                 rows = conn.execute("SELECT * FROM dead_letter_queue ORDER BY failed_at_ns DESC").fetchall()
             return [dict(r) for r in rows]
 
+    def save_trusted_provider_record(self, record: Dict[str, Any]) -> bool:
+        with self._lock, self._connect() as conn:
+            verified_at = record.get("verified_at") or int(time.time())
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO trusted_provider_records (
+                    provider_record_id, transfer_id, expected_utr, amount_paise,
+                    currency, merchant_account_id, settlement_status,
+                    settlement_date, rail_type, source, verified_at, tenant_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["provider_record_id"],
+                    record["transfer_id"],
+                    record["expected_utr"],
+                    int(record["amount_paise"]),
+                    record.get("currency", "INR"),
+                    record["merchant_account_id"],
+                    record.get("settlement_status", "processed"),
+                    str(record["settlement_date"]),
+                    record.get("rail_type", "NEFT"),
+                    record.get("source", "webhook"),
+                    verified_at,
+                    record.get("tenant_id", "merchant_rzp_primary"),
+                ),
+            )
+            conn.commit()
+            return True
+
+    def get_trusted_provider_records_for_transfer(
+        self, transfer_id: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        with self._lock, self._connect() as conn:
+            if tenant_id:
+                cur = conn.execute(
+                    "SELECT * FROM trusted_provider_records WHERE transfer_id = ? AND tenant_id = ?",
+                    (transfer_id, tenant_id),
+                )
+            else:
+                cur = conn.execute(
+                    "SELECT * FROM trusted_provider_records WHERE transfer_id = ?",
+                    (transfer_id,),
+                )
+            return [dict(row) for row in cur.fetchall()]
+
+    def get_trusted_provider_records_by_utr(
+        self, expected_utr: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        with self._lock, self._connect() as conn:
+            if tenant_id:
+                cur = conn.execute(
+                    "SELECT * FROM trusted_provider_records WHERE expected_utr = ? AND tenant_id = ?",
+                    (expected_utr, tenant_id),
+                )
+            else:
+                cur = conn.execute(
+                    "SELECT * FROM trusted_provider_records WHERE expected_utr = ?",
+                    (expected_utr,),
+                )
+            return [dict(row) for row in cur.fetchall()]
+
     def health_check(self) -> Dict[str, Any]:
         with self._lock, self._connect() as conn:
             cur = conn.execute("SELECT 1 AS alive")
@@ -1220,6 +1325,22 @@ class PostgreSQLStorageBackend(StorageBackend):
                         resolved_by VARCHAR(255),
                         resolution_notes TEXT
                     );
+                    CREATE TABLE IF NOT EXISTS trusted_provider_records (
+                        provider_record_id VARCHAR(255) PRIMARY KEY,
+                        transfer_id VARCHAR(255) NOT NULL,
+                        expected_utr VARCHAR(64) NOT NULL,
+                        amount_paise BIGINT NOT NULL,
+                        currency VARCHAR(10) NOT NULL DEFAULT 'INR',
+                        merchant_account_id VARCHAR(255) NOT NULL,
+                        settlement_status VARCHAR(64) NOT NULL,
+                        settlement_date VARCHAR(32) NOT NULL,
+                        rail_type VARCHAR(32) NOT NULL DEFAULT 'NEFT',
+                        source VARCHAR(64) NOT NULL DEFAULT 'webhook',
+                        verified_at BIGINT NOT NULL,
+                        tenant_id VARCHAR(255) NOT NULL DEFAULT 'merchant_rzp_primary'
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_pg_tprov_trans ON trusted_provider_records(tenant_id, transfer_id);
+                    CREATE INDEX IF NOT EXISTS idx_pg_tprov_utr ON trusted_provider_records(tenant_id, expected_utr);
                 """)
             conn.commit()
 
@@ -1836,7 +1957,77 @@ class PostgreSQLStorageBackend(StorageBackend):
                 else:
                     cur.execute("SELECT * FROM dead_letter_queue ORDER BY failed_at_ns DESC")
                 rows = cur.fetchall()
-                return [dict(r) for r in rows]
+    def save_trusted_provider_record(self, record: Dict[str, Any]) -> bool:
+        verified_at = record.get("verified_at") or int(time.time())
+        with self._lock, self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO trusted_provider_records (
+                        provider_record_id, transfer_id, expected_utr, amount_paise,
+                        currency, merchant_account_id, settlement_status,
+                        settlement_date, rail_type, source, verified_at, tenant_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (provider_record_id) DO UPDATE SET
+                        transfer_id = EXCLUDED.transfer_id,
+                        expected_utr = EXCLUDED.expected_utr,
+                        amount_paise = EXCLUDED.amount_paise,
+                        currency = EXCLUDED.currency,
+                        merchant_account_id = EXCLUDED.merchant_account_id,
+                        settlement_status = EXCLUDED.settlement_status,
+                        settlement_date = EXCLUDED.settlement_date,
+                        rail_type = EXCLUDED.rail_type,
+                        source = EXCLUDED.source,
+                        verified_at = EXCLUDED.verified_at
+                """, (
+                    record["provider_record_id"],
+                    record["transfer_id"],
+                    record["expected_utr"],
+                    int(record["amount_paise"]),
+                    record.get("currency", "INR"),
+                    record["merchant_account_id"],
+                    record.get("settlement_status", "processed"),
+                    str(record["settlement_date"]),
+                    record.get("rail_type", "NEFT"),
+                    record.get("source", "webhook"),
+                    verified_at,
+                    record.get("tenant_id", "merchant_rzp_primary"),
+                ))
+            conn.commit()
+            return True
+
+    def get_trusted_provider_records_for_transfer(
+        self, transfer_id: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        with self._lock, self._get_connection() as conn:
+            with conn.cursor() as cur:
+                if tenant_id:
+                    cur.execute(
+                        "SELECT * FROM trusted_provider_records WHERE transfer_id = %s AND tenant_id = %s",
+                        (transfer_id, tenant_id),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT * FROM trusted_provider_records WHERE transfer_id = %s",
+                        (transfer_id,),
+                    )
+                return [dict(r) for r in cur.fetchall()]
+
+    def get_trusted_provider_records_by_utr(
+        self, expected_utr: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        with self._lock, self._get_connection() as conn:
+            with conn.cursor() as cur:
+                if tenant_id:
+                    cur.execute(
+                        "SELECT * FROM trusted_provider_records WHERE expected_utr = %s AND tenant_id = %s",
+                        (expected_utr, tenant_id),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT * FROM trusted_provider_records WHERE expected_utr = %s",
+                        (expected_utr,),
+                    )
+                return [dict(r) for r in cur.fetchall()]
 
     def health_check(self) -> Dict[str, Any]:
         with self._lock, self._get_connection() as conn:

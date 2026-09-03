@@ -50,7 +50,7 @@ try:
     from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel, Field, ConfigDict
 
 except ImportError:
     print("[ERROR] FastAPI not installed. Run: pip install fastapi uvicorn")
@@ -94,6 +94,7 @@ from kuber_recon.narration_parser import (
     NarrationEvidenceTier,
     RailSettlementConfig,
     TrustedProviderRecord,
+    get_rail_config,
 )
 from kuber_recon.simulation import FinancialDigitalTwin
 from kuber_recon.storage import PostgreSQLStorageBackend, SQLiteStorageBackend, StorageBackend, get_storage_backend
@@ -264,12 +265,28 @@ class WebhookIdempotencyStore:
             raise ValueError("sweep_expired_contracts requires a non-empty tenant_id.")
         return self.backend.sweep_expired_contracts(tenant_id=tenant_id)
 
+    def save_trusted_provider_record(self, record: Dict[str, Any]) -> bool:
+        """Persist an authoritative provider settlement/transfer record."""
+        return self.backend.save_trusted_provider_record(record)
+
+    def get_trusted_provider_records_for_transfer(
+        self, transfer_id: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve authoritative provider records linked to a specific transfer_id."""
+        return self.backend.get_trusted_provider_records_for_transfer(transfer_id, tenant_id=tenant_id)
+
+    def get_trusted_provider_records_by_utr(
+        self, expected_utr: str, tenant_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve authoritative provider records matching an expected UTR."""
+        return self.backend.get_trusted_provider_records_by_utr(expected_utr, tenant_id=tenant_id)
+
 
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 import logging
@@ -556,8 +573,9 @@ class ReleaseContractRequest(BaseModel):
     public_key_hex: str = Field(..., description="RFC 8032 Ed25519 32-byte public key in hex")
     signature_hex: str = Field(..., description="RFC 8032 Ed25519 64-byte signature in hex")
     bank_narration: Optional[str] = Field(None, description="Raw bank statement clearing narration to be parsed and joined")
-    provider_records: Optional[List[Dict[str, Any]]] = Field(None, description="Trusted provider records for 5-point join verification")
     require_narration_join: Optional[bool] = Field(False, description="Enforce that release must be joined to a valid bank narration")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class AutoReleaseNarrationRequest(BaseModel):
@@ -566,7 +584,8 @@ class AutoReleaseNarrationRequest(BaseModel):
     checker_id: str = "cfo_autonomous_verifier"
     public_key_hex: str = Field(..., description="RFC 8032 Ed25519 32-byte public key in hex")
     signature_hex: str = Field(..., description="RFC 8032 Ed25519 64-byte signature in hex")
-    provider_records: Optional[List[Dict[str, Any]]] = Field(None, description="Trusted provider records for 5-point join verification")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -956,9 +975,25 @@ async def razorpay_webhook_listener(
             transfer_id = transfer_entity["id"]
             notes = transfer_entity.get("notes") or {}
             apex_contract_id = notes.get("apex_contract_id")
+            utr = transfer_entity.get("utr") or transfer_entity.get("acquirer_data", {}).get("utr")
         except KeyError:
             pass
         else:
+            if transfer_id and utr:
+                idempotency_store.save_trusted_provider_record({
+                    "provider_record_id": f"rec_{transfer_id}_{utr}",
+                    "transfer_id": transfer_id,
+                    "expected_utr": utr,
+                    "amount_paise": int(transfer_entity.get("amount", 0)),
+                    "currency": transfer_entity.get("currency", "INR"),
+                    "merchant_account_id": transfer_entity.get("recipient") or transfer_entity.get("account", ""),
+                    "settlement_status": transfer_entity.get("status", "processed"),
+                    "settlement_date": str(date.today()),
+                    "rail_type": transfer_entity.get("rail") or "NEFT",
+                    "source": "webhook",
+                    "tenant_id": notes.get("tenant_id", "merchant_rzp_primary"),
+                })
+
             releasing_cid = idempotency_store.find_releasing_contract_by_transfer(
                 transfer_id=transfer_id,
                 contract_id=apex_contract_id,
@@ -1193,35 +1228,58 @@ def apex_release_settlement(
                 ),
             )
 
-        # Invariant 2: Candidate UTR must join to trusted provider record(s)
-        raw_providers = req.provider_records or contract_data.get("provider_records") or []
-        provider_matches: List[TrustedProviderRecord] = []
-        for p in raw_providers:
-            if isinstance(p, dict):
-                p_utr = p.get("expected_utr") or p.get("utr") or p.get("utr_number")
-                if p_utr == candidate.candidate_utr:
-                    try:
-                        s_date = p.get("settlement_date")
-                        if isinstance(s_date, str):
-                            s_date = datetime.strptime(s_date, "%Y-%m-%d").date()
-                        elif isinstance(s_date, datetime):
-                            s_date = s_date.date()
-                        elif not isinstance(s_date, date):
-                            s_date = date.today()
+        # Invariant 2: Candidate UTR must join strictly to SERVER-SIDE trusted provider records
+        # Client cannot supply provider records; they are fetched exclusively from the persisted
+        # webhook-verified store or queried authoritatively via Razorpay adapter.
+        transfer_id = contract_data.get("transfer_id")
+        server_provider_records: List[Dict[str, Any]] = []
+        if transfer_id:
+            server_provider_records.extend(
+                idempotency_store.get_trusted_provider_records_for_transfer(transfer_id=transfer_id, tenant_id=tenant_id)
+            )
+        # Also query server-side store by candidate UTR
+        utr_records = idempotency_store.get_trusted_provider_records_by_utr(expected_utr=candidate.candidate_utr, tenant_id=tenant_id)
+        for r in utr_records:
+            if r["provider_record_id"] not in {x["provider_record_id"] for x in server_provider_records}:
+                server_provider_records.append(r)
 
-                        provider_matches.append(
-                            TrustedProviderRecord(
-                                provider_record_id=p.get("provider_record_id") or p.get("provider_transfer_id") or p.get("transfer_id", f"trf_{candidate.candidate_utr[:8]}"),
-                                expected_utr=p_utr,
-                                amount_paise=int(p.get("amount_paise", contract_data["amount_paise"])),
-                                currency=p.get("currency", "INR"),
-                                merchant_account_id=p.get("merchant_account_id", contract_data.get("seller_account_id", contract_data["seller_agent_id"])),
-                                settlement_status=p.get("settlement_status", "processed"),
-                                settlement_date=s_date,
-                            )
+        # If not yet found in database store, attempt authoritative query from Razorpay adapter using transfer_id
+        if not server_provider_records and transfer_id:
+            gateway_record = razorpay_adapter.fetch_transfer_record(transfer_id=transfer_id, contract_data=contract_data)
+            if gateway_record:
+                # Persist provider event server-side before it can be used for release
+                idempotency_store.save_trusted_provider_record(gateway_record)
+                server_provider_records.append(gateway_record)
+
+        # Map to TrustedProviderRecord instances
+        provider_matches: List[TrustedProviderRecord] = []
+        for p in server_provider_records:
+            p_utr = p.get("expected_utr") or p.get("utr") or p.get("utr_number")
+            if p_utr == candidate.candidate_utr:
+                try:
+                    s_date = p.get("settlement_date")
+                    if isinstance(s_date, str):
+                        s_date = datetime.strptime(s_date, "%Y-%m-%d").date()
+                    elif isinstance(s_date, datetime):
+                        s_date = s_date.date()
+                    elif not isinstance(s_date, date):
+                        s_date = date.today()
+
+                    provider_matches.append(
+                        TrustedProviderRecord(
+                            provider_record_id=p["provider_record_id"],
+                            expected_utr=p_utr,
+                            amount_paise=int(p["amount_paise"]),
+                            currency=p.get("currency", "INR"),
+                            merchant_account_id=p["merchant_account_id"],
+                            settlement_status=p.get("settlement_status", "processed"),
+                            settlement_date=s_date,
+                            rail_type=p.get("rail_type", "NEFT"),
+                            source=p.get("source", "server_store"),
                         )
-                    except Exception as e:
-                        logger.warning(f"Malformed provider record rejected: {e}")
+                    )
+                except Exception as e:
+                    logger.warning("Malformed server-side provider record rejected: %s", e)
 
         # Fail closed on zero matches (proves: narration alone CANNOT trigger release)
         if len(provider_matches) == 0:
@@ -1239,12 +1297,22 @@ def apex_release_settlement(
 
         # Invariant 3: Exactly 1 provider record -> Execute 5-point verification
         matched_provider = provider_matches[0]
-        # Use date object for observed_date
-        observed_date = date.today()
-        if candidate.extracted_date_token:
-            with contextlib.suppress(Exception):
-                # parse token if available
-                pass
+
+        # Invariant 4: Derive observed statement date strictly from parsed narration date token
+        observed_date = IndianBankNarrationParser.parse_date_token(candidate.extracted_date_token)
+        if not observed_date:
+            raise HTTPException(
+                status_code=412,
+                detail=(
+                    "Narration Date Verification Refusal: Bank narration memo does not contain an extractable statement date token (YYYYMMDD or DDMMYYYY). "
+                    "Automated release requires a verifiable statement date matching provider settlement lifecycle. "
+                    "Routed to manual review queue."
+                ),
+            )
+
+        # Invariant 5: Derive rail-specific tolerance dynamically from trusted server-side record
+        rail_config = get_rail_config(matched_provider.rail_type)
+
         observed_account_id = contract_data.get("seller_account_id") or contract_data["seller_agent_id"]
 
         is_join_verified, join_refusal_reason = IndianBankNarrationParser.verify_provider_record_join(
@@ -1254,7 +1322,7 @@ def apex_release_settlement(
             observed_currency="INR",
             observed_account_id=observed_account_id,
             observed_date=observed_date,
-            rail_config=RailSettlementConfig(rail_name="NEFT"),
+            rail_config=rail_config,
         )
 
         if not is_join_verified:
@@ -1268,6 +1336,8 @@ def apex_release_settlement(
             "detected_bank": candidate.detected_bank,
             "evidence_tier": candidate.evidence_tier.value,
             "provider_record_id": matched_provider.provider_record_id,
+            "rail_type": matched_provider.rail_type,
+            "statement_date": str(observed_date),
             "join_verified": True,
             "verified_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -1351,7 +1421,6 @@ def auto_release_from_narration(
         public_key_hex=req.public_key_hex,
         signature_hex=req.signature_hex,
         bank_narration=req.bank_narration,
-        provider_records=req.provider_records,
         require_narration_join=True,
     )
     return apex_release_settlement(req=release_req, auth=auth)
