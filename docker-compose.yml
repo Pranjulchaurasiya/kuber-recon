@@ -1,0 +1,47 @@
+# ==============================================================================
+# NOTICE: PostgreSQL and Redis integration profile is exercised in CI containers.
+# ==============================================================================
+# Production-shaped service topology for local development, staging integration,
+# and CI verification. Environment variables are sourced strictly from .env.
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ── PostgreSQL 16 Storage Engine ───────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: kuber_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kuber_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kuber_local_secure_password_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-kuber_recon}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kuber_admin} -d ${POSTGRES_DB:-kuber_recon}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis 7 Distributed Lock & State Cache ────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: kuber_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

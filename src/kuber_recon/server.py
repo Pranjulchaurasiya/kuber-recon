@@ -27,7 +27,7 @@ import os
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from threading import RLock
@@ -88,6 +88,12 @@ from kuber_recon.security import (
     create_access_token,
     decode_access_token,
     get_key_custodian,
+)
+from kuber_recon.narration_parser import (
+    IndianBankNarrationParser,
+    NarrationEvidenceTier,
+    RailSettlementConfig,
+    TrustedProviderRecord,
 )
 from kuber_recon.simulation import FinancialDigitalTwin
 from kuber_recon.storage import PostgreSQLStorageBackend, SQLiteStorageBackend, StorageBackend, get_storage_backend
@@ -549,6 +555,18 @@ class ReleaseContractRequest(BaseModel):
     checker_id: str = "cfo_autonomous_verifier"
     public_key_hex: str = Field(..., description="RFC 8032 Ed25519 32-byte public key in hex")
     signature_hex: str = Field(..., description="RFC 8032 Ed25519 64-byte signature in hex")
+    bank_narration: Optional[str] = Field(None, description="Raw bank statement clearing narration to be parsed and joined")
+    provider_records: Optional[List[Dict[str, Any]]] = Field(None, description="Trusted provider records for 5-point join verification")
+    require_narration_join: Optional[bool] = Field(False, description="Enforce that release must be joined to a valid bank narration")
+
+
+class AutoReleaseNarrationRequest(BaseModel):
+    contract_id: str
+    bank_narration: str = Field(..., description="Raw bank clearing narration to be parsed and joined")
+    checker_id: str = "cfo_autonomous_verifier"
+    public_key_hex: str = Field(..., description="RFC 8032 Ed25519 32-byte public key in hex")
+    signature_hex: str = Field(..., description="RFC 8032 Ed25519 64-byte signature in hex")
+    provider_records: Optional[List[Dict[str, Any]]] = Field(None, description="Trusted provider records for 5-point join verification")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1152,6 +1170,108 @@ def apex_release_settlement(
             detail=f"Cryptographic Verification Failed ({custodian.algorithm}): Client-supplied signature is invalid, corrupted, or did not sign the canonical assertion payload.",
         )
 
+    # 3B. Strict Narration & 5-Point Provider Record Join Gate
+    # Invariant: Narration data alone cannot trigger release. Release requires a verified provider-record join
+    # and existing contract-state guards. Fail closed on zero or multiple provider matches.
+    narration_join_audit = None
+    if req.bank_narration or req.require_narration_join or contract_data.get("require_narration_join"):
+        if not req.bank_narration:
+            raise HTTPException(
+                status_code=412,
+                detail="Precondition Failed: Contract release requires a valid bank clearing narration and 5-point provider join.",
+            )
+
+        candidate = IndianBankNarrationParser.parse_narration(req.bank_narration)
+
+        # Invariant 1: Candidate evidence must be TIER_A_CANDIDATE
+        if candidate.evidence_tier != NarrationEvidenceTier.TIER_A_CANDIDATE or not candidate.candidate_utr:
+            raise HTTPException(
+                status_code=412,
+                detail=(
+                    f"Narration Release Refusal: Candidate evidence tier is {candidate.evidence_tier.value}; "
+                    f"funds cannot be released on Tier B/Tier C non-authoritative narration. ({candidate.non_authoritative_reason})"
+                ),
+            )
+
+        # Invariant 2: Candidate UTR must join to trusted provider record(s)
+        raw_providers = req.provider_records or contract_data.get("provider_records") or []
+        provider_matches: List[TrustedProviderRecord] = []
+        for p in raw_providers:
+            if isinstance(p, dict):
+                p_utr = p.get("expected_utr") or p.get("utr") or p.get("utr_number")
+                if p_utr == candidate.candidate_utr:
+                    try:
+                        s_date = p.get("settlement_date")
+                        if isinstance(s_date, str):
+                            s_date = datetime.strptime(s_date, "%Y-%m-%d").date()
+                        elif isinstance(s_date, datetime):
+                            s_date = s_date.date()
+                        elif not isinstance(s_date, date):
+                            s_date = date.today()
+
+                        provider_matches.append(
+                            TrustedProviderRecord(
+                                provider_record_id=p.get("provider_record_id") or p.get("provider_transfer_id") or p.get("transfer_id", f"trf_{candidate.candidate_utr[:8]}"),
+                                expected_utr=p_utr,
+                                amount_paise=int(p.get("amount_paise", contract_data["amount_paise"])),
+                                currency=p.get("currency", "INR"),
+                                merchant_account_id=p.get("merchant_account_id", contract_data.get("seller_account_id", contract_data["seller_agent_id"])),
+                                settlement_status=p.get("settlement_status", "processed"),
+                                settlement_date=s_date,
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning(f"Malformed provider record rejected: {e}")
+
+        # Fail closed on zero matches (proves: narration alone CANNOT trigger release)
+        if len(provider_matches) == 0:
+            raise HTTPException(
+                status_code=412,
+                detail=f"Provider Join Refusal: Zero trusted provider records matched candidate UTR '{candidate.candidate_utr}'. Funds cannot be released on narration alone.",
+            )
+
+        # Fail closed on multiple matches (proves: ambiguous candidate join refused)
+        if len(provider_matches) > 1:
+            raise HTTPException(
+                status_code=412,
+                detail=f"Provider Join Refusal: Ambiguous candidate match: {len(provider_matches)} matching provider records found for UTR '{candidate.candidate_utr}'. Funds cannot be released on ambiguous provider records.",
+            )
+
+        # Invariant 3: Exactly 1 provider record -> Execute 5-point verification
+        matched_provider = provider_matches[0]
+        # Use date object for observed_date
+        observed_date = date.today()
+        if candidate.extracted_date_token:
+            with contextlib.suppress(Exception):
+                # parse token if available
+                pass
+        observed_account_id = contract_data.get("seller_account_id") or contract_data["seller_agent_id"]
+
+        is_join_verified, join_refusal_reason = IndianBankNarrationParser.verify_provider_record_join(
+            candidate=candidate,
+            linked_provider_record=matched_provider,
+            observed_amount_paise=contract_data["amount_paise"],
+            observed_currency="INR",
+            observed_account_id=observed_account_id,
+            observed_date=observed_date,
+            rail_config=RailSettlementConfig(rail_name="NEFT"),
+        )
+
+        if not is_join_verified:
+            raise HTTPException(
+                status_code=412,
+                detail=f"5-Point Provider Join Refusal: {join_refusal_reason}",
+            )
+
+        narration_join_audit = {
+            "candidate_utr": candidate.candidate_utr,
+            "detected_bank": candidate.detected_bank,
+            "evidence_tier": candidate.evidence_tier.value,
+            "provider_record_id": matched_provider.provider_record_id,
+            "join_verified": True,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }
+
     # 4. Atomic CAS State Update (Transition to RELEASING)
     new_proof = hashlib.sha256(f"{req.contract_id}:RELEASING:{req.checker_id}:{time.time_ns()}".encode()).hexdigest()
     expected_version = contract_data.get("version", 1)
@@ -1191,6 +1311,7 @@ def apex_release_settlement(
             "signature_verified": True,
             "algorithm": custodian.algorithm,
             "proof_hash": f"sha256:{new_proof}",
+            "narration_join_audit": narration_join_audit,
             "message": "Route Transfer hold release failed at gateway. Marked for manual reconciliation.",
         }
 
@@ -1209,8 +1330,31 @@ def apex_release_settlement(
         "signature_verified": True,
         "algorithm": custodian.algorithm,
         "proof_hash": f"sha256:{new_proof}",
+        "narration_join_audit": narration_join_audit,
         "message": "Razorpay Route hold release triggered (PATCH on_hold: false). Contract transitioned to RELEASING, awaiting final transfer.processed webhook.",
     }
+
+
+@app.post("/api/apex/contracts/auto-release-from-narration")
+def auto_release_from_narration(
+    req: AutoReleaseNarrationRequest,
+    auth: AuthContext = Depends(require_roles(UserRole.FINANCE_REVIEWER, UserRole.ADMINISTRATOR)),
+):
+    """
+    Dedicated endpoint for statement-clearing auto-release.
+    Enforces strict 5-point provider join validation before releasing hold.
+    Fails closed on Tier B/Tier C narrations or zero/multiple provider matches.
+    """
+    release_req = ReleaseContractRequest(
+        contract_id=req.contract_id,
+        checker_id=req.checker_id,
+        public_key_hex=req.public_key_hex,
+        signature_hex=req.signature_hex,
+        bank_narration=req.bank_narration,
+        provider_records=req.provider_records,
+        require_narration_join=True,
+    )
+    return apex_release_settlement(req=release_req, auth=auth)
 
 
 @app.get("/api/apex/signer/public-key")

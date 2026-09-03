@@ -1,0 +1,75 @@
+name: PostgreSQL & Redis Container Integration CI
+
+on:
+  push:
+    branches: [ "main", "feat/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: postgres-redis-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Security Notice: Database credentials below are ephemeral, container-scoped passwords
+# generated specifically for isolated runner instances and have no production or staging access.
+env:
+  CI_POSTGRES_USER: kuber_ci_user
+  CI_POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'kuber_ephemeral_ci_password_2026' }}
+  CI_POSTGRES_DB: kuber_recon_ci
+
+jobs:
+  integration-test:
+    name: Container-Backed PostgreSQL & Redis Invariant Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kuber_ci_user
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'kuber_ephemeral_ci_password_2026' }}
+          POSTGRES_DB: kuber_recon_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kuber_ci_user -d kuber_recon_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install System & Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install psycopg2-binary redis
+
+      - name: Run Strict PostgreSQL & Redis Integration Suite (Fails on SQLite Fallback)
+        env:
+          PYTHONPATH: src
+          KUBER_ENV: STAGING
+          DATABASE_URL: postgresql://kuber_ci_user:${{ secrets.CI_POSTGRES_PASSWORD || 'kuber_ephemeral_ci_password_2026' }}@localhost:5432/kuber_recon_ci
+          REDIS_URL: redis://localhost:6379/0
+          REQUIRE_POSTGRES_REDIS: "true"
+        run: |
+          pytest -v tests/test_postgres_redis_integration.py
+

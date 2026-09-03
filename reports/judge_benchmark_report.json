@@ -1,0 +1,132 @@
+{
+  "generated_at": "2026-09-03T19:40:27.017124+00:00",
+  "pipeline": "ClusteredReconciliationPipeline with Multi-Bank Narration Parser",
+  "accounting_policy": "Dual Accounting: Explicit Reconciled Volume + Explicit Exception Volume; Zero Unexplained Delta",
+  "results": [
+    {
+      "scenario_target": 50,
+      "total_records_ingested": 80,
+      "invoices_count": 71,
+      "bank_credits_count": 9,
+      "total_input_credits_paise": 8901859,
+      "iterations": 3,
+      "mean_latency_ms": 7.19,
+      "p50_latency_ms": 2.49,
+      "p95_latency_ms": 16.64,
+      "p99_latency_ms": 16.64,
+      "throughput_records_per_sec": 11125.1,
+      "structured_breakdown": {
+        "exact_subset_sum_matches": 6,
+        "planted_ambiguities_refused": 1,
+        "dense_clusters_quarantined": 1,
+        "tier_b_non_authoritative_holds": 1,
+        "tier_c_malformed_exceptions": 1,
+        "unmatched_clean_credits": 0,
+        "total_reconciled_paise": 8278359,
+        "total_exceptions_paise": 623500,
+        "unexplained_delta_paise": 0,
+        "zero_float_policy_verified": true
+      }
+    },
+    {
+      "scenario_target": 100,
+      "total_records_ingested": 121,
+      "invoices_count": 106,
+      "bank_credits_count": 15,
+      "total_input_credits_paise": 17903006,
+      "iterations": 3,
+      "mean_latency_ms": 16.83,
+      "p50_latency_ms": 14.0,
+      "p95_latency_ms": 23.54,
+      "p99_latency_ms": 23.54,
+      "throughput_records_per_sec": 7188.6,
+      "structured_breakdown": {
+        "exact_subset_sum_matches": 12,
+        "planted_ambiguities_refused": 1,
+        "dense_clusters_quarantined": 1,
+        "tier_b_non_authoritative_holds": 1,
+        "tier_c_malformed_exceptions": 1,
+        "unmatched_clean_credits": 0,
+        "total_reconciled_paise": 17279506,
+        "total_exceptions_paise": 623500,
+        "unexplained_delta_paise": 0,
+        "zero_float_policy_verified": true
+      }
+    },
+    {
+      "scenario_target": 250,
+      "total_records_ingested": 243,
+      "invoices_count": 211,
+      "bank_credits_count": 32,
+      "total_input_credits_paise": 45697182,
+      "iterations": 3,
+      "mean_latency_ms": 16.93,
+      "p50_latency_ms": 16.5,
+      "p95_latency_ms": 18.08,
+      "p99_latency_ms": 18.08,
+      "throughput_records_per_sec": 14354.0,
+      "structured_breakdown": {
+        "exact_subset_sum_matches": 29,
+        "planted_ambiguities_refused": 1,
+        "dense_clusters_quarantined": 1,
+        "tier_b_non_authoritative_holds": 1,
+        "tier_c_malformed_exceptions": 1,
+        "unmatched_clean_credits": 0,
+        "total_reconciled_paise": 45073682,
+        "total_exceptions_paise": 623500,
+        "unexplained_delta_paise": 0,
+        "zero_float_policy_verified": true
+      }
+    },
+    {
+      "scenario_target": 500,
+      "total_records_ingested": 447,
+      "invoices_count": 386,
+      "bank_credits_count": 61,
+      "total_input_credits_paise": 92950819,
+      "iterations": 3,
+      "mean_latency_ms": 28.77,
+      "p50_latency_ms": 30.84,
+      "p95_latency_ms": 31.42,
+      "p99_latency_ms": 31.42,
+      "throughput_records_per_sec": 15536.5,
+      "structured_breakdown": {
+        "exact_subset_sum_matches": 58,
+        "planted_ambiguities_refused": 1,
+        "dense_clusters_quarantined": 1,
+        "tier_b_non_authoritative_holds": 1,
+        "tier_c_malformed_exceptions": 1,
+        "unmatched_clean_credits": 0,
+        "total_reconciled_paise": 92327319,
+        "total_exceptions_paise": 623500,
+        "unexplained_delta_paise": 0,
+        "zero_float_policy_verified": true
+      }
+    },
+    {
+      "scenario_target": 1000,
+      "total_records_ingested": 855,
+      "invoices_count": 736,
+      "bank_credits_count": 119,
+      "total_input_credits_paise": 185881099,
+      "iterations": 3,
+      "mean_latency_ms": 48.09,
+      "p50_latency_ms": 45.05,
+      "p95_latency_ms": 54.44,
+      "p99_latency_ms": 54.44,
+      "throughput_records_per_sec": 17779.5,
+      "structured_breakdown": {
+        "exact_subset_sum_matches": 116,
+        "planted_ambiguities_refused": 1,
+        "dense_clusters_quarantined": 1,
+        "tier_b_non_authoritative_holds": 1,
+        "tier_c_malformed_exceptions": 1,
+        "unmatched_clean_credits": 0,
+        "total_reconciled_paise": 185257599,
+        "total_exceptions_paise": 623500,
+        "unexplained_delta_paise": 0,
+        "zero_float_policy_verified": true
+      }
+    }
+  ]
+}

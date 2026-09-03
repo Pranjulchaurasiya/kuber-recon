@@ -476,6 +476,7 @@ class ClusteredReconciliationPipeline:
 
         credit_matches: Dict[str, List[Tuple[Tuple[str, date], ReconciledSettlementBlock]]] = defaultdict(list)
 
+        intra_cluster_exceptions: Dict[str, str] = {}
         for cluster_key, active_invoices in cluster_candidate_invoices.items():
             if not active_invoices:
                 continue
@@ -491,13 +492,16 @@ class ClusteredReconciliationPipeline:
             if not candidate_credits:
                 continue
 
-            reconciled_blocks, _ = self.engine.reconcile_batch(
+            reconciled_blocks, cluster_exceptions = self.engine.reconcile_batch(
                 candidate_credits,
                 active_invoices,
                 holidays=holidays,
             )
             for block in reconciled_blocks:
                 credit_matches[block.utr_number].append((cluster_key, block))
+            for c_exc, reason in cluster_exceptions:
+                if c_exc.utr_number not in intra_cluster_exceptions or "AMBIGUOUS" in reason:
+                    intra_cluster_exceptions[c_exc.utr_number] = reason
 
 
         # 6. Resolve Global Matches with Anti-Greedy Ambiguity Protection
@@ -521,7 +525,8 @@ class ClusteredReconciliationPipeline:
                     f"AMBIGUOUS_COLLISION (Credit matches valid subsets across {len(matches)} distinct clusters: {colliding_clusters})",
                 ))
             else:
-                all_exceptions.append((credit, "NO_EXACT_COVER_FOUND"))
+                fallback_reason = intra_cluster_exceptions.get(credit.utr_number, "NO_EXACT_COVER_FOUND")
+                all_exceptions.append((credit, fallback_reason))
 
         t_solve_end = time.perf_counter()
         total_time_ms = (time.perf_counter() - t0) * 1000.0

@@ -244,6 +244,9 @@ def main():
         serve_web_console(port)
     elif args[0] == "simulate-shock":
         run_digital_twin_simulation()
+    elif args[0] == "verify-razorpay-wire":
+        from kuber_recon.wire_diagnostic import cli_main
+        cli_main()
     elif args[0] == "run-benchmark":
         records = 10000
         if "--records" in args:
