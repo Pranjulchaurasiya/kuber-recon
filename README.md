@@ -293,7 +293,7 @@ python scripts/verify_live_control_loop.py
 
 ## 🚧 Known Limitations & System Boundaries
 
-> **Submission Positioning:** *KuberRecon is a sandbox-verified Track 04 finance-control prototype with reproducible synthetic benchmarks, deterministic paise-exact reconciliation, explicit ambiguity refusal, and server-side release guards. Live provider onboarding and production infrastructure remain future work.*
+> **Submission Positioning:** *KuberRecon is a sandbox-verified Track 04 finance-control prototype. It reconciles synthetic multi-source batches with paise-exact arithmetic, refuses ambiguous matches, accounts for every paise as reconciled or exception-held, and demonstrates server-side release controls. Live Razorpay provider onboarding and production infrastructure remain future work.*
 
 1. **Local Software Key Custody:** Asymmetric Ed25519 keypairs are demonstration keys executed in server-side software memory (Python `cryptography` hazmat); production requires hardware KMS/CloudHSM custody.
 2. **Mock / Sandbox Rails Default:** When live Razorpay API keys are absent, transfer creation and webhook processing execute against our deterministic sandbox simulation adapter.

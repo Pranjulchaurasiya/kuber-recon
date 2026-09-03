@@ -96,7 +96,7 @@ python -m kuber_recon.cli run-demo
 python -m pytest tests/ -q
 ```
 
-> *"Every claim we’ve demonstrated is backed by **212 automated invariant tests** running across 29 modules—including AST scanners enforcing zero floats, multi-threaded concurrency suites proving zero over-recovery, and 0.000 False Match Rate verification on our synthetic benchmark fixture corpus.*
+> *"Every claim we’ve demonstrated is backed by **275 automated tests (0 failures)** running across 29 modules—including AST scanners enforcing zero floats, multi-threaded concurrency suites proving zero over-recovery, 0 observed false auto-matches on our committed synthetic benchmark corpus with ambiguity refused, and exact paise dual accounting.*
 > 
 > *Thank you. We are happy to take your questions."*
 
