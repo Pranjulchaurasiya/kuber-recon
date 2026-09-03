@@ -7,7 +7,7 @@
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
 [![Tests Passing](https://img.shields.io/badge/pytest-275%20passed%20(0%20failures)-brightgreen)](tests/)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
-[![Official Benchmark](https://img.shields.io/badge/Track%2004-Official%20Benchmark%20Frozen-gold)](reports/official_track04_benchmark.md)
+[![Evaluation Benchmark](https://img.shields.io/badge/Track%2004-Evaluation%20Benchmark-gold)](reports/track04_evaluation_benchmark.md)
 
 [![Zero-Float Policy](https://img.shields.io/badge/AST%20Static%20Linter-Zero%20Floats%20Guarded-success)](tests/test_zero_float_policy.py)
 [![Razorpay Route Integration](https://img.shields.io/badge/Razorpay%20Route-Transfer%20Hold%20Gating-gold)](src/kuber_recon/server.py)
@@ -15,7 +15,7 @@
 [![Security & Tenant Isolation](https://img.shields.io/badge/Tenant%20Auth-401%20Enforced%20%26%20Sanitized-purple)](tests/test_security_tenant_isolation.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Official Benchmark ](reports/official_track04_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-275-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
+[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Evaluation Benchmark ](reports/track04_evaluation_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-275-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
 
 ---
 
@@ -197,36 +197,36 @@ Judges can verify all major financial invariants in real time on the running API
 # 1. Health & Storage Status (Reports active SQLite WAL backend & metrics)
 curl -s http://127.0.0.1:8000/health
 
-# 2. Clustered MITM Batch Reconciliation (100 Transactions, 0 paise drift)
+# 2. Clustered MITM Batch Reconciliation (100 Transactions, 0 unexplained paise within corpus model)
 curl -s -X POST http://127.0.0.1:8000/api/v2/reconcile/batch-clustered \
   -H "Content-Type: application/json" \
   -H "X-Merchant-Id: merchant_rzp_primary" \
-  -H "X-API-Key: kuber_sandbox_key_primary_2026" \
+  -H "X-API-Key: $KUBER_API_KEY" \
   -d '{"records": 100, "seed": 42}'
 
-# 3. Global Multi-Cluster Ambiguity Refusal (Proves zero false match tolerance)
+# 3. Global Multi-Cluster Ambiguity Refusal (0 observed false auto-matches)
 curl -s -X POST http://127.0.0.1:8000/api/reconcile/ambiguous \
   -H "X-Merchant-Id: merchant_rzp_primary" \
-  -H "X-API-Key: kuber_sandbox_key_primary_2026"
+  -H "X-API-Key: $KUBER_API_KEY"
 
 # 4. Create APEX Route Escrow Contract (Funds locked with on_hold: true)
 curl -s -X POST http://127.0.0.1:8000/api/apex/contracts/create \
   -H "Content-Type: application/json" \
   -H "X-Merchant-Id: merchant_rzp_primary" \
-  -H "X-API-Key: kuber_sandbox_key_primary_2026" \
-  -d '{"buyer_agent_id":"buyer_01","seller_agent_id":"seller_01","seller_account_id":"acc_mock_01","amount_paise":50000,"expected_record_count":1,"ttl_seconds":3600}'
+  -H "X-API-Key: $KUBER_API_KEY" \
+  -d '{"buyer_agent_id":"buyer_01","seller_agent_id":"agent_seller_data_01","seller_account_id":"acc_mock_01","amount_paise":50000,"expected_record_count":1,"ttl_seconds":3600}'
 
 # 5. Dual-Authorization Anti-Collusion Guard (Buyer attempting self-release rejected)
 curl -s -X POST http://127.0.0.1:8000/api/apex/contracts/release \
   -H "Content-Type: application/json" \
   -H "X-Merchant-Id: merchant_rzp_primary" \
-  -H "X-API-Key: kuber_sandbox_key_primary_2026" \
+  -H "X-API-Key: $KUBER_API_KEY" \
   -d '{"contract_id":"apex_cnt_sample","checker_id":"buyer_01","public_key_hex":"00","signature_hex":"00"}'
 
 # 6. Working Capital Advance Sweep (Autonomous nodal split-recovery at source)
 curl -s -X POST http://127.0.0.1:8000/api/capital/reconcile-and-sweep \
   -H "X-Merchant-Id: merchant_rzp_primary" \
-  -H "X-API-Key: kuber_sandbox_key_primary_2026"
+  -H "X-API-Key: $KUBER_API_KEY"
 ```
 
 ---
@@ -260,9 +260,14 @@ cd frontend && npm run dev
 python -m pytest -q
 ```
 
-### 4. Run Official Deterministic Benchmark Suite (Track 04)
+### 4. Run Track 04 Project Evaluation Benchmark
 ```bash
-python scripts/run_official_benchmark.py
+python scripts/run_track04_evaluation_benchmark.py
+```
+
+### 5. Verify Complete Finance-Ops Control Loop (Signed Webhooks)
+```bash
+python scripts/verify_live_control_loop.py
 ```
 
 ---
@@ -287,6 +292,8 @@ python scripts/run_official_benchmark.py
 ---
 
 ## 🚧 Known Limitations & System Boundaries
+
+> **Submission Positioning:** *KuberRecon is a sandbox-verified Track 04 finance-control prototype with reproducible synthetic benchmarks, deterministic paise-exact reconciliation, explicit ambiguity refusal, and server-side release guards. Live provider onboarding and production infrastructure remain future work.*
 
 1. **Local Software Key Custody:** Asymmetric Ed25519 keypairs are demonstration keys executed in server-side software memory (Python `cryptography` hazmat); production requires hardware KMS/CloudHSM custody.
 2. **Mock / Sandbox Rails Default:** When live Razorpay API keys are absent, transfer creation and webhook processing execute against our deterministic sandbox simulation adapter.

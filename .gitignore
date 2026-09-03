@@ -36,6 +36,7 @@ frontend/next-env.d.ts
 # Virtual environments & secrets
 .env
 .env.*
+!.env.example
 .venv
 env/
 venv/

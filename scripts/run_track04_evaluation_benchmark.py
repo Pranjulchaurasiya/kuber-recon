@@ -1,15 +1,15 @@
 """
-Track 04 Official Benchmark Suite: Deterministic Frozen Datasets & Dual Accounting
-===================================================================================
-Executes the three official benchmark runs defined in Track 04 Winning Benchmark:
+Track 04 Project Evaluation Benchmark Suite: Deterministic Datasets & Dual Accounting
+======================================================================================
+Project evaluation benchmark aligned to Track 04 specifications:
 1. Clean Batch (100 records, seed=1001): Straight reconciliation and throughput.
 2. Messy Batch (250 records, seed=2002): Narration variation, missing fields, date variance.
 3. Adversarial Batch (500 records, seed=3003): Duplicate events, ambiguous subsets,
    oversized clusters, cross-tenant attempts, and malformed clearing memos.
 
 Outputs:
-- reports/official_track04_benchmark.json
-- reports/official_track04_benchmark.md (Human-readable table)
+- reports/track04_evaluation_benchmark.json
+- reports/track04_evaluation_benchmark.md (Human-readable table)
 """
 
 from datetime import date, datetime, timedelta, timezone
@@ -266,7 +266,7 @@ def execute_run(scenario_name: str, target: int, seed: int, runs: int = 3) -> Di
 
 def main():
     print("=" * 90)
-    print(" [OFFICIAL BENCHMARK] RAZORPAY BUILDATHON TRACK 04 -- FROZEN BENCHMARK SUITE")
+    print(" [BENCHMARK] KUBERRECON PROJECT EVALUATION BENCHMARK -- ALIGNED TO TRACK 04")
     print("=" * 90)
     
     scenarios = [
@@ -289,24 +289,24 @@ def main():
 
     reports_dir = Path(__file__).resolve().parent.parent / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
-    json_path = reports_dir / "official_track04_benchmark.json"
-    md_path = reports_dir / "official_track04_benchmark.md"
+    json_path = reports_dir / "track04_evaluation_benchmark.json"
+    md_path = reports_dir / "track04_evaluation_benchmark.md"
 
     # Save JSON
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump({
-            "benchmark_version": "Track04_Final_Frozen_v1",
+            "benchmark_version": "Track04_Evaluation_v1",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "git_commit": get_git_commit(),
             "results": results,
         }, f, indent=2)
 
     # Save Markdown Table
-    md_content = f"""# Official Track 04 Benchmark Results (Deterministic Frozen Suite)
+    md_content = f"""# Track 04 Project Evaluation Benchmark Results
 
 Generated: `{datetime.now(timezone.utc).isoformat()}`  
 Git Commit: `{get_git_commit()}`  
-Mathematical Policy: **Exact Paise Arithmetic (Zero Floats), Dual Accounting Balance Sheet**
+Mathematical Policy: **Exact Base-10 Integer Paise Arithmetic (Zero Floats), Dual Accounting Balance Sheet**
 
 | Metric | Clean Batch (100) | Messy Batch (250) | Adversarial Batch (500) |
 | :--- | :---: | :---: | :---: |
@@ -329,16 +329,17 @@ Mathematical Policy: **Exact Paise Arithmetic (Zero Floats), Dual Accounting Bal
 | **p95 Latency** | {results[0]['p95_latency_ms']} ms | {results[1]['p95_latency_ms']} ms | {results[2]['p95_latency_ms']} ms |
 | **Throughput (rec/s)** | {results[0]['throughput_records_per_second']} rec/s | {results[1]['throughput_records_per_second']} rec/s | {results[2]['throughput_records_per_second']} rec/s |
 
-### Winning Invariant Proof:
-1. **Zero Unexplained Delta:** $\\text{{Bank Credits Total}} = \\text{{Auto-Resolved Total}} + \\text{{Exception Queue Total}}$. Every single paisa is accounted for.
-2. **Anti-Greedy Ambiguity Refusal:** Multi-solution subset sums ($|S| > 1$) are refused 100% of the time.
-3. **Graceful Combinatorial Degradation:** Over-dense clusters ($N > 24$) are quarantined to the manual review queue without guessing.
+### Invariant Proofs (Synthetic Corpus Evaluation):
+1. **0 Unexplained Paise:** $\\text{{Bank Credits Total}} = \\text{{Auto-Resolved Total}} + \\text{{Exception Queue Total}}$ (0 unexplained paise within the corpus accounting model, including explicitly classified exceptions).
+2. **0 Observed False Auto-Matches:** Exact matching observed 0 false matches across tested synthetic fixtures.
+3. **Ambiguity Refusal:** Multi-solution subset sums ($|S| > 1$) are refused 100% of the time.
+4. **Combinatorial Degradation:** Over-dense clusters ($N > 24$) are quarantined to the review queue without guessing.
 """
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md_content)
 
     print("\n" + "=" * 90)
-    print(f" [SUCCESS] Official Track 04 Benchmark Complete.")
+    print(f" [SUCCESS] Track 04 Project Evaluation Benchmark Complete.")
     print(f" Saved JSON: {json_path}")
     print(f" Saved Markdown: {md_path}")
     print("=" * 90)

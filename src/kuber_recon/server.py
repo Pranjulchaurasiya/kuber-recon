@@ -980,6 +980,26 @@ async def razorpay_webhook_listener(
             pass
         else:
             if transfer_id and utr:
+                settled_ts = (
+                    transfer_entity.get("settled_at")
+                    or transfer_entity.get("created_at")
+                    or payload.get("created_at")
+                )
+                if settled_ts:
+                    try:
+                        settlement_date_str = str(datetime.fromtimestamp(int(settled_ts), tz=timezone.utc).date())
+                    except (ValueError, TypeError, OverflowError):
+                        settlement_date_str = str(date.today())
+                else:
+                    settlement_date_str = str(date.today())
+
+                rail_str = (
+                    transfer_entity.get("rail")
+                    or transfer_entity.get("method")
+                    or transfer_entity.get("mode")
+                    or "NEFT"
+                ).upper()
+
                 idempotency_store.save_trusted_provider_record({
                     "provider_record_id": f"rec_{transfer_id}_{utr}",
                     "transfer_id": transfer_id,
@@ -988,8 +1008,8 @@ async def razorpay_webhook_listener(
                     "currency": transfer_entity.get("currency", "INR"),
                     "merchant_account_id": transfer_entity.get("recipient") or transfer_entity.get("account", ""),
                     "settlement_status": transfer_entity.get("status", "processed"),
-                    "settlement_date": str(date.today()),
-                    "rail_type": transfer_entity.get("rail") or "NEFT",
+                    "settlement_date": settlement_date_str,
+                    "rail_type": rail_str,
                     "source": "webhook",
                     "tenant_id": notes.get("tenant_id", "merchant_rzp_primary"),
                 })

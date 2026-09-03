@@ -8,7 +8,7 @@ Supports:
 """
 
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import requests
@@ -161,6 +161,15 @@ class RazorpayClientAdapter:
             or transfer_id.startswith("trf_mock_")
         )
         if is_sandbox_transfer and contract_data:
+            contract_ts = contract_data.get("created_at")
+            if contract_ts:
+                try:
+                    settlement_date_str = str(datetime.fromtimestamp(int(contract_ts), tz=timezone.utc).date())
+                except (ValueError, TypeError, OverflowError):
+                    settlement_date_str = str(date.today())
+            else:
+                settlement_date_str = str(date.today())
+
             return {
                 "provider_record_id": f"rec_{transfer_id}",
                 "transfer_id": transfer_id,
@@ -169,7 +178,7 @@ class RazorpayClientAdapter:
                 "currency": contract_data.get("currency", "INR"),
                 "merchant_account_id": contract_data.get("seller_account_id") or contract_data.get("seller_agent_id"),
                 "settlement_status": "processed",
-                "settlement_date": str(date.today()),
+                "settlement_date": settlement_date_str,
                 "rail_type": "NEFT",
                 "source": "gateway_api",
                 "tenant_id": contract_data.get("tenant_id", "merchant_rzp_primary"),

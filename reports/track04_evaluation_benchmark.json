@@ -1,7 +1,7 @@
 {
-  "benchmark_version": "Track04_Final_Frozen_v1",
-  "generated_at": "2026-09-03T21:22:45.957369+00:00",
-  "git_commit": "dbbe5ab1e66fb1dbbbe5ed7f0f9b14d819351843",
+  "benchmark_version": "Track04_Evaluation_v1",
+  "generated_at": "2026-09-03T21:41:13.463343+00:00",
+  "git_commit": "156b0cc4404989e0fab65e951efa8d073b4e5734",
   "results": [
     {
       "dataset_name": "clean_batch_100",
@@ -21,10 +21,10 @@
       "observed_false_matches": 0,
       "precision": 1.0,
       "auto_resolution_rate": 0.9524,
-      "p50_latency_ms": 4.94,
-      "p95_latency_ms": 24.15,
-      "throughput_records_per_second": 11408.5,
-      "git_commit": "dbbe5ab1e66fb1dbbbe5ed7f0f9b14d819351843"
+      "p50_latency_ms": 5.11,
+      "p95_latency_ms": 39.87,
+      "throughput_records_per_second": 7503.6,
+      "git_commit": "156b0cc4404989e0fab65e951efa8d073b4e5734"
     },
     {
       "dataset_name": "messy_batch_250",
@@ -44,10 +44,10 @@
       "observed_false_matches": 0,
       "precision": 1.0,
       "auto_resolution_rate": 0.6857,
-      "p50_latency_ms": 7.02,
-      "p95_latency_ms": 8.24,
-      "throughput_records_per_second": 33062.0,
-      "git_commit": "dbbe5ab1e66fb1dbbbe5ed7f0f9b14d819351843"
+      "p50_latency_ms": 8.34,
+      "p95_latency_ms": 9.58,
+      "throughput_records_per_second": 29020.7,
+      "git_commit": "156b0cc4404989e0fab65e951efa8d073b4e5734"
     },
     {
       "dataset_name": "adversarial_batch_500",
@@ -67,10 +67,10 @@
       "observed_false_matches": 0,
       "precision": 1.0,
       "auto_resolution_rate": 0.8514,
-      "p50_latency_ms": 38.84,
-      "p95_latency_ms": 40.18,
-      "throughput_records_per_second": 12247.3,
-      "git_commit": "dbbe5ab1e66fb1dbbbe5ed7f0f9b14d819351843"
+      "p50_latency_ms": 36.46,
+      "p95_latency_ms": 39.79,
+      "throughput_records_per_second": 12410.4,
+      "git_commit": "156b0cc4404989e0fab65e951efa8d073b4e5734"
     }
   ]
 }
