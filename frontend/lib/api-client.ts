@@ -113,7 +113,7 @@ export async function executeCapitalDrawdown(merchantId = 'merchant_rzp_primary'
     }
     return { ok: true, data: body, status: res.status }
   } catch (err: any) {
-    return { ok: false, error: err.message || 'Network error connecting to APEX Kernel' }
+    return { ok: false, error: err.message || 'Network error connecting to Kuber Kernel' }
   }
 }
 

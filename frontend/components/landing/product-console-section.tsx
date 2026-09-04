@@ -71,7 +71,7 @@ export function ProductConsoleSection() {
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
               <div>
-                <h3 className="text-lg font-bold text-foreground">APEX Capital Merchant Terminal</h3>
+                <h3 className="text-lg font-bold text-foreground">Kuber Capital Merchant Terminal</h3>
                 <p className="text-xs text-muted-foreground">
                   Live underwritten facility for Delhi Hyperlocal Logistics (<code className="font-mono">merch_delhi_hyperlocal_01</code>)
                 </p>
@@ -91,7 +91,7 @@ export function ProductConsoleSection() {
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
               <div>
-                <h3 className="text-lg font-bold text-foreground">APEX Pre-Settlement Escrow Console</h3>
+                <h3 className="text-lg font-bold text-foreground">Kuber Pre-Settlement Escrow Console</h3>
                 <p className="text-xs text-muted-foreground">
                   Cryptographic delivery gating & Horowitz–Sahni subset-sum settlement matching
                 </p>

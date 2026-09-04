@@ -22,7 +22,7 @@ export function ConvergenceScene() {
         <div className="flex items-center gap-2.5">
           <span className="flex h-2.5 w-2.5 rounded-full bg-gain animate-status-dot" />
           <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
-            APEX Autonomous Convergence Circuit
+            Kuber Settlement Assurance Circuit
           </span>
           <span className="rounded bg-accent px-2 py-0.5 font-mono text-[10px] uppercase font-semibold text-primary border border-border">
             Route Escrow Sandbox Stream
@@ -51,11 +51,11 @@ export function ConvergenceScene() {
           <svg
             viewBox="0 0 920 340"
             className="w-full h-auto drop-shadow-sm select-none"
-            aria-label="APEX 3-Stream Convergence Diagram"
+            aria-label="Kuber 3-Stream Settlement Convergence Diagram"
           >
             <defs>
               {/* Glow Filter */}
-              <filter id="apex-glow" x="-40%" y="-40%" width="180%" height="180%">
+              <filter id="kuber-glow" x="-40%" y="-40%" width="180%" height="180%">
                 <feGaussianBlur stdDeviation="8" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
@@ -210,7 +210,7 @@ export function ConvergenceScene() {
               />
             )}
 
-            {/* ── 3. Central Glowing Reactor: APEX Underwriter ────────────── */}
+            {/* ── 3. Central Glowing Reactor: Kuber Recon Solver ────────────── */}
             <g className="cursor-pointer">
               {/* Outer Halo */}
               {isIgnited && (
@@ -220,7 +220,7 @@ export function ConvergenceScene() {
                   r="72"
                   className="fill-none stroke-[var(--primary)]/30"
                   strokeWidth="6"
-                  filter="url(#apex-glow)"
+                  filter="url(#kuber-glow)"
                 />
               )}
               {/* Reactor Core */}
@@ -232,7 +232,7 @@ export function ConvergenceScene() {
                 strokeWidth="2.5"
               />
               <text x="490" y="142" textAnchor="middle" className="fill-[var(--muted-foreground)] text-[9px] font-mono font-bold tracking-wider">
-                APEX UNDERWRITER
+                KUBER RECON SOLVER
               </text>
               <text x="490" y="164" textAnchor="middle" className="fill-[var(--foreground)] text-sm font-mono font-extrabold">
                 SRI: 0.9675
@@ -284,7 +284,7 @@ export function ConvergenceScene() {
               />
               <circle cx="658" cy="106" r="4" className="fill-[var(--gain)]" />
               <text x="670" y="110" className="fill-[var(--gain)] text-[10px] font-mono font-extrabold tracking-wider">
-                1-CLICK CAPITAL DISBURSED
+                VERIFIED SETTLEMENT RELEASED
               </text>
 
               <text x="656" y="142" className="fill-[var(--muted-foreground)] text-[10px] font-mono">

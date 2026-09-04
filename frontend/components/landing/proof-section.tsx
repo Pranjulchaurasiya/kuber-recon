@@ -114,11 +114,11 @@ export function ProofSection() {
           </div>
         </div>
 
-        {/* Card 3: APEX Neurosymbolic Kernel (Ours) */}
+        {/* Card 3: Kuber Recon Kernel (Ours) */}
         <div className="relative flex flex-col justify-between rounded-2xl border-2 border-gain bg-panel p-6 shadow-xl ring-4 ring-gain/10 hover-glow animate-fade-up stagger-3">
           {/* Top Tag */}
           <div className="absolute -top-3 right-6 rounded-full bg-gain px-3 py-0.5 font-mono text-[10px] font-bold text-white uppercase shadow">
-            APEX KERNEL (OURS)
+            KUBER RECON KERNEL (OURS)
           </div>
 
           <div className="space-y-4">
@@ -129,7 +129,7 @@ export function ProofSection() {
               </span>
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">APEX Combinatorial + Bayesian SRI</h3>
+              <h3 className="text-lg font-bold text-foreground">Kuber Combinatorial + Dual-Entry Engine</h3>
               <p className="text-xs text-muted-foreground mt-1">Paise-exact combinatorial subset solver & Route sweeps.</p>
             </div>
 

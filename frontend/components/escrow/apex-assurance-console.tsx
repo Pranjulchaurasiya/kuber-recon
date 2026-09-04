@@ -115,8 +115,8 @@ export function ApexAssuranceConsole() {
       type: 'buyer',
     },
     {
-      sender: 'APEX_GATEWAY',
-      msg: 'APEX Assurance Ready: Awaiting Razorpay Route transfer lock with TTL = 86,400s (24h).',
+      sender: 'KUBER_GATEWAY',
+      msg: 'Kuber Assurance Ready: Awaiting Razorpay Route transfer lock with TTL = 86,400s (24h).',
       time: '00:00:02',
       type: 'apex',
     },
@@ -278,7 +278,7 @@ export function ApexAssuranceConsole() {
         })
       }
       setActiveStep(3)
-      addLog('GOLDEN_FLOW', `Step 4: Contract RELEASED. 12% APEX Capital recovery sweep executed. Zero Float Drift!`, 'apex')
+      addLog('GOLDEN_FLOW', `Step 4: Contract RELEASED. 12% Kuber recovery sweep executed. Zero Float Drift!`, 'apex')
       await refreshContractState(contractData.contract_id)
       setGoldenFlowStep('Golden Flow Complete (Zero Float Drift)!')
     } catch (err) {

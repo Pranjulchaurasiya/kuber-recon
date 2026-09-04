@@ -78,7 +78,7 @@ export function ProblemSolutionSection() {
             </div>
             <div>
               <span className="font-mono text-xs font-bold text-primary uppercase tracking-wider">The Solution</span>
-              <h3 className="text-xl font-extrabold text-foreground">The APEX Autonomous Operating System</h3>
+              <h3 className="text-xl font-extrabold text-foreground">The Kuber Autonomous Settlement OS</h3>
             </div>
           </div>
 

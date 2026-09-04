@@ -229,7 +229,7 @@ export function CapitalHub() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/15 border border-gold/30 px-2.5 py-0.5 font-mono text-[11px] font-bold text-gold">
-              <Banknote className="h-3 w-3" /> APEX Capital
+              <Banknote className="h-3 w-3" /> Kuber Capital
             </span>
             <span className="font-mono text-xs text-muted-foreground">Autonomous Underwriting & Recovery</span>
             {apiConnected && (
@@ -335,7 +335,7 @@ export function CapitalHub() {
               >
                 {isDisbursing ? (
                   <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Calling APEX Kernel...
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Calling Kuber Kernel...
                   </>
                 ) : (
                   <>
