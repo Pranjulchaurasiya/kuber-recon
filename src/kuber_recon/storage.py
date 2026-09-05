@@ -1466,11 +1466,12 @@ class PostgreSQLStorageBackend(StorageBackend):
         with self._lock, self._get_connection() as conn:
             try:
                 with conn.cursor() as cur:
-                    where_check = "SELECT version, status, proof_hash, assertions_passed, on_hold FROM apex_contracts WHERE contract_id = %s FOR UPDATE"
+                    where_check = "SELECT version, status, proof_hash, assertions_passed, on_hold FROM apex_contracts WHERE contract_id = %s"
                     params_check: List[Any] = [contract_id]
                     if tenant_id is not None:
                         where_check += " AND tenant_id = %s"
                         params_check.append(tenant_id)
+                    where_check += " FOR UPDATE"
                     cur.execute(where_check, tuple(params_check))
                     row = cur.fetchone()
                     if not row:
@@ -1539,7 +1540,8 @@ class PostgreSQLStorageBackend(StorageBackend):
                     """, (contract_id, target_status, new_proof, new_assertions, now))
                 conn.commit()
                 return True
-            except Exception:
+            except Exception as e:
+                logger.exception("Failed to transition contract state for %s: %s", contract_id, e)
                 conn.rollback()
                 return False
 
