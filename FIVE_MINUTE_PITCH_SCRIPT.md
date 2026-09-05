@@ -1,195 +1,215 @@
-# 🏆 KUBER OS — Official 5-Minute Pitch & Demo Video Script (Solo Builder Edition)
-> **Razorpay AI Buildathon 2026**  
-> **Product:** Kuber OS (Autonomous Agentic Escrow, Working Capital & Settlement Engine)  
-> **Builder:** Solo Project (100% individual design, architecture, implementation & testing)  
-> **Target Video Length:** 4:45 – 5:00 Minutes  
-> **Tone:** Confident, Energetic, Crisp, First-Person ("I" / "My"), Simple English
+# 🏆 KUBER OS — Solo Builder 5-Minute Pitch & Live Demo Guide
+> **Razorpay AI Buildathon 2026** · *Solo Submission*  
+> **Builder:** Pranjul Chaurasiya  
+> **Product:** Kuber OS (Autonomous Agentic Escrow, Working Capital & Settlement Assurance Engine)  
+> **Target Duration:** 4:45 – 5:00 Minutes  
+> **Perspective:** First-Person Singular (**"I built"**, **"I solved"**, **"My engine"**)
 
 ---
 
-## 📋 Pre-Recording Setup (2 Minutes Before Recording)
+## 🖥️ Screen & Setup Preparation (Do This Before You Record)
 
-1. **Browser Window (Clean, 1080p, Zoom 100% or 110%)**:
-   - **Tab 1:** Deployed Frontend (`https://your-frontend-url` or `http://localhost:3000`)
-   - **Tab 2:** Capital Hub / Underwriting tab on the dashboard
-   - **Tab 3:** Health Check page (`https://kuber-recon.onrender.com/health` - confirm `{"status":"ok"}`)
-   - **Tab 4:** GitHub Repository (`README.md` showing 287 passing tests badge & architecture diagram)
-2. **Terminal Window (Half-screen or ready to Alt-Tab)**:
-   - Font size: 14pt–16pt, dark background, clean buffer.
-   - Command ready: `python -m pytest tests/ -q`
-3. **Audio & Setup**: Quiet room, speak clearly into the microphone at ~130 words/minute with deliberate pauses.
+### 1. Browser Setup (Clean 1080p, Chrome/Brave)
+Have your browser open with these tabs ready:
+* **Tab 1:** Your deployed frontend (or `http://localhost:3000`)
+  * Starts at `/` (Overview)
+* **Tab 2:** Backend Health Check
+  * `https://kuber-recon.onrender.com/health` (verify it shows `{"status":"ok"}`)
+* **Tab 3:** GitHub Repository
+  * Shows `README.md` with 287 passing tests badge and architecture
+
+### 2. Terminal Setup (Ready for Alt-Tab)
+* Dark theme, font size 15pt–16pt so it's sharp on video.
+* Working directory: `c:\Users\pranj\Documents\Razorpay-Buildthon\kuber-recon`
+* Pre-type (don't hit enter yet): `python -m pytest tests/ -q`
 
 ---
 
-## ⏱️ Video Timeline Breakdown (5:00 Total)
+## ⏱️ Visual Timeline & On-Screen Action Guide
 
 ```
-┌───────────────┬─────────────────────────────────────────────────┬───────────────────────────────┐
-│ TIME          │ SEGMENT                                         │ ON-SCREEN DISPLAY             │
-├───────────────┼─────────────────────────────────────────────────┼───────────────────────────────┤
-│ 00:00 - 00:45 │ The Hook, Problem & Solo Thesis                 │ Deployed Web UI (Home / Hero) │
-│ 00:45 - 01:45 │ Live Demo Part 1: Delivery-Gated Escrow Hold    │ Contract Simulation UI        │
-│ 01:45 - 02:45 │ Live Demo Part 2: Malicious Refusal vs Release │ Audit Log / Verification CAS  │
-│ 02:45 - 03:45 │ Live Demo Part 3: Instant Capital & Split Sweep │ Capital Hub Tab               │
-│ 03:45 - 04:30 │ Enterprise Moat: Tally Prime XML & 287 Tests    │ Tally Export + Terminal Tests │
-│ 04:30 - 05:00 │ The Razorpay Moat, Business Impact & Closing    │ Architecture Slide / Summary  │
-└───────────────┴─────────────────────────────────────────────────┴───────────────────────────────┘
+┌───────────────┬───────────────────────────────────┬───────────────────────────────────────────┐
+│ TIME          │ ON-SCREEN ACTION                  │ EXACT URL / PAGE                          │
+├───────────────┼───────────────────────────────────┼───────────────────────────────────────────┤
+│ 00:00 - 00:45 │ Mouse on Hero Title & Stats Cards │ / (Overview Dashboard)                    │
+│ 00:45 - 01:45 │ Click "Initialize Contract"       │ /console -> Tab: "Assurance Lifecycle"    │
+│ 01:45 - 02:45 │ Click Scenario A, then Scenario B │ /console -> Tab: "Assurance Lifecycle"    │
+│ 02:45 - 03:45 │ Click Sidebar -> "Kuber Capital"  │ /capital (Capital Hub)                    │
+│ 03:45 - 04:30 │ Alt-Tab to Terminal -> Run Pytest │ Terminal Window (287 tests passing)       │
+│ 04:30 - 05:00 │ Alt-Tab to Browser -> Overview    │ / (Overview Dashboard / Closing)          │
+└───────────────┴───────────────────────────────────┴───────────────────────────────────────────┘
 ```
 
 ---
 
-## 🎙️ Word-for-Word Script & Visual Action Guide
+## 🎙️ Word-for-Word Script with Exact On-Screen Guidelines
 
 ---
 
-### ⏱️ [00:00 – 00:45] The Hook, The Problem & Solo Intro
+### [00:00 – 00:45] The Hook & The Problem
+**📍 Screen Action:**
+1. Keep the browser on `/` (Kuber OS Overview).
+2. Mouse rests on the hero title: **"Autonomous Settlement Assurance & Working Capital"**.
+3. Slowly hover over the top metric cards (*False Match Rate: 0.0%*, *Protected Volume*, *Gateway Escrow Rail: ACTIVE*).
 
-**🖥️ On Screen:**  
-Open your deployed web frontend. Mouse rests naturally over the top banner or hero headline: *"Deterministic Financial Settlement for Agentic Commerce."*
-
-**🗣️ What you say:**
-> *"Hello judges! My name is Pranjul, and I built **Kuber OS** solo for the Razorpay AI Buildathon.*
+**🗣️ Speak with energy:**
+> *"Hi judges! My name is Pranjul, and I built **Kuber OS** as a solo developer for the Razorpay AI Buildathon.*
 > 
-> *Right now, software is undergoing the biggest shift in 30 years. Autonomous AI agents are no longer just chatbots—they are negotiating, purchasing cloud compute, and buying B2B inventory directly.*
+> *Right now, software is going through a massive transformation. Autonomous AI agents are no longer just answering questions—they are negotiating deals, buying software licenses, and purchasing inventory on behalf of companies.*
 > 
-> *But there is a critical financial gap:*
+> *Here is the multi-crore problem I set out to solve:*
+> *Payment gateways are designed for humans with credit cards. If an AI agent buys ₹25,000 worth of datasets or APIs today, the gateway automatically settles the payout to the seller in 2 days, no questions asked.*
 > 
-> *Payment gateways are designed for humans with credit cards. If an AI agent purchases ₹25,000 worth of datasets or API services today, the gateway automatically settles the payout to the seller in 2 days. Nobody verifies whether the seller actually delivered what was promised.*
+> *If the seller agent hallucinates, sends corrupted data, or disappears, the money has already left the bank. Chargebacks don't work for autonomous bot transactions.*
 > 
-> *If the seller hallucinates, sends corrupted files, or disappears, the money has already left the bank. Chargebacks are practically impossible for bot-to-bot transactions.*
-> 
-> *I built **Kuber OS** to solve this. I turned Razorpay Route into a delivery-gated escrow and autonomous working capital platform."*
+> *I built **Kuber OS** to turn Razorpay Route into a delivery-gated escrow and automated working capital engine for the AI economy."*
 
 ---
 
-### ⏱️ [00:45 – 01:45] Live Demo Part 1: Delivery-Gated Contract
+### [00:45 – 01:45] Live Demo Part 1: Delivery-Gated Contract Hold
+**📍 Screen Action:**
+1. In the left sidebar, click **"Assurance Console"** (`/console`).
+2. At the top of the page, click the middle tab: **"Assurance Lifecycle (Settlement Verification)"**.
+3. Scroll slightly down to **Step 1: Contract Initialization**.
+4. Click the blue button: **"Initialize Agent Contract (₹25,000)"**.
+5. *Wait 1 second.* Point cursor to the contract badge showing `STATUS: HELD` and `ON_HOLD: TRUE`.
 
-**🖥️ On Screen:**  
-Click on **"Agent Escrow"** or navigate to the Contract Console. Show an active contract for ₹25,000.
-
-**🗣️ What you say:**
-> *"Let me show you this live.*
+**🗣️ Speak clearly:**
+> *"Let me show you this running live.*
 > 
-> *Here is an enterprise buyer agent purchasing data for ₹25,000. When the purchase order triggers, Kuber OS doesn't blindly disburse the payout.*
+> *I’ll navigate to my Assurance Console. Here, an enterprise buyer agent is purchasing B2B intelligence for ₹25,000. When I initialize this contract, Kuber OS doesn't blindly disburse the funds.*
 > 
-> *Instead, my system immediately hooks into **Razorpay Route** and locks the funds using native `on_hold: true`. The payout is frozen at the nodal clearing account.*
+> *Instead, my backend immediately intercepts the transaction and calls **Razorpay Route** with `on_hold: true`. The payout is locked at the nodal clearing account.*
 > 
-> *The seller has proof of funds—they know the buyer is good for the money—but they cannot withdraw a single rupee until they mathematically prove delivery.*
+> *The seller agent receives cryptographic proof of funds—they know the money is reserved—but they cannot withdraw a single rupee until they mathematically prove delivery.*
 > 
-> *And notice this design decision: every financial calculation in my engine is calculated in 100% exact integer paise. I enforced a strict zero floating-point rule across the entire codebase. Zero rounding leakage, ever."*
+> *Crucially, I enforced a strict **zero floating-point policy** across the entire backend. Every calculation is done in exact integer paise. In high-frequency finance, floating-point rounding errors lead to cash leakage. I eliminated that completely."*
 
 ---
 
-### ⏱️ [01:45 – 02:45] Live Demo Part 2: Malicious Refusal vs. 100% Clean Release
+### [01:45 – 02:45] Live Demo Part 2: Malicious Refusal vs. 100% Clean Release
+**📍 Screen Action:**
+1. Look at **Step 2: Submit Delivery Payload**.
+2. Click the red button: **"Scenario A: Malicious / Corrupted Delivery"**.
+3. *Wait 1.5 seconds.* Point cursor to the red audit alert: *"Assertion Refusal: Checksum mismatch & corrupted line items"*.
+4. Now click the green button: **"Scenario B: 100% Clean Verified Delivery"**.
+5. *Wait 1.5 seconds.* Point cursor to the green badges: Mod-36 GSTIN verified, Ed25519 signature verified.
+6. Scroll down to **Step 3: Release Route Hold** and click **"Execute Settlement Release"**.
+7. Watch the status transition to `RELEASING` and then `RELEASED` upon webhook confirmation.
 
-**🖥️ On Screen:**  
-1. Click **"Scenario A: Malicious / Corrupted Delivery"**.  
-   Show the red rejection banner and audit log.  
-2. Click **"Scenario B: 100% Verified Clean Delivery"**.  
-   Show green success, Mod-36 GSTIN match, Ed25519 cryptographic signature, and state turning to `RELEASED`.
-
-**🗣️ What you say:**
-> *"Now let me demonstrate what happens when an agent misbehaves.*
+**🗣️ Speak with conviction:**
+> *"Now watch what happens when things go wrong.*
 > 
-> *In Scenario A, the seller agent attempts to submit corrupted data or an invalid GST invoice. Watch what Kuber OS does.*
+> *In Scenario A, the seller agent attempts to submit corrupted files and an invalid GST tax invoice. I click Scenario A.*
+> *Instantly, my assertion kernel rejects the delivery. It doesn't use an LLM that guesses—it deterministically verifies the Mod-36 GSTIN checksum, line items, and payload hash. It issues an **Honest Refusal**.*
+> *The funds remain securely locked in Razorpay. The buyer’s ₹25,000 is 100% protected.*
 > 
-> *My deterministic assertion kernel catches the mismatch immediately. I don't ask an LLM to guess. The engine validates the Mod-36 GSTIN checksum, line items, and data hashes. It issues an **Honest Refusal**.*
-> *The funds remain locked safely inside Razorpay. The buyer never loses a single rupee.*
+> *Now, let’s test Scenario B: Clean Delivery.*
+> *The seller delivers genuine verified work. The payload hash matches, line items total to the exact paise, and the authorized CFO verifier signs the assertion using RFC 8032 Ed25519 cryptography.*
 > 
-> *Now watch Scenario B: Clean Delivery.*
-> *The seller delivers genuine, verified work. The payload checksum matches to the exact paise. The authorized CFO verifier signs the canonical assertion using Ed25519 cryptography.*
-> 
-> *My backend executes an atomic Compare-And-Swap state change, triggers the Razorpay Route release, and listens for the signed HMAC webhook to finalize the payout.*
-> *Settled in seconds, completely trustless."*
+> *I click Execute Settlement Release.*
+> *Kuber OS performs an atomic Compare-And-Swap database state transition, patches Razorpay Route to release the hold, and listens for the authoritative HMAC-SHA256 webhook to mark the contract `RELEASED`.*
+> *Safe, verified settlement in under two seconds."*
 
 ---
 
-### ⏱️ [02:45 – 03:45] Live Demo Part 3: Instant Capital & Split-Sweep Recovery
+### [02:45 – 03:45] Live Demo Part 3: Instant Capital & 12% Split-Sweep Recovery
+**📍 Screen Action:**
+1. In the left sidebar, click **"Kuber Capital"** (`/capital`).
+2. Scroll down to the **Underwriting Assessment** card.
+3. Point cursor to:
+   - *Settlement Reliability Index (SRI): 0.9675 (Tier A Premier)*
+   - *Working Capital Approved: ₹59,764*
+4. Scroll further down to the **Automated Split-Settlement Recovery Schedule** table showing:
+   - Day 1: ₹2,656 sweep (12%)
+   - Day 2: ₹1,502 sweep (12%)
+   - Day 3: ₹1,195 sweep (12%)
 
-**🖥️ On Screen:**  
-Click on the **"Capital Hub"** / **"Working Capital"** tab in your dashboard. Point to the **Settlement Reliability Index (SRI)**, the **Disbursed Advance**, and the **Daily Split-Sweep Table**.
-
-**🗣️ What you say:**
-> *"Now comes the core economic engine I built: **instant working capital**.*
+**🗣️ Speak enthusiastically:**
+> *"Now let me show you the second half of what I built: **Autonomous Working Capital**.*
 > 
-> *Because Kuber OS verifies every single transaction, I have ground-truth data that no traditional bank or CIBIL score can see.*
+> *Traditional banks take 5 days to analyze stale bank statements. But because Kuber OS verifies every single delivered transaction, I have real-time ground-truth financial data.*
 > 
-> *Look at my underwriting engine here:*
-> *I take 100 verified delivered transactions. Instead of a naive average that unfairly penalizes small sellers, I apply a Bayesian shrinkage formula ($N_0=50, p_0=0.98$). This gives this seller an exact **Settlement Reliability Index of 0.9675**, placing them in **Tier A Premier**.*
+> *Here on the Capital Hub, my underwriting engine analyzes 100 verified delivered transactions. To prevent small sellers from being ruined by one disputed order, I implemented a **Bayesian shrinkage algorithm** ($N_0=50, p_0=0.98$).*
 > 
-> *Instantly, my engine underwrites a **₹59,764** working capital advance at a flat 4% factor fee—disbursed directly via Razorpay Payouts.*
+> *This computes an exact Settlement Reliability Index of **0.9675**, qualifying this merchant for **Tier A Premier**.*
 > 
-> *And how do I guarantee recovery? Look at the bottom table:*
-> *As this merchant continues selling goods, Razorpay Route automatically sweeps 12% at source—₹2,656 on Day 1, ₹1,502 on Day 2—repaying the advance automatically before money ever leaves the gateway. Zero default risk, zero manual collection calls!"*
+> *My system immediately underwrites an advance of **₹59,764** at a flat 4% factor fee, disbursed instantly via simulated Razorpay Payouts.*
+> 
+> *And how does the merchant repay? Look at this table:*
+> *As new sales settle through Razorpay Route, Kuber OS automatically sweeps a 12% split at the nodal source—₹2,656 on Day 1, ₹1,502 on Day 2—amortizing the advance down in exact paise before funds leave the gateway. Zero collection hassle, zero default risk!"*
 
 ---
 
-### ⏱️ [03:45 – 04:30] Enterprise Moat: Tally Prime XML Export & 287 Tests
-
-**🖥️ On Screen:**  
-1. In the Web UI, click **"Export to Tally Prime"** (show XML download or preview).  
-2. Switch to Terminal and run:  
-   `python -m pytest tests/ -q`  
-   Watch the green dots fly and show **287 passed in ~14s**.
-
-**🗣️ What you say:**
-> *"I also built a feature specifically for Indian businesses: **Enterprise Tally Prime Integration**.*
-> 
-> *Over 2 million Indian businesses run on Tally Prime. Reconciling split payments and escrow manually is a huge operational burden.*
-> *I built a dedicated exporter so finance teams can click one button to generate compliant double-entry `<ENVELOPE>` XML journal vouchers, complete with Section 194-O TDS and gateway MDR deductions, ready to import directly into Tally Prime.*
-> 
-> *And beneath this UI is production-grade engineering.*
-> *Let me run my automated test suite in the terminal right now:*
-> *(pause 2 seconds while tests run)*
-> ***287 automated tests passing with 0 failures***.
-> *This includes AST scanners I wrote to forbid float arithmetic, state concurrency race tests, and a production PostgreSQL and Redis pipeline on GitHub Actions."*
-
----
-
-### ⏱️ [04:30 – 05:00] The Razorpay Moat & Closing
-
-**🖥️ On Screen:**  
-Switch back to your browser hero screen or architecture diagram. Look directly into the camera with a confident smile.
-
-**🗣️ What you say:**
-> *"Why can only Razorpay win this market? I call this the **Ownership Triple-Test**:*
-> 
-> 1. *Banks only see lump-sum bank deposits; only Razorpay sees the line-item agent contracts.*
-> 2. *External SaaS cannot freeze payouts; only Razorpay Route has native `on_hold` pre-settlement controls.*
-> 3. *And external lenders face severe defaults; Razorpay sweeps repayments at the nodal account before payout.*
-> 
-> *I built Kuber OS solo during this buildathon to turn Razorpay from a payment gateway into the financial operating system for autonomous AI commerce.*
-> 
-> *The entire codebase, live deployed app, and 287-test suite are in my GitHub repository.*
-> 
-> *Thank you for your time, and I am excited to answer any questions!"*
-
----
-
-## 🎯 Video Submission Checklist (For Google Form)
-
-When filling out the Google Form:
-
-1. **Video Hosting**:
-   - Upload to **YouTube as "Unlisted"** (or Loom with Public view link).
-   - Verify the link plays in an Incognito / Private window.
-2. **Video Title**:
-   - `Kuber OS — Razorpay AI Buildathon 2026 (Demo & Pitch by Pranjul)`
-3. **Video Description (Paste this in YouTube/Loom description)**:
-   ```text
-   Kuber OS: Autonomous Agentic Escrow, Working Capital & Settlement Assurance Engine
-   Built solo by Pranjul for the Razorpay AI Buildathon 2026
-
-   Links:
-   - Live Application: [Your Frontend URL]
-   - Live Backend Health: https://kuber-recon.onrender.com/health
-   - GitHub Repository: https://github.com/Pranjulchaurasiya/kuber-recon
-
-   Timestamps:
-   0:00 - The Agentic Commerce Settlement Problem & Solo Introduction
-   0:45 - Razorpay Route Delivery-Gated Hold & Exact-Paise Math
-   1:45 - Live Demo: Corrupted Refusal vs 100% Clean Release
-   2:45 - Capital Hub: Bayesian Underwriting & 12% Split-Sweep Recovery
-   3:45 - Tally Prime XML Export & 287 Automated Tests
-   4:30 - The Razorpay Ownership Moat & Vision
+### [03:45 – 04:30] Enterprise Moat: Tally Prime XML & 287 Tests
+**📍 Screen Action:**
+1. Stay on browser or switch to Terminal (split screen or clean Alt-Tab).
+2. Point out: *"I built a native Tally Prime XML exporter for Indian accounting teams."*
+3. In Terminal, run:
+   ```bash
+   python -m pytest tests/ -q
    ```
+4. Let the tests execute live on camera (takes ~12 to 14 seconds).
+5. Highlight the final line: **`287 passed`**.
+
+**🗣️ Speak with pride:**
+> *"I also tackled real-world Indian accounting friction.*
+> *Over 2 million Indian businesses use Tally Prime. Manually reconciling split escrows and TDS deductions is an operational nightmare.*
+> 
+> *I engineered a dedicated module that exports reconciled settlements directly into compliant **Tally Prime double-entry XML journal vouchers** (`<ENVELOPE>`). Finance teams can import it into Tally in one click with zero manual data entry, properly accounting for Section 194-O TDS and gateway MDR.*
+> 
+> *And to ensure bank-grade reliability, I wrote a comprehensive automated test suite.*
+> *Let's run pytest right now live in the terminal:*
+> *(pause 2 seconds while tests fly by)*
+> ***287 automated tests, all passing with zero failures***.
+> *This includes AST scanners enforcing zero floats, multi-threaded double-drawdown race condition tests, and a production PostgreSQL and Redis CI pipeline."*
+
+---
+
+### [04:30 – 05:00] The Razorpay Moat & Closing
+**📍 Screen Action:**
+1. Alt-Tab back to the browser on the **Overview** or **Money Lineage** (`/lineage`) page.
+2. Keep the camera focused on you with the sleek dashboard in the background.
+
+**🗣️ Confident closing:**
+> *"Why can only Razorpay build this? I call it the **Ownership Triple-Test**:*
+> 
+> 1. *Traditional lenders only see end-of-month bank balances; Razorpay sees line-item agent contracts and delivery proofs.*
+> 2. *External SaaS cannot freeze money; only Razorpay Route has native `on_hold` pre-settlement rails.*
+> 3. *And Razorpay eliminates default risk by recovering capital at the nodal account before payout.*
+> 
+> *As a solo builder, I wanted to prove that Razorpay can be much more than a checkout button—it can be the trusted financial operating system for the autonomous agent economy.*
+> 
+> *The entire project is live, open-sourced on GitHub, and fully documented.*
+> *Thank you judges, and I look forward to your feedback!"*
+
+---
+
+## 📋 Google Form Submission Template
+
+* **Project Name:** Kuber OS
+* **Track:** Track 01 (AI Growth & Agentic Commerce) / Track 04 (Next-Gen Financial Infrastructure)
+* **Team Type:** Solo Builder (Pranjul Chaurasiya)
+* **5-Minute Video Pitch Link:** `[Paste YouTube / Loom Link]`
+* **GitHub Repository:** `https://github.com/Pranjulchaurasiya/kuber-recon`
+* **Live Demo URL:** `[Paste your frontend URL]`
+* **Backend Health API:** `https://kuber-recon.onrender.com/health`
+
+### YouTube / Loom Video Description Template:
+```text
+Kuber OS: Autonomous Agentic Escrow, Working Capital & Settlement Assurance Engine
+Built solo by Pranjul Chaurasiya for the Razorpay AI Buildathon 2026.
+
+🔗 Links:
+- Live Demo: [Your Frontend URL]
+- Backend Health: https://kuber-recon.onrender.com/health
+- GitHub Repo: https://github.com/Pranjulchaurasiya/kuber-recon
+
+⏱️ Video Timestamps:
+0:00 - The Agentic Commerce Problem (Solo Builder Intro)
+0:45 - Live Demo: Initializing Delivery-Gated Contract via Razorpay Route
+1:45 - Live Demo: Corrupted Delivery Refusal vs 100% Clean Release
+2:45 - Live Demo: Capital Hub (Bayesian Underwriting & 12% Split-Sweep Recovery)
+3:45 - Enterprise Moat: Tally Prime XML Export & 287 Automated Tests Live
+4:30 - The Razorpay Ownership Triple-Test & Closing
+```
