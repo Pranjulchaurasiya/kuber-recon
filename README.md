@@ -1,11 +1,11 @@
-# 🏛️ Kuber OS: Autonomous AI Finance Controller & Settlement Assurance
+# Kuber OS: Autonomous AI Finance Controller & Settlement Assurance
 
 > **Track 04: AI Finance Controller · Razorpay AI Buildathon 2026**  
 > **Solo Builder Submission: Pranjul Chaurasiya**  
 > **Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery**  
 > *Powered by Horowitz–Sahni Meet-in-the-Middle Combinatorial Subset-Sum Matching, GSTIN Mod-36 Checksums, and Prototype Merkle Tree Audit Chains.*
 
-| 🌐 **Live Web Application** | ⚡ **Backend API Health** | 🧪 **Automated Test Suite** | 📦 **Enterprise Accounting** |
+| Live Web Application | Backend API Health | Automated Test Suite | Enterprise Accounting |
 |:---:|:---:|:---:|:---:|
 | [**kuber-os.vercel.app**](https://kuber-os.vercel.app/) | [`kuber-recon.onrender.com/health`](https://kuber-recon.onrender.com/health) | `287 passed (0 failures)` | `Tally Prime XML Export` |
 
@@ -23,15 +23,15 @@
 [![Security & Tenant Isolation](https://img.shields.io/badge/Tenant%20Auth-401%20Enforced%20%26%20Sanitized-purple)](tests/test_security_tenant_isolation.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ 🌐 Live Demo ](https://kuber-os.vercel.app/) • [ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Evaluation Benchmark ](reports/track04_evaluation_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-287-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
+[ Live Demo ](https://kuber-os.vercel.app/) • [ Problem vs Solution ](#problem-vs-solution-30-second-overview) • [ Benchmark ](reports/track04_evaluation_benchmark.md) • [ Layer Taxonomy ](#system-architecture--layer-taxonomy) • [ Razorpay Value ](#value-for-razorpay) • [ Architecture ](#detailed-architectural-pipeline) • [ Invariants ](#key-engineering-invariants) • [ Test Suite ](#full-test-suite-breakdown-287-items) • [ Quickstart ](#quickstart--local-reproduction)
 
 ---
 
-## ⚡ 30-Second Cold Start: Problem vs Solution
+## Problem vs. Solution (30-Second Overview)
 
-### 🚨 The Core Problem vs 🛡️ The APEX Solution
+### The Core Problem vs. The Kuber Solution
 
-| # | 🔴 The Problem in AI Commerce | 🟢 The APEX Solution |
+| # | The Problem in AI Commerce | The Kuber OS Solution |
 |---|---|---|
 | **1** | **Blind Pre-Settlement Disbursals:** AI buyer agents order automatically, but legacy gateways disburse funds immediately before checking if goods actually arrived. | **Deterministic Escrow ([Razorpay Route](src/kuber_recon/server.py)):** Locks funds with `on_hold: true`. Settlement releases only after cryptographic proof of delivery. |
 | **2** | **AI Hallucinations & Float Drift:** Using LLMs to verify invoices causes phantom line items and floating-point errors (`0.1 + 0.2 != 0.3`). | **Zero-LLM Math Kernel:** Uses **Horowitz–Sahni Subset-Sum algorithm** and **GSTIN Mod-36 checksums** in exact base-10 paise. 0 false matches observed on tested synthetic fixtures. |
@@ -50,7 +50,7 @@
 
 ---
 
-## 🏗️ System Architecture & Layer Taxonomy
+## System Architecture & Layer Taxonomy
 
 Kuber OS unifies three specialized engineering layers into one coherent financial operating system:
 
@@ -62,7 +62,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🎯 The Unified Pitch: Underwriting Ground Truth & Nodal Recovery
+## The Unified Thesis: Underwriting Ground Truth & Nodal Recovery
 
 > *"APEX turns verified agentic commerce into instant working capital for merchants, using deterministic delivery verification as its underwriting moat and Razorpay Route split-settlements for automated recovery."*
 
@@ -86,7 +86,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🏢 Value for Razorpay
+## Value for Razorpay
 
 | Question | Clear Answer |
 |---|---|
@@ -97,7 +97,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🏗️ System Architecture
+## Detailed Architectural Pipeline
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -135,7 +135,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🛡️ Key Engineering Invariants
+## Key Engineering Invariants
 
 | # | Invariant | Technical Mechanism | Verification Proof |
 |---|---|---|---|
@@ -149,7 +149,7 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🧪 Full Test Suite Breakdown (287 Items — 100% Green)
+## Full Test Suite Breakdown (287 Items — 100% Green)
 
 > **Strict 3-Way Evidence Framework:**
 > - `VERIFIED_TEST_CORPUS`: **287 automated tests collected across 41 test modules.**
@@ -200,7 +200,7 @@ Total: 287 collected across 41 modules (0 failures, 100% PASS in CI)
 
 ---
 
-## ⏱️ 5-Minute Judge Verification Runbook (cURL Commands)
+## Judge Verification Runbook (cURL Commands)
 
 Judges can verify all major financial invariants in real time on the running API gateway (`http://127.0.0.1:8000`):
 
@@ -242,7 +242,7 @@ curl -s -X POST http://127.0.0.1:8000/api/capital/reconcile-and-sweep \
 
 ---
 
-## 🚀 Quickstart & Local Reproduction
+## Quickstart & Local Reproduction
 
 ### 1. Instant Capital & Settlement CLI Demos
 ```bash
@@ -266,9 +266,9 @@ cd frontend && npm run dev
 # Open http://localhost:3000
 ```
 
-### 3. Run Automated Invariant Tests (275 Items)
+### 3. Run Automated Invariant Tests (287 Items)
 ```bash
-python -m pytest -q
+python -m pytest tests/ -q
 ```
 
 ### 4. Run Track 04 Project Evaluation Benchmark
@@ -283,7 +283,7 @@ python scripts/verify_live_control_loop.py
 
 ---
 
-## ⚖️ 3-Tier Architecture Boundary Matrix
+## 3-Tier Architecture Boundary Matrix
 
 | Dimension | Tier 1: Fully Implemented Kernel (This Repo) | Tier 2: Sandbox / Prototype Layer | Tier 3: Planned Production Architecture |
 |---|---|---|---|
@@ -296,13 +296,13 @@ python scripts/verify_live_control_loop.py
 
 ---
 
-## ⚠️ Regulatory & Statutory Disclaimer
+## Regulatory & Statutory Disclaimer
 
 > **IMPORTANT NOTICE:** Regulatory and statutory logic shown in this project (including Indian GST Section 16/Rule 36(4), Income Tax Act Section 194-O TDS withholdings, and RBI Digital Lending FLDG guidelines) is an algorithmic sandbox demonstration inspired by applicable RBI, CBIC, GST, FLDG, and payment-settlement concepts. It is not legal, tax, or financial advice, does not establish formal regulatory compliance, and requires independent formal legal, tax, risk, security, and compliance review before production commercial use.
 
 ---
 
-## 🚧 Known Limitations & System Boundaries
+## Known Limitations & System Boundaries
 
 > **Submission Positioning:** *KuberRecon is a sandbox-verified Track 04 finance-control prototype. It reconciles synthetic multi-source batches with paise-exact arithmetic, refuses ambiguous matches, accounts for every paise as reconciled or exception-held, and demonstrates server-side release controls. Live Razorpay provider onboarding and production infrastructure remain future work.*
 
