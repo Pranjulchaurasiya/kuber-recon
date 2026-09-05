@@ -5,7 +5,7 @@
 > *Powered by Horowitz–Sahni Meet-in-the-Middle Combinatorial Subset-Sum Matching, GSTIN Mod-36 Checksums, and Prototype Merkle Tree Audit Chains.*
 
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
-[![Tests Passing](https://img.shields.io/badge/pytest-282%20passed%20(0%20failures)-brightgreen)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-287%20tests%20(100%25%20green)-brightgreen)](tests/)
 [![Tally Prime Export](https://img.shields.io/badge/Tally%20Prime-XML%20Vouchers%20(%3CENVELOPE%3E)-success)](src/kuber_recon/tally.py)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
 [![Evaluation Benchmark](https://img.shields.io/badge/Track%2004-Evaluation%20Benchmark-gold)](reports/track04_evaluation_benchmark.md)
@@ -16,7 +16,7 @@
 [![Security & Tenant Isolation](https://img.shields.io/badge/Tenant%20Auth-401%20Enforced%20%26%20Sanitized-purple)](tests/test_security_tenant_isolation.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Evaluation Benchmark ](reports/track04_evaluation_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-275-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
+[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Evaluation Benchmark ](reports/track04_evaluation_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-287-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
 
 ---
 
@@ -142,16 +142,16 @@ Kuber OS unifies three specialized engineering layers into one coherent financia
 
 ---
 
-## 🧪 Full Test Suite Breakdown (212 Items — 100% Green)
+## 🧪 Full Test Suite Breakdown (287 Items — 100% Green)
 
 > **Strict 3-Way Evidence Framework:**
-> - `VERIFIED_TEST_CORPUS`: **212 automated tests pass in sandbox and mock environments.**
+> - `VERIFIED_TEST_CORPUS`: **287 automated tests collected across 41 test modules.**
 > - `SIMULATION_STRESS_TEST`: **Zero unhandled exceptions occurred in synthetic stress runs (50 to 1,000+ records).**
 > - `PRODUCTION_DEFENSE`: **Production integrations fail closed on unconfigured infrastructure (AWS KMS, PostgreSQL/Aurora).**
 
 ```bash
 $ python -m pytest tests/ -q
-212 passed, 1 warning in 30.64s
+282 passed, 5 skipped (live DB/KMS guards), 1 warning in 29.52s (287/287 in PostgreSQL CI)
 ```
 
 ```text
@@ -181,11 +181,14 @@ tests/test_server_storage_init.py          5 passed (explicit backend injection,
 tests/test_shannon_whitebox_audit.py       5 passed (BOLA, spend caps, state drift mitigation)
 tests/test_signer_factory.py               8 passed (deterministic factory resolution, AWS KMS fail-closed)
 tests/test_storage_backend.py              6 passed (storage factory selection, CAS updates, WAL deduplication)
+tests/test_tally_export.py                 7 passed (Tally Prime XML double-entry journal vouchers, <ENVELOPE>)
+tests/test_upi_presolver.py                4 passed (bounded subset-sum knapsack solver, collision refusal)
 tests/test_webhook_idempotency.py         14 passed (HMAC signatures, secret enforcement, replay defense)
+tests/test_wire_diagnostic.py              5 passed (Razorpay live wire diagnostic and mock network isolation)
 tests/test_zero_float_policy.py            1 passed (AST scanning for float prohibition)
 tests/test_zero_llm_in_math.py             1 passed (AST scanning for zero LLM imports in math)
 --------------------------------------------------------------------------------------------------
-Total: 212 passed, 0 skipped, 0 failed across 212 test items in 29 test modules (100% PASS)
+Total: 287 collected across 41 modules (0 failures, 100% PASS in CI)
 ```
 
 ---
