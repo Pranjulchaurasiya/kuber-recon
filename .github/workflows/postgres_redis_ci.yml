@@ -67,9 +67,10 @@ jobs:
         env:
           PYTHONPATH: src
           KUBER_ENV: STAGING
-          DATABASE_URL: postgresql://kuber_ci_user:kuber_ephemeral_ci_password_2026@localhost:5432/kuber_recon_ci
-          REDIS_URL: redis://localhost:6379/0
+          DATABASE_URL: postgresql://kuber_ci_user:kuber_ephemeral_ci_password_2026@127.0.0.1:5432/kuber_recon_ci
+          REDIS_URL: redis://127.0.0.1:6379/0
           REQUIRE_POSTGRES_REDIS: "true"
         run: |
-          pytest -v tests/test_postgres_redis_integration.py
+          python -c "import psycopg2, redis; conn = psycopg2.connect('postgresql://kuber_ci_user:kuber_ephemeral_ci_password_2026@127.0.0.1:5432/kuber_recon_ci'); print('PostgreSQL 127.0.0.1:5432 Ready:', conn.status); conn.close(); r = redis.from_url('redis://127.0.0.1:6379/0'); print('Redis 127.0.0.1:6379 Ready:', r.ping())"
+          pytest -v -rA --tb=short tests/test_postgres_redis_integration.py
 

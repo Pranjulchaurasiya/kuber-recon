@@ -1346,7 +1346,12 @@ class PostgreSQLStorageBackend(StorageBackend):
                 """)
                 conn.commit()
         except Exception as e:
-            logger.warning("PostgreSQL DB initialization deferred or unreachable: %s", e)
+            err_msg = str(e).lower()
+            if any(term in err_msg for term in ("could not translate host name", "connection refused", "timeout", "is the server running")):
+                logger.warning("PostgreSQL DB initialization deferred (unreachable host): %s", e)
+                return
+            logger.error("PostgreSQL DB DDL initialization error: %s", e)
+            raise
 
     def try_insert_webhook_event(self, event_id: str) -> bool:
         with self._lock, self._get_connection() as conn:

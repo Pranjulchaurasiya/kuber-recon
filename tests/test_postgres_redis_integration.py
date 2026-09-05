@@ -80,8 +80,6 @@ def pg_redis_backend():
         backend = PostgreSQLStorageBackend(database_url=db_url)
         # Verify connectivity and ensure DDL tables exist
         backend._init_db()
-        conn = backend._get_connection()
-        conn.close()
         return backend
     except Exception as err:
         if require_pg_redis:
