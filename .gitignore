@@ -96,6 +96,10 @@ reports/qa_frames_subtitled/
 *PLAYBOOK*
 *video*
 *VIDEO*
+*pitch*
+*PITCH*
+*.pdf
+*.PDF
 *.mp4
 *.webm
 *.mov
@@ -104,6 +108,7 @@ reports/qa_frames_subtitled/
 DEMO_SCRIPT.md
 PRESENTER_DEMO_PLAYBOOK.md
 VIDEO_SCRIPT.md
+FIVE_MINUTE_PITCH_SCRIPT.md
 reports/*demo*
 reports/*video*
 reports/final_video_qa_report.md
