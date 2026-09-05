@@ -78,7 +78,8 @@ def pg_redis_backend():
 
     try:
         backend = PostgreSQLStorageBackend(database_url=db_url)
-        # Verify connectivity
+        # Verify connectivity and ensure DDL tables exist
+        backend._init_db()
         conn = backend._get_connection()
         conn.close()
         return backend
@@ -221,9 +222,9 @@ def test_transaction_rollback_on_failed_invariants(pg_redis_backend):
             # 1. Insert valid contract
             cur.execute("""
                 INSERT INTO apex_contracts (
-                    contract_id, tenant_id, status, amount_paise, fee_paise, on_hold, version
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (contract_id, tenant_id, "INITIALIZED", 100000, 0, True, 1))
+                    contract_id, tenant_id, status, amount_paise, fee_paise, on_hold, version, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (contract_id, tenant_id, "INITIALIZED", 100000, 0, True, 1, int(time.time()), int(time.time())))
 
             # 2. Trigger intentional database failure (violating non-null or invalid syntax)
             try:

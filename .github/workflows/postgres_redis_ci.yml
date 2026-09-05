@@ -14,7 +14,7 @@ concurrency:
 # generated specifically for isolated runner instances and have no production or staging access.
 env:
   CI_POSTGRES_USER: kuber_ci_user
-  CI_POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'kuber_ephemeral_ci_password_2026' }}
+  CI_POSTGRES_PASSWORD: kuber_ephemeral_ci_password_2026
   CI_POSTGRES_DB: kuber_recon_ci
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: kuber_ci_user
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'kuber_ephemeral_ci_password_2026' }}
+          POSTGRES_PASSWORD: kuber_ephemeral_ci_password_2026
           POSTGRES_DB: kuber_recon_ci
         ports:
           - 5432:5432
@@ -67,7 +67,7 @@ jobs:
         env:
           PYTHONPATH: src
           KUBER_ENV: STAGING
-          DATABASE_URL: postgresql://kuber_ci_user:${{ secrets.CI_POSTGRES_PASSWORD || 'kuber_ephemeral_ci_password_2026' }}@localhost:5432/kuber_recon_ci
+          DATABASE_URL: postgresql://kuber_ci_user:kuber_ephemeral_ci_password_2026@localhost:5432/kuber_recon_ci
           REDIS_URL: redis://localhost:6379/0
           REQUIRE_POSTGRES_REDIS: "true"
         run: |

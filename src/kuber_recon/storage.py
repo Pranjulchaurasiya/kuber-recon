@@ -1180,6 +1180,7 @@ class PostgreSQLStorageBackend(StorageBackend):
     def __init__(self, database_url: str, db_connection: Optional[Any] = None):
         self.database_url = database_url
         self._injected_conn = db_connection
+        self._conn = None
         self._lock = threading.RLock()
         self._init_db()
 
@@ -1189,9 +1190,13 @@ class PostgreSQLStorageBackend(StorageBackend):
         try:
             import psycopg2
             from psycopg2.extras import RealDictCursor
-            conn = psycopg2.connect(self.database_url, cursor_factory=RealDictCursor)
-            conn.autocommit = False
-            return conn
+            url = self.database_url
+            if url.startswith("postgresql+psycopg2://"):
+                url = "postgresql://" + url[len("postgresql+psycopg2://"):]
+            if self._conn is None or getattr(self._conn, "closed", 1) != 0:
+                self._conn = psycopg2.connect(url, cursor_factory=RealDictCursor)
+                self._conn.autocommit = False
+            return self._conn
         except ImportError:
             raise SecurityConfigError(
                 "psycopg2 is required for PostgreSQLStorageBackend. Run: pip install psycopg2-binary"
@@ -1199,43 +1204,40 @@ class PostgreSQLStorageBackend(StorageBackend):
 
     def _init_db(self) -> None:
         """Create PostgreSQL tables with row-level lock readiness and compound unique constraints."""
-        if self._injected_conn is None and "postgres" in self.database_url:
-            # Skip remote network attempt in unit tests unless live PostgreSQL is connected
-            return
-
-        with self._lock, self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS processed_events (
-                        event_id VARCHAR(255) PRIMARY KEY,
-                        received_at BIGINT NOT NULL
-                    );
-                    CREATE TABLE IF NOT EXISTS apex_contracts (
-                        contract_id VARCHAR(255) PRIMARY KEY,
-                        tenant_id VARCHAR(255) NOT NULL DEFAULT 'merchant_rzp_primary',
-                        buyer_agent_id VARCHAR(255) NOT NULL DEFAULT '',
-                        seller_agent_id VARCHAR(255) NOT NULL DEFAULT '',
-                        seller_account_id VARCHAR(255) NOT NULL DEFAULT '',
-                        status VARCHAR(64) NOT NULL,
-                        payment_id VARCHAR(255),
-                        transfer_id VARCHAR(255),
-                        amount_paise BIGINT NOT NULL,
-                        fee_paise BIGINT NOT NULL DEFAULT 0,
-                        on_hold BOOLEAN NOT NULL,
-                        on_hold_until BIGINT,
-                        settlement_id VARCHAR(255),
-                        recipient_account VARCHAR(255),
-                        proof_hash VARCHAR(255),
-                        assertions_passed INTEGER DEFAULT 0,
-                        refusal_reason TEXT,
-                        webhook_event_id VARCHAR(255),
-                        created_at BIGINT NOT NULL,
-                        updated_at BIGINT NOT NULL,
-                        version BIGINT NOT NULL DEFAULT 1,
-                        release_started_at BIGINT,
-                        expected_record_count INTEGER,
-                        CONSTRAINT uq_tenant_contract UNIQUE(tenant_id, contract_id)
-                    );
+        try:
+            with self._lock, self._get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS processed_events (
+                            event_id VARCHAR(255) PRIMARY KEY,
+                            received_at BIGINT NOT NULL
+                        );
+                        CREATE TABLE IF NOT EXISTS apex_contracts (
+                            contract_id VARCHAR(255) PRIMARY KEY,
+                            tenant_id VARCHAR(255) NOT NULL DEFAULT 'merchant_rzp_primary',
+                            buyer_agent_id VARCHAR(255) NOT NULL DEFAULT '',
+                            seller_agent_id VARCHAR(255) NOT NULL DEFAULT '',
+                            seller_account_id VARCHAR(255) NOT NULL DEFAULT '',
+                            status VARCHAR(64) NOT NULL,
+                            payment_id VARCHAR(255),
+                            transfer_id VARCHAR(255),
+                            amount_paise BIGINT NOT NULL,
+                            fee_paise BIGINT NOT NULL DEFAULT 0,
+                            on_hold BOOLEAN NOT NULL,
+                            on_hold_until BIGINT,
+                            settlement_id VARCHAR(255),
+                            recipient_account VARCHAR(255),
+                            proof_hash VARCHAR(255),
+                            assertions_passed INTEGER DEFAULT 0,
+                            refusal_reason TEXT,
+                            webhook_event_id VARCHAR(255),
+                            created_at BIGINT NOT NULL DEFAULT 0,
+                            updated_at BIGINT NOT NULL DEFAULT 0,
+                            version BIGINT NOT NULL DEFAULT 1,
+                            release_started_at BIGINT,
+                            expected_record_count INTEGER,
+                            CONSTRAINT uq_tenant_contract UNIQUE(tenant_id, contract_id)
+                        );
                     CREATE TABLE IF NOT EXISTS apex_contract_audit_log (
                         id BIGSERIAL PRIMARY KEY,
                         contract_id VARCHAR(255) NOT NULL,
@@ -1342,7 +1344,9 @@ class PostgreSQLStorageBackend(StorageBackend):
                     CREATE INDEX IF NOT EXISTS idx_pg_tprov_trans ON trusted_provider_records(tenant_id, transfer_id);
                     CREATE INDEX IF NOT EXISTS idx_pg_tprov_utr ON trusted_provider_records(tenant_id, expected_utr);
                 """)
-            conn.commit()
+                conn.commit()
+        except Exception as e:
+            logger.warning("PostgreSQL DB initialization deferred or unreachable: %s", e)
 
     def try_insert_webhook_event(self, event_id: str) -> bool:
         with self._lock, self._get_connection() as conn:
@@ -2030,12 +2034,13 @@ class PostgreSQLStorageBackend(StorageBackend):
                 return [dict(r) for r in cur.fetchall()]
 
     def health_check(self) -> Dict[str, Any]:
-        with self._lock, self._get_connection() as conn:
+        with self._lock:
             try:
+                conn = self._get_connection()
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1 AS alive")
                     row = cur.fetchone()
-                    alive = row["alive"] == 1
+                    alive = bool(row and row.get("alive") == 1)
                     return {
                         "backend": "PostgreSQL / Aurora (Row-Level Locks Enabled)",
                         "status": "connected" if alive else "error",
