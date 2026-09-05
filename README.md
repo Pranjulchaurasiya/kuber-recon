@@ -5,7 +5,8 @@
 > *Powered by Horowitz–Sahni Meet-in-the-Middle Combinatorial Subset-Sum Matching, GSTIN Mod-36 Checksums, and Prototype Merkle Tree Audit Chains.*
 
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
-[![Tests Passing](https://img.shields.io/badge/pytest-275%20passed%20(0%20failures)-brightgreen)](tests/)
+[![Tests Passing](https://img.shields.io/badge/pytest-282%20passed%20(0%20failures)-brightgreen)](tests/)
+[![Tally Prime Export](https://img.shields.io/badge/Tally%20Prime-XML%20Vouchers%20(%3CENVELOPE%3E)-success)](src/kuber_recon/tally.py)
 [![Deterministic Kernel](https://img.shields.io/badge/Financial%20Kernel-Zero%20LLM%20in%20Math-blue)](tests/test_zero_llm_in_math.py)
 [![Evaluation Benchmark](https://img.shields.io/badge/Track%2004-Evaluation%20Benchmark-gold)](reports/track04_evaluation_benchmark.md)
 

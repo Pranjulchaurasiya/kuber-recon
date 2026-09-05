@@ -100,6 +100,7 @@ from kuber_recon.simulation import FinancialDigitalTwin
 from kuber_recon.storage import PostgreSQLStorageBackend, SQLiteStorageBackend, StorageBackend, get_storage_backend
 from kuber_recon.types import InvoiceRecord, BankNodalCredit, paise_to_inr_decimal
 from kuber_recon.events import FinancialEventEnvelope, TransactionalOutboxDispatcher
+from kuber_recon.tally import export_tally_json_from_blocks, export_tally_xml_from_blocks, TallyLedgerConfig
 
 global_outbox_dispatcher = TransactionalOutboxDispatcher()
 
@@ -496,6 +497,14 @@ class ReconcileRequest(BaseModel):
     seed: int = 42
 
 
+class TallyExportRequest(BaseModel):
+    records: int = 50
+    seed: int = 42
+    is_interstate: bool = False
+    company_name: str = "##SVCurrentCompany"
+    format: str = "xml"  # "xml" for Tally Prime import, "json" for canonical audit JSON
+
+
 class ReconcileResponse(BaseModel):
     records_input: int
     settlements_reconciled: int
@@ -813,6 +822,50 @@ def reconcile(req: ReconcileRequest, tenant_id: str = Depends(verify_tenant_auth
         solver_solve_ms=round(solve_ms, 3),
         unexplained_delta_paise=0,
         proof_hash="sha256:" + proof,
+    )
+
+
+@app.get("/api/reconcile/export/tally")
+@app.post("/api/reconcile/export/tally")
+def export_tally_journal_vouchers(
+    records: int = 50,
+    seed: int = 42,
+    is_interstate: bool = False,
+    company_name: str = "##SVCurrentCompany",
+    format: str = "xml",
+    req: Optional[TallyExportRequest] = None,
+    tenant_id: str = Depends(verify_tenant_auth),
+):
+    """
+    Export verified, sealed reconciliation blocks as postable Tally Prime XML (<ENVELOPE>)
+    double-entry journal vouchers or canonical audit JSON.
+    """
+    if req is not None:
+        records = req.records
+        seed = req.seed
+        is_interstate = req.is_interstate
+        company_name = req.company_name
+        format = req.format
+
+    generator = ChaosDataGenerator(seed=seed)
+    invoices, bank_credits, _, _ = generator.generate_suite(num_records=min(records, 1000))
+
+    engine = ReconciliationEngine()
+    reconciled, _ = engine.reconcile_batch(bank_credits, invoices)
+
+    if format.lower() == "json":
+        json_data = export_tally_json_from_blocks(reconciled, is_interstate=is_interstate)
+        return JSONResponse(content=json_data)
+
+    xml_content = export_tally_xml_from_blocks(
+        reconciled,
+        is_interstate=is_interstate,
+        company_name=company_name,
+    )
+    return Response(
+        content=xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": 'attachment; filename="kuber_tally_journal_vouchers.xml"'},
     )
 
 
