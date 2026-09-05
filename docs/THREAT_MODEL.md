@@ -129,6 +129,6 @@ The threat model mitigations are continuously verified via two independent autom
    ```
 2. **Standalone One-Command Judge Audit Harness:**
    ```powershell
-   python -m kuber_recon.judge_demo
+   python -m kuber_recon.judge_audit
    ```
    *Executes complete settlement lifecycle and proves all 10 adversarial attack vectors are blocked with 100% invariant passes.*

@@ -92,6 +92,6 @@ Total: 212 passed, 0 skipped, 0 failed across 212 test items in 29 test modules 
 
 ## 🏛️ Scripted Judge Invariant Harness (19 / 19 Passed)
 
-*Executed via `python -m kuber_recon.judge_demo` across 2 consecutive runs:*
+*Executed via `python -m kuber_recon.judge_audit` across 2 consecutive runs:*
 - 9 Settlement & Capital Lifecycle Invariants Verified
 - 10 Adversarial Invariant Attacks Verified (HMAC forgery, cross-tenant IDOR, replay window, ambiguity collision refusal, candidate overflow $N=25$, solver node budget exhaustion)

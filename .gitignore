@@ -88,3 +88,26 @@ scratch_*.py
 artifacts/
 reports/qa_frames/
 reports/qa_frames_subtitled/
+
+# Demo, video recordings, playbooks & presentation assets
+*demo*
+*DEMO*
+*playbook*
+*PLAYBOOK*
+*video*
+*VIDEO*
+*.mp4
+*.webm
+*.mov
+*.avi
+*.mkv
+DEMO_SCRIPT.md
+PRESENTER_DEMO_PLAYBOOK.md
+VIDEO_SCRIPT.md
+reports/*demo*
+reports/*video*
+reports/final_video_qa_report.md
+scripts/record_master_demo.py
+scripts/build_indic_subtitled_video.py
+scripts/produce_indic_voice_video.py
+scripts/extract_qa_frames.py

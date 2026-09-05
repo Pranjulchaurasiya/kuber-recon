@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ApexAssuranceConsole } from '@/components/escrow/apex-assurance-console'
 import { SecurityProofMatrix } from '@/components/security/security-proof-matrix'
-import { DemoControlPanel } from '@/components/kuber/demo-control-panel'
+import { AssuranceControlPanel } from '@/components/kuber/assurance-control-panel'
 import { ShieldCheck, ShieldAlert, Cpu, Terminal } from 'lucide-react'
 
 export default function ConsolePage() {
@@ -34,7 +34,7 @@ export default function ConsolePage() {
             }`}
           >
             <ShieldCheck className="h-3.5 w-3.5" />
-            Assurance Lifecycle (3-Stage Demo)
+            Assurance Lifecycle (Settlement Verification)
           </button>
           <button
             onClick={() => setActiveTab('security')}
@@ -57,7 +57,7 @@ export default function ConsolePage() {
 
       {/* Tab View */}
       {activeTab === 'judge' ? (
-        <DemoControlPanel />
+        <AssuranceControlPanel />
       ) : activeTab === 'assurance' ? (
         <ApexAssuranceConsole />
       ) : (
