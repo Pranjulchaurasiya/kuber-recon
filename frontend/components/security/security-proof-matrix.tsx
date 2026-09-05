@@ -306,11 +306,11 @@ export function SecurityProofMatrix() {
   return (
     <div className="space-y-6 font-mono text-xs">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-panel p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/70 bg-panel/70 p-5 sm:p-6 shadow-sm">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-gold" />
-            <h2 className="text-base font-bold text-foreground">Security Proof & Attack Matrix</h2>
+            <ShieldAlert className="h-4 w-4 text-gold" />
+            <h2 className="text-base font-bold text-foreground">Security Proof &amp; Attack Matrix</h2>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Live adversarial harness executing 10 attack vectors against backend invariant guards in real time.
@@ -327,9 +327,9 @@ export function SecurityProofMatrix() {
           <button
             onClick={runAllAttacks}
             disabled={runningId !== null}
-            className="inline-flex items-center gap-2 rounded-xl bg-gold px-4 py-2.5 font-bold text-black hover:bg-gold/90 transition-all shadow-sm"
+            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 font-mono text-xs font-bold text-background hover:opacity-90 transition-opacity shadow-sm"
           >
-            <Play className="h-4 w-4" /> Run All 9 Vectors
+            <Play className="h-3.5 w-3.5" /> Run All 9 Vectors
           </button>
         </div>
       </div>
@@ -343,18 +343,12 @@ export function SecurityProofMatrix() {
           return (
             <div
               key={vector.id}
-              className={`rounded-2xl border bg-panel p-5 flex flex-col justify-between space-y-4 transition-all ${
-                res?.isPass
-                  ? 'border-gain/40 bg-gain/5'
-                  : res
-                  ? 'border-danger/40 bg-danger/5'
-                  : 'border-border'
-              }`}
+              className="rounded-xl border border-border/70 bg-panel/70 p-5 flex flex-col justify-between space-y-4 hover:border-foreground/20 transition-all shadow-sm"
             >
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-bold text-foreground text-xs leading-snug">{vector.name}</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-background border border-border text-muted-foreground">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-muted/50 border border-border/60 text-muted-foreground">
                     {vector.category}
                   </span>
                 </div>
@@ -371,7 +365,7 @@ export function SecurityProofMatrix() {
                 </div>
 
                 {res && (
-                  <div className="space-y-1.5 rounded-lg bg-background p-2.5 border border-border text-[10px]">
+                  <div className="space-y-1.5 rounded-lg bg-muted/40 p-2.5 border border-border/60 text-[10px]">
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Observed:</span>
                       <span className="font-bold text-foreground">HTTP {res.observedStatus}</span>
@@ -392,12 +386,12 @@ export function SecurityProofMatrix() {
                 <button
                   onClick={() => executeAttack(vector)}
                   disabled={isRunning}
-                  className={`w-full py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`w-full py-2 px-3 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all text-xs ${
                     isRunning
                       ? 'bg-panel border border-border text-muted-foreground animate-pulse'
                       : res?.isPass
-                      ? 'bg-gain/15 text-gain hover:bg-gain/25 border border-gain/30'
-                      : 'bg-background hover:bg-panel border border-border text-foreground'
+                      ? 'bg-gain/15 text-gain hover:bg-gain/25 border border-gain/20'
+                      : 'bg-foreground text-background hover:opacity-90'
                   }`}
                 >
                   <Play className="h-3 w-3" />

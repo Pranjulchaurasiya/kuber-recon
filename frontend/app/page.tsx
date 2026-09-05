@@ -34,12 +34,12 @@ export default function RootLandingPage() {
         <section className="space-y-8 pt-4">
           <div className="text-center space-y-5 max-w-4xl mx-auto">
             {/* Buildathon Eyebrow */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel/90 px-3.5 py-1.5 shadow-sm backdrop-blur">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-panel/80 px-3.5 py-1.5 shadow-sm backdrop-blur-sm">
               <span className="flex h-2 w-2 rounded-full bg-primary animate-status-dot" />
-              <span className="font-mono text-xs font-bold text-primary">
+              <span className="font-mono text-xs font-semibold text-primary">
                 Razorpay AI Buildathon 2026 · Track 04
               </span>
-              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground/30">•</span>
               <span className="text-xs text-muted-foreground">
                 AI Finance Controller &amp; Settlement OS
               </span>
@@ -50,7 +50,7 @@ export default function RootLandingPage() {
               AI transactions move fast.<br />
               <span>
                 Settlement must never be{' '}
-                <span className="text-primary drop-shadow-sm underline decoration-primary/40 underline-offset-8">
+                <span className="text-primary underline decoration-primary/30 underline-offset-8">
                   blind
                 </span>
                 .
@@ -58,7 +58,7 @@ export default function RootLandingPage() {
             </h1>
 
             {/* Pitch Lede */}
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground/90 font-medium leading-relaxed max-w-3xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground font-normal leading-relaxed max-w-3xl mx-auto">
               Kuber OS gates Razorpay Route pre-settlement behind line-item delivery proofs, turns verified revenue into instant working capital, and sweeps repayments at the nodal source.
             </p>
 
@@ -66,14 +66,14 @@ export default function RootLandingPage() {
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <Link
                 href="/console"
-                className="inline-flex items-center gap-2 rounded-xl bg-foreground px-6 py-3 text-sm font-bold text-background shadow-lg transition-all hover:opacity-90 hover:scale-[1.02]"
+                className="inline-flex items-center gap-2 rounded-lg bg-foreground px-5 py-2.5 text-sm font-semibold text-background shadow-sm transition-opacity hover:opacity-90"
               >
                 Launch Assurance Radar
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <a
                 href="#product-console"
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-panel/80 px-6 py-3 text-sm font-bold text-foreground shadow-sm transition-all hover:bg-accent hover:border-primary/40"
+                className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-panel/70 px-5 py-2.5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60"
               >
                 Working Capital Terminal
               </a>

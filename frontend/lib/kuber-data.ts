@@ -185,9 +185,11 @@ export const guardrails = [
 export const navItems = [
   { href: '/', label: 'Kuber OS Overview', code: 'KBR' },
   { href: '/console', label: 'Assurance Console', code: 'CTL' },
+  { href: '/capital', label: 'Kuber Capital', code: 'CAP' },
   { href: '/escrow', label: 'Gateway Escrow', code: 'ESC' },
   { href: '/lineage', label: 'Money Lineage', code: 'DAG' },
   { href: '/twin', label: 'Digital Twin', code: 'SIM' },
   { href: '/ledger', label: 'Ledger & Merkle', code: 'MRK' },
 ]
+
 

@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShieldCheck, Zap, Cpu, Sparkles, CheckCircle2, ArrowRight, Play, RotateCcw } from 'lucide-react'
+import { Zap, Play } from 'lucide-react'
 
 export function ConvergenceScene() {
   const [activeStep, setActiveStep] = useState<number>(0)
   const [isIgnited, setIsIgnited] = useState<boolean>(true)
-  const [activeFeed, setActiveFeed] = useState<number>(3) // 1, 2, 3 or all
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -16,15 +15,16 @@ export function ConvergenceScene() {
   }, [])
 
   return (
-    <div className="relative w-full rounded-2xl border border-border bg-panel/90 p-4 sm:p-6 shadow-2xl backdrop-blur-xl overflow-hidden">
+    <div className="relative w-full rounded-xl border border-border/70 bg-panel/70 p-4 sm:p-6 shadow-sm backdrop-blur-md overflow-hidden">
       {/* Top Console Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3 mb-4">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-2.5 w-2.5 rounded-full bg-gain animate-status-dot" />
-          <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
-            Kuber Settlement Assurance Circuit
+          <span className="flex h-2 w-2 rounded-full bg-gain animate-status-dot" />
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">
+            Settlement Convergence Circuit
           </span>
-          <span className="rounded bg-accent px-2 py-0.5 font-mono text-[10px] uppercase font-semibold text-primary border border-border">
+          <span className="text-muted-foreground/30">•</span>
+          <span className="rounded bg-muted/60 px-2 py-0.5 font-mono text-[10px] font-medium text-muted-foreground border border-border/60">
             Route Escrow Sandbox Stream
           </span>
         </div>
@@ -33,312 +33,293 @@ export function ConvergenceScene() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsIgnited(!isIgnited)}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-mono font-semibold transition-all ${
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-mono font-medium transition-colors ${
               isIgnited
-                ? 'bg-primary/10 text-primary border border-primary/30'
-                : 'bg-muted text-muted-foreground border border-border'
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'bg-muted/60 text-muted-foreground border border-border/60'
             }`}
           >
-            {isIgnited ? <Zap className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5" />}
-            {isIgnited ? 'Reactor Ignited' : 'Standby'}
+            {isIgnited ? <Zap className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3" />}
+            {isIgnited ? 'Active Stream' : 'Paused'}
           </button>
         </div>
       </div>
 
       {/* SVG Canvas & Circuit Topology */}
       <div className="relative w-full overflow-x-auto">
-        <div className="min-w-[760px] relative py-2">
+        <div className="min-w-[760px] relative py-1">
           <svg
-            viewBox="0 0 920 340"
-            className="w-full h-auto drop-shadow-sm select-none"
+            viewBox="0 0 920 280"
+            className="w-full h-auto select-none"
             aria-label="Kuber 3-Stream Settlement Convergence Diagram"
           >
             <defs>
-              {/* Glow Filter */}
-              <filter id="kuber-glow" x="-40%" y="-40%" width="180%" height="180%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-
               {/* Beam Gradients */}
               <linearGradient id="beam-agent" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="var(--primary)" stopOpacity="1" />
+                <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.9" />
               </linearGradient>
 
               <linearGradient id="beam-tax" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="var(--gold)" stopOpacity="1" />
+                <stop offset="100%" stopColor="var(--gold)" stopOpacity="0.9" />
               </linearGradient>
 
               <linearGradient id="beam-solver" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="var(--gain)" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="var(--gain)" stopOpacity="1" />
+                <stop offset="100%" stopColor="var(--gain)" stopOpacity="0.9" />
               </linearGradient>
 
               <linearGradient id="beam-output" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="var(--gain)" stopOpacity="0.4" />
+                <stop offset="0%" stopColor="var(--gain)" stopOpacity="0.3" />
                 <stop offset="100%" stopColor="var(--gain)" stopOpacity="1" />
               </linearGradient>
             </defs>
 
-            {/* Feed 1: Signed Delivery Manifest & E-Way Bill Webhook */}
-            <g className="cursor-pointer transition-transform hover:scale-[1.01]">
+            {/* ── FEED 1: Delivery Proof ────────────────────────────────────── */}
+            <g className="cursor-pointer transition-opacity hover:opacity-90">
               <rect
                 x="20"
-                y="20"
-                width="248"
-                height="76"
-                rx="10"
+                y="16"
+                width="240"
+                height="64"
+                rx="8"
                 className="fill-[var(--card)] stroke-[var(--border)]"
-                strokeWidth="1.5"
+                strokeWidth="1"
               />
-              <circle cx="42" cy="42" r="5" className="fill-[var(--primary)]" />
-              <text x="56" y="44" className="fill-[var(--muted-foreground)] text-[10px] font-mono font-bold tracking-wider">
-                01 · DELIVERY PROOF INGESTION
+              <circle cx="38" cy="36" r="3.5" className="fill-[var(--primary)]" />
+              <text x="50" y="38" className="fill-[var(--muted-foreground)] text-[9px] font-mono font-bold tracking-wider">
+                01 · DELIVERY PROOF
               </text>
-              <text x="56" y="62" className="fill-[var(--foreground)] text-xs font-mono font-bold">
-                E-Way Bill &amp; Ed25519 Manifest
+              <text x="50" y="54" className="fill-[var(--foreground)] text-xs font-mono font-semibold">
+                Ed25519 E-Way Manifest
               </text>
-              <text x="56" y="78" className="fill-[var(--primary)] text-[10px] font-mono font-semibold">
-                Triggers Route on_hold: false
+              <text x="50" y="68" className="fill-[var(--primary)] text-[9px] font-mono">
+                Triggers on_hold: false
               </text>
             </g>
 
-            {/* Feed 2: Statutory Tax Kernel */}
-            <g className="cursor-pointer transition-transform hover:scale-[1.01]">
+            {/* ── FEED 2: Statutory Tax Kernel ──────────────────────────────── */}
+            <g className="cursor-pointer transition-opacity hover:opacity-90">
               <rect
                 x="20"
-                y="132"
-                width="248"
-                height="76"
-                rx="10"
+                y="108"
+                width="240"
+                height="64"
+                rx="8"
                 className="fill-[var(--card)] stroke-[var(--border)]"
-                strokeWidth="1.5"
+                strokeWidth="1"
               />
-              <circle cx="42" cy="154" r="5" className="fill-[var(--gold)]" />
-              <text x="56" y="156" className="fill-[var(--muted-foreground)] text-[10px] font-mono font-bold tracking-wider">
+              <circle cx="38" cy="128" r="3.5" className="fill-[var(--gold)]" />
+              <text x="50" y="130" className="fill-[var(--muted-foreground)] text-[9px] font-mono font-bold tracking-wider">
                 02 · STATUTORY TAX KERNEL
               </text>
-              <text x="56" y="174" className="fill-[var(--foreground)] text-xs font-mono font-bold">
+              <text x="50" y="146" className="fill-[var(--foreground)] text-xs font-mono font-semibold">
                 GSTIN 29ABCDE1234F1Z5
               </text>
-              <text x="56" y="190" className="fill-[var(--gold)] text-[10px] font-mono font-semibold">
-                Mod-36 Verified GSTR-2B Match
+              <text x="50" y="160" className="fill-[var(--gold)] text-[9px] font-mono">
+                Mod-36 GSTR-2B Verified
               </text>
             </g>
 
-            {/* Feed 3: Combinatorial Subset-Sum Solver */}
-            <g className="cursor-pointer transition-transform hover:scale-[1.01]">
+            {/* ── FEED 3: Horowitz-Sahni Solver ─────────────────────────────── */}
+            <g className="cursor-pointer transition-opacity hover:opacity-90">
               <rect
                 x="20"
-                y="244"
-                width="248"
-                height="76"
-                rx="10"
+                y="200"
+                width="240"
+                height="64"
+                rx="8"
                 className="fill-[var(--card)] stroke-[var(--border)]"
-                strokeWidth="1.5"
+                strokeWidth="1"
               />
-              <circle cx="42" cy="266" r="5" className="fill-[var(--gain)]" />
-              <text x="56" y="268" className="fill-[var(--muted-foreground)] text-[10px] font-mono font-bold tracking-wider">
+              <circle cx="38" cy="220" r="3.5" className="fill-[var(--gain)]" />
+              <text x="50" y="222" className="fill-[var(--muted-foreground)] text-[9px] font-mono font-bold tracking-wider">
                 03 · HOROWITZ–SAHNI SOLVER
               </text>
-              <text x="56" y="286" className="fill-[var(--foreground)] text-xs font-mono font-bold">
-                100 Items Reconciled (7.34ms)
+              <text x="50" y="238" className="fill-[var(--foreground)] text-xs font-mono font-semibold">
+                100 Pairs Reconciled (7.34ms)
               </text>
-              <text x="56" y="302" className="fill-[var(--gain)] text-[10px] font-mono font-semibold">
-                Paise-Exact (Tested Fixtures, 0 Floats)
+              <text x="50" y="252" className="fill-[var(--gain)] text-[9px] font-mono">
+                Paise-Exact (0 Float Drift)
               </text>
             </g>
 
-            {/* ── 2. Animated Energy Beam Tracks to Center ─────────────────── */}
-
-            {/* Beam 1 Track & Flow */}
+            {/* ── Connecting Data Tracks to Center ─────────────────────────── */}
             <path
-              d="M 268 58 C 340 58, 360 170, 428 170"
+              d="M 260 48 C 340 48, 360 140, 420 140"
               fill="none"
               stroke="var(--border)"
-              strokeWidth="2"
-              strokeDasharray="4 4"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
             />
             {isIgnited && (
               <path
-                d="M 268 58 C 340 58, 360 170, 428 170"
+                d="M 260 48 C 340 48, 360 140, 420 140"
                 fill="none"
                 stroke="url(#beam-agent)"
-                strokeWidth="3.5"
+                strokeWidth="2"
                 className="animate-beam"
               />
             )}
 
-            {/* Beam 2 Track & Flow */}
             <path
-              d="M 268 170 H 428"
+              d="M 260 140 H 420"
               fill="none"
               stroke="var(--border)"
-              strokeWidth="2"
-              strokeDasharray="4 4"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
             />
             {isIgnited && (
               <path
-                d="M 268 170 H 428"
+                d="M 260 140 H 420"
                 fill="none"
                 stroke="url(#beam-tax)"
-                strokeWidth="3.5"
+                strokeWidth="2"
                 className="animate-beam"
               />
             )}
 
-            {/* Beam 3 Track & Flow */}
             <path
-              d="M 268 282 C 340 282, 360 170, 428 170"
+              d="M 260 232 C 340 232, 360 140, 420 140"
               fill="none"
               stroke="var(--border)"
-              strokeWidth="2"
-              strokeDasharray="4 4"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
             />
             {isIgnited && (
               <path
-                d="M 268 282 C 340 282, 360 170, 428 170"
+                d="M 260 232 C 340 232, 360 140, 420 140"
                 fill="none"
                 stroke="url(#beam-solver)"
-                strokeWidth="3.5"
+                strokeWidth="2"
                 className="animate-beam"
               />
             )}
 
-            {/* ── 3. Central Glowing Reactor: Kuber Recon Solver ────────────── */}
+            {/* ── CENTRAL NODE: Kuber Recon Solver ─────────────────────────── */}
             <g className="cursor-pointer">
-              {/* Outer Halo */}
-              {isIgnited && (
-                <circle
-                  cx="490"
-                  cy="170"
-                  r="72"
-                  className="fill-none stroke-[var(--primary)]/30"
-                  strokeWidth="6"
-                  filter="url(#kuber-glow)"
-                />
-              )}
-              {/* Reactor Core */}
-              <circle
-                cx="490"
-                cy="170"
-                r="62"
-                className="fill-[var(--card)] stroke-[var(--primary)]"
-                strokeWidth="2.5"
+              {/* Subtle outer dashed perimeter */}
+              <rect
+                x="414"
+                y="86"
+                width="168"
+                height="108"
+                rx="14"
+                className="fill-none stroke-[var(--primary)]/30"
+                strokeWidth="1"
+                strokeDasharray="4 4"
               />
-              <text x="490" y="142" textAnchor="middle" className="fill-[var(--muted-foreground)] text-[9px] font-mono font-bold tracking-wider">
+              {/* Inner card */}
+              <rect
+                x="420"
+                y="92"
+                width="156"
+                height="96"
+                rx="10"
+                className="fill-[var(--card)] stroke-[var(--primary)]/80"
+                strokeWidth="1.5"
+              />
+              <text x="498" y="114" textAnchor="middle" className="fill-[var(--muted-foreground)] text-[9px] font-mono font-bold tracking-wider">
                 KUBER RECON SOLVER
               </text>
-              <text x="490" y="164" textAnchor="middle" className="fill-[var(--foreground)] text-sm font-mono font-extrabold">
+              <text x="498" y="136" textAnchor="middle" className="fill-[var(--foreground)] text-sm font-mono font-bold">
                 SRI: 0.9675
               </text>
-              <text x="490" y="180" textAnchor="middle" className="fill-[var(--gain)] text-[10px] font-mono font-bold">
+              <text x="498" y="152" textAnchor="middle" className="fill-[var(--gain)] text-[10px] font-mono font-semibold">
                 TIER A PREMIER
               </text>
-              <text x="490" y="196" textAnchor="middle" className="fill-[var(--muted-foreground)] text-[9px] font-mono font-semibold">
+              <text x="498" y="170" textAnchor="middle" className="fill-[var(--muted-foreground)] text-[9px] font-mono">
                 ₹2,47,089.55 VD-GMV
               </text>
             </g>
 
-            {/* ── 4. Output Beam to Dual-Action Verdict ────────────────────── */}
+            {/* ── Output Connector Track ───────────────────────────────────── */}
             <path
-              d="M 546 170 H 640"
+              d="M 582 140 H 660"
               fill="none"
               stroke="var(--border)"
-              strokeWidth="2"
-              strokeDasharray="4 4"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
             />
             {isIgnited && (
               <path
-                d="M 546 170 H 640"
+                d="M 582 140 H 660"
                 fill="none"
                 stroke="url(#beam-output)"
-                strokeWidth="4"
+                strokeWidth="2"
                 className="animate-beam"
               />
             )}
 
-            {/* ── 5. Right Output Box: Instant Capital & Route Split-Sweep ──── */}
-            <g className="cursor-pointer transition-transform hover:scale-[1.01]">
+            {/* ── RIGHT OUTPUT CARD: Verified Settlement ───────────────────── */}
+            <g className="cursor-pointer transition-opacity hover:opacity-90">
               <rect
-                x="640"
-                y="90"
-                width="260"
-                height="160"
-                rx="12"
+                x="660"
+                y="74"
+                width="240"
+                height="132"
+                rx="10"
                 className="fill-[var(--card)] stroke-[var(--gain)]/60"
-                strokeWidth="2"
+                strokeWidth="1.5"
               />
+              {/* Clean top bar */}
               <rect
-                x="640"
-                y="90"
-                width="260"
-                height="32"
-                rx="12"
-                className="fill-[var(--gain)]/15"
+                x="660"
+                y="74"
+                width="240"
+                height="28"
+                rx="10"
+                className="fill-[var(--gain)]/10"
               />
-              <circle cx="658" cy="106" r="4" className="fill-[var(--gain)]" />
-              <text x="670" y="110" className="fill-[var(--gain)] text-[10px] font-mono font-extrabold tracking-wider">
-                VERIFIED SETTLEMENT RELEASED
+              <circle cx="676" cy="88" r="3.5" className="fill-[var(--gain)]" />
+              <text x="686" y="91" className="fill-[var(--gain)] text-[9px] font-mono font-bold tracking-wider">
+                SETTLEMENT RELEASED
               </text>
 
-              <text x="656" y="142" className="fill-[var(--muted-foreground)] text-[10px] font-mono">
+              <text x="674" y="122" className="fill-[var(--muted-foreground)] text-[9px] font-mono">
                 Advance Facility
               </text>
-              <text x="656" y="162" className="fill-[var(--foreground)] text-base font-mono font-bold text-gain">
-                ₹59,764.78 <tspan className="fill-[var(--muted-foreground)] text-xs font-normal">(`pout_live_01`)</tspan>
+              <text x="674" y="140" className="fill-[var(--gain)] text-sm font-mono font-bold">
+                ₹59,764.78 <tspan className="fill-[var(--muted-foreground)] text-[10px] font-normal">(`pout_live_01`)</tspan>
               </text>
 
-              <line x1="656" y1="174" x2="884" y2="174" stroke="var(--border)" strokeWidth="1" />
+              <line x1="674" y1="152" x2="886" y2="152" stroke="var(--border)" strokeWidth="1" strokeOpacity="0.6" />
 
-              <text x="656" y="196" className="fill-[var(--muted-foreground)] text-[10px] font-mono">
+              <text x="674" y="172" className="fill-[var(--muted-foreground)] text-[9px] font-mono">
                 Recovery Protocol
               </text>
-              <text x="656" y="214" className="fill-[var(--foreground)] text-xs font-mono font-semibold">
+              <text x="674" y="188" className="fill-[var(--foreground)] text-[11px] font-mono font-medium">
                 12.0% Automated Split-Sweep
-              </text>
-              <text x="656" y="232" className="fill-[var(--gain)] text-[10px] font-mono font-semibold">
-                Locked to Nodal Settlement Inflow
               </text>
             </g>
           </svg>
         </div>
       </div>
 
-      {/* Bottom Live Metric Strip */}
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border/80 pt-4">
-        <div className="flex items-center gap-2 rounded-lg bg-background/50 p-2.5 border border-border/60">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-primary/10 text-primary font-mono text-xs font-bold">
-            01
-          </div>
+      {/* Bottom Minimalist Metric Strip */}
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border/60 pt-4">
+        <div className="flex items-center gap-3 py-1 px-2">
+          <div className="font-mono text-xs font-bold text-primary">01</div>
           <div>
             <div className="text-[10px] font-mono text-muted-foreground uppercase">Nodal Protection</div>
-            <div className="text-xs font-semibold text-foreground">Pre-Settlement Route Hold</div>
+            <div className="text-xs font-medium text-foreground">Pre-Settlement Route Hold</div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg bg-background/50 p-2.5 border border-border/60">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-gold/10 text-gold font-mono text-xs font-bold">
-            02
-          </div>
+        <div className="flex items-center gap-3 py-1 px-2 sm:border-l sm:border-border/60">
+          <div className="font-mono text-xs font-bold text-gold">02</div>
           <div>
             <div className="text-[10px] font-mono text-muted-foreground uppercase">Mathematical Underwriting</div>
-            <div className="text-xs font-semibold text-foreground">Bayesian SRI Prior (N₀=50)</div>
+            <div className="text-xs font-medium text-foreground">Bayesian SRI Prior (N₀=50)</div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg bg-background/50 p-2.5 border border-border/60">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-gain/10 text-gain font-mono text-xs font-bold">
-            03
-          </div>
+        <div className="flex items-center gap-3 py-1 px-2 sm:border-l sm:border-border/60">
+          <div className="font-mono text-xs font-bold text-gain">03</div>
           <div>
             <div className="text-[10px] font-mono text-muted-foreground uppercase">Nodal Recovery</div>
-            <div className="text-xs font-semibold text-foreground">Automated 12% Split-Sweep</div>
+            <div className="text-xs font-medium text-foreground">Automated 12% Split-Sweep</div>
           </div>
         </div>
       </div>

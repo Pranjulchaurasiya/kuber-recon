@@ -15,7 +15,7 @@ import {
 export function VoiceBriefingPlayer() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [duration, setDuration] = useState(30)
+  const [duration, setDuration] = useState(55)
   const [currentTime, setCurrentTime] = useState(0)
   const [showTranscript, setShowTranscript] = useState(false)
   const [playbackRate, setPlaybackRate] = useState<number>(1.0)
@@ -103,7 +103,7 @@ export function VoiceBriefingPlayer() {
       {/* Hidden HTML5 Audio Element */}
       <audio
         ref={audioRef}
-        src="/audio/apex_executive_briefing.wav"
+        src="/audio/kuber_executive_briefing.wav"
         preload="metadata"
       />
 
@@ -118,16 +118,16 @@ export function VoiceBriefingPlayer() {
               : 'bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground'
               }`}
             aria-label={isPlaying ? 'Pause Audio Briefing' : 'Play Audio Briefing'}
-            title={isPlaying ? 'Pause' : 'Listen to 60s Briefing'}
+            title={isPlaying ? 'Pause' : 'Listen to Briefing'}
           >
             {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
           </button>
 
           <div className="text-left space-y-0.5">
             <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
-              <span>30s Executive Audio Brief</span>
+              <span>Executive Audio Brief</span>
               <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] font-extrabold text-primary border border-primary/30 shadow-xs">
-                Sarvam AI (Advait)
+                Sarvam AI (Advait · Bulbul v3)
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground hidden sm:block">
@@ -207,10 +207,10 @@ export function VoiceBriefingPlayer() {
             <span className="flex items-center gap-1 font-bold text-primary">
               <Sparkles className="h-3 w-3" /> Spoken Script (Sarvam Indic Voice)
             </span>
-            <span>Language: English (en-IN) · Speaker: Advait (Studio Pro) · Pace: 1.0x</span>
+            <span>Language: English (en-IN) · Speaker: Advait (Bulbul v3) · Pace: 1.05x</span>
           </div>
           <p className="text-foreground/90 leading-relaxed font-sans text-xs">
-            &ldquo;Welcome to Kuber OS Settlement Assurance, built for the Razorpay AI Buildathon 2026. Today, autonomous AI buyer agents can transact instantly. But they settle blindly. Traditional payment rails disburse funds before verifying if delivery occurred or if seller GSTIN is legitimate. Kuber OS solves this. We gate Razorpay Route pre-settlement behind cryptographic delivery proofs, Horowitz–Sahni meet-in-the-middle subset-sum matching, and statutory GSTIN Mod-36 checksums, ensuring 0 false matches on tested fixtures and zero float rounding errors. Once verified, Kuber OS converts merchant revenue into instant working capital, and automatically recovers advances through a twelve percent nodal settlement sweep at the source. Click Launch Console to explore the live autonomous settlement radar.&rdquo;
+            &ldquo;Welcome to Kuber OS, the autonomous AI finance controller and settlement assurance platform built for the Razorpay AI Buildathon 2026. Today, autonomous AI buyer agents can transact instantly, but they settle blindly. Traditional payment rails disburse funds before verifying if delivery occurred or if seller GSTIN is legitimate. Kuber OS solves this. We gate Razorpay Route pre-settlement behind cryptographic delivery proofs, Horowitz&ndash;Sahni meet-in-the-middle subset-sum matching, and statutory GSTIN Mod-36 checksums, ensuring zero false matches on tested fixtures and zero float rounding errors. Once verified, Kuber OS converts merchant revenue into instant working capital, and automatically recovers advances through a twelve percent nodal settlement sweep at the source. Click Launch Console to explore the live autonomous settlement radar.&rdquo;
           </p>
         </div>
       )}

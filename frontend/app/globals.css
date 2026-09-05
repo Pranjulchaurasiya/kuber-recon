@@ -76,10 +76,10 @@
   --danger: #b91c1c; /* Deep Crimson */
   --destructive: #b91c1c;
 
-  --border: #cbd5e1;
-  --input: #cbd5e1;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
   --ring: #0284c7;
-  --glow-color: rgba(2, 132, 199, 0.15);
+  --glow-color: rgba(2, 132, 199, 0.08);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -310,10 +310,10 @@
   --danger: #b91c1c; /* Deep Crimson */
   --destructive: #b91c1c;
 
-  --border: #cbd5e1;
-  --input: #cbd5e1;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
   --ring: #0284c7;
-  --glow-color: rgba(2, 132, 199, 0.15);
+  --glow-color: rgba(2, 132, 199, 0.08);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -344,12 +344,12 @@
 
 /* Interactive Hover Lift & Glow */
 .hover-glow {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .hover-glow:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px var(--glow-color);
-  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px -2px var(--glow-color);
+  border-color: var(--border);
 }
 
 /* Dynamic Aurora Background Effect */
@@ -366,26 +366,15 @@
   top: -20%;
   left: 50%;
   transform: translateX(-50%);
-  width: 1000px;
-  height: 600px;
+  width: 900px;
+  height: 500px;
   background: radial-gradient(ellipse at center, var(--glow-color) 0%, rgba(0,0,0,0) 70%);
-  filter: blur(60px);
-  opacity: 0.8;
+  filter: blur(80px);
+  opacity: 0.5;
 }
 
 .grid-rings {
-  position: absolute;
-  top: 5%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 1200px;
-  height: 800px;
-  background-image: 
-    radial-gradient(circle at center, transparent 30%, var(--border) 31%, transparent 32%),
-    radial-gradient(circle at center, transparent 55%, var(--border) 56%, transparent 57%),
-    radial-gradient(circle at center, transparent 80%, var(--border) 81%, transparent 82%);
-  opacity: 0.4;
-  pointer-events: none;
+  display: none;
 }
 
 /* Monospace Financial Values */

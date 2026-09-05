@@ -62,14 +62,14 @@ export function GapSection() {
           return (
             <div
               key={i}
-              className={`relative flex flex-col justify-between rounded-xl border border-border bg-panel p-5 shadow-sm hover-glow animate-fade-up stagger-${i + 1}`}
+              className={`relative flex flex-col justify-between rounded-xl border border-border/70 bg-panel/70 p-5 shadow-sm hover-glow animate-fade-up stagger-${i + 1}`}
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent border border-border text-foreground">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/60 border border-border/60 text-foreground">
                     <Icon className="h-4 w-4" />
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold border ${silo.color}`}>
+                  <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold border ${silo.color}`}>
                     {silo.verdict}
                   </span>
                 </div>
@@ -88,18 +88,18 @@ export function GapSection() {
       </div>
 
       {/* Evidence Strip — hard numbers anchored to the blind spots */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-2xl border border-border bg-panel/60 p-5 max-w-2xl mx-auto text-center animate-fade-up">
-        <div>
-          <div className="font-mono text-2xl font-extrabold text-foreground">₹1.8 Lakh Cr</div>
-          <div className="text-xs text-muted-foreground mt-1">Underserved Indian MSME Credit Gap</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-xl border border-border/70 bg-panel/60 p-6 max-w-2xl mx-auto text-center animate-fade-up">
+        <div className="py-1">
+          <div className="font-mono text-xl sm:text-2xl font-bold text-foreground">₹1.8 Lakh Cr</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Underserved MSME Credit Gap</div>
         </div>
-        <div>
-          <div className="font-mono text-2xl font-extrabold text-gain">0.000</div>
-          <div className="text-xs text-muted-foreground mt-1">Measured FMR (Tested Synthetic Corpus)</div>
+        <div className="py-1 sm:border-l sm:border-border/60">
+          <div className="font-mono text-xl sm:text-2xl font-bold text-gain">0.000</div>
+          <div className="text-[11px] text-muted-foreground mt-1">FMR (Zero False Matches)</div>
         </div>
-        <div>
-          <div className="font-mono text-2xl font-extrabold text-primary">₹0.00</div>
-          <div className="text-xs text-muted-foreground mt-1">Over-Recovery Under Concurrent Race</div>
+        <div className="py-1 sm:border-l sm:border-border/60">
+          <div className="font-mono text-xl sm:text-2xl font-bold text-primary">₹0.00</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Over-Recovery Under Concurrent Race</div>
         </div>
       </div>
     </section>

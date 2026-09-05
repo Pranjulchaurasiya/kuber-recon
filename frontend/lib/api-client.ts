@@ -5,8 +5,13 @@
  */
 
 export function getApiUrl(): string {
-  const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-  return url.replace(/\/$/, '')
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
+  }
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    return 'https://kuber-recon.onrender.com'
+  }
+  return 'http://localhost:8000'
 }
 
 export const DEFAULT_AUTH_HEADERS = {

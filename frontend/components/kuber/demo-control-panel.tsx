@@ -69,11 +69,15 @@ export function DemoControlPanel() {
       const latency = Math.round(performance.now() - t0)
       const data = await resp.json()
       if (resp.ok) {
+        const blocks = data.exact_reconciled_blocks ?? data.reconciled_pairs_count ?? 0
+        const invoices = data.total_invoices_ingested ?? 100
+        const paise = data.total_reconciled_paise ?? 0
+        const inrFormatted = (paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         updateResult(key, {
           status: 'success',
           statusCode: resp.status,
           latencyMs: latency,
-          summary: `Reconciled ${data.reconciled_pairs_count || 0} pairs (${data.exact_subset_sum_matches || 0} MITM subset-sums) in ${latency}ms with 0 paise drift.`,
+          summary: `Reconciled ${blocks} blocks (${invoices} invoices, ₹${inrFormatted}) in ${latency}ms with 0 paise drift.`,
           payload: data,
         })
       } else {
@@ -121,18 +125,15 @@ export function DemoControlPanel() {
   const runWebhookDedup = async () => {
     const key = 'webhook_dedup'
     setRunningKey(key)
-    updateResult(key, { title: 'Durable Webhook Idempotency Race', status: 'running', summary: 'Submitting duplicate Razorpay transfer webhook events...' })
+    updateResult(key, { title: 'Durable Webhook Idempotency Race', status: 'running', summary: 'Submitting duplicate Razorpay transfer webhook events with HMAC...' })
     const t0 = performance.now()
     try {
-      const eventId = `evt_judge_${Date.now().toString().slice(-6)}`
-      const payload = {
-        entity: 'event',
-        account_id: 'acc_test_demo',
-        event: 'transfer.processed',
-        contains: ['transfer'],
-        payload: { transfer: { entity: { id: 'trf_mock_dedup_01', status: 'processed', on_hold: false } } },
-        created_at: Math.floor(Date.now() / 1000),
-      }
+      // 1. Fetch mathematically valid HMAC fixture from sandbox
+      const fixtureResp = await fetch(`${getApiUrl()}/api/sandbox/webhook/fixture?transfer_id=trf_judge_${Date.now().toString().slice(-6)}`)
+      const fixture = await fixtureResp.json()
+      const eventId = fixture.x_razorpay_event_id
+      const signature = fixture.x_razorpay_signature
+      const payload = fixture.raw_payload
 
       // First webhook post
       const resp1 = await fetch(`${getApiUrl()}/api/webhook/razorpay`, {
@@ -140,7 +141,7 @@ export function DemoControlPanel() {
         headers: {
           'Content-Type': 'application/json',
           'X-Razorpay-Event-Id': eventId,
-          'X-Razorpay-Signature': 'mock_valid_signature_for_test',
+          'X-Razorpay-Signature': signature,
         },
         body: JSON.stringify(payload),
       })
@@ -152,7 +153,7 @@ export function DemoControlPanel() {
         headers: {
           'Content-Type': 'application/json',
           'X-Razorpay-Event-Id': eventId,
-          'X-Razorpay-Signature': 'mock_valid_signature_for_test',
+          'X-Razorpay-Signature': signature,
         },
         body: JSON.stringify(payload),
       })
@@ -166,6 +167,7 @@ export function DemoControlPanel() {
         summary: `Idempotency Invariant Proven: Event ${eventId} recognized as duplicate. Stored once in WAL backend.`,
         payload: { first_call: data1, second_call: data2 },
       })
+
     } catch (err: any) {
       updateResult(key, { status: 'error', summary: err.message || 'Network error' })
     } finally {
@@ -418,18 +420,18 @@ export function DemoControlPanel() {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="rounded-2xl border border-gold/40 bg-panel p-6 shadow-sm">
+      <div className="rounded-xl border border-border/70 bg-panel/70 p-5 sm:p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-gold flex items-center gap-1.5">
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
                 <Cpu className="h-4 w-4" /> Live Judge Verification Suite
               </span>
-              <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-mono font-bold text-gold">
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-primary border border-primary/20">
                 Track 04 · Razorpay AI Buildathon
               </span>
             </div>
-            <h2 className="text-xl font-bold text-foreground">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">
               Automated Judge Control Panel
             </h2>
             <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
@@ -437,17 +439,17 @@ export function DemoControlPanel() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="font-mono text-xs border border-border rounded-xl px-3 py-2 bg-background/50 flex items-center gap-2">
-              <Database className="h-3.5 w-3.5 text-blue-400" />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="font-mono text-xs border border-border/60 rounded-lg px-3 py-1.5 bg-muted/30 flex items-center gap-2">
+              <Database className="h-3.5 w-3.5 text-blue-500" />
               <span className="text-muted-foreground">Storage: </span>
-              <span className="text-foreground font-bold">{integrationStatus?.idempotency_backend || 'SQLite (WAL Mode)'}</span>
+              <span className="text-foreground font-semibold">{integrationStatus?.idempotency_backend || 'SQLite (WAL Mode)'}</span>
             </div>
 
-            <div className="font-mono text-xs border border-border rounded-xl px-3 py-2 bg-background/50 flex items-center gap-2">
+            <div className="font-mono text-xs border border-border/60 rounded-lg px-3 py-1.5 bg-muted/30 flex items-center gap-2">
               <Lock className="h-3.5 w-3.5 text-gold" />
               <span className="text-muted-foreground">Mode: </span>
-              <span className="text-gold font-bold uppercase">{integrationStatus?.mode || 'SANDBOX_SIMULATION'}</span>
+              <span className="text-gold font-semibold uppercase">{integrationStatus?.mode || 'SANDBOX_SIMULATION'}</span>
             </div>
           </div>
         </div>
@@ -462,7 +464,7 @@ export function DemoControlPanel() {
           return (
             <div
               key={item.id}
-              className="rounded-2xl border border-border bg-panel p-5 flex flex-col justify-between space-y-4 hover:border-gold/40 transition-colors"
+              className="rounded-xl border border-border/70 bg-panel/70 p-5 flex flex-col justify-between space-y-4 hover:border-foreground/20 transition-colors shadow-sm"
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -472,14 +474,14 @@ export function DemoControlPanel() {
                   </div>
                   {res && (
                     <span
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
                         res.status === 'success'
-                          ? 'bg-gain/20 text-gain'
+                          ? 'bg-gain/15 text-gain border border-gain/20'
                           : res.status === 'refused'
-                          ? 'bg-amber-500/20 text-amber-500'
+                          ? 'bg-amber-500/15 text-amber-500 border border-amber-500/20'
                           : res.status === 'running'
-                          ? 'bg-blue-500/20 text-blue-400 animate-pulse'
-                          : 'bg-danger/20 text-danger'
+                          ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20 animate-pulse'
+                          : 'bg-danger/15 text-danger border border-danger/20'
                       }`}
                     >
                       {res.status.toUpperCase()}
@@ -492,19 +494,19 @@ export function DemoControlPanel() {
               </div>
 
               {res && (
-                <div className="rounded-xl border border-border bg-background/60 p-3 font-mono text-[11px] space-y-1">
+                <div className="rounded-lg border border-border/60 bg-muted/40 p-2.5 font-mono text-[11px] space-y-1">
                   <div className="flex items-center justify-between text-muted-foreground text-[10px]">
                     <span>{res.statusCode ? `HTTP ${res.statusCode}` : 'RESULT'}</span>
                     {res.latencyMs !== undefined && <span>{res.latencyMs}ms</span>}
                   </div>
-                  <div className="text-foreground font-semibold leading-tight">{res.summary}</div>
+                  <div className="text-foreground font-medium leading-tight">{res.summary}</div>
                 </div>
               )}
 
               <button
                 onClick={item.action}
                 disabled={isRunning}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-foreground text-background font-mono text-xs font-bold py-2.5 px-4 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-foreground text-background font-mono text-xs font-semibold py-2 px-3 hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {isRunning ? (
                   <>

@@ -528,59 +528,59 @@ export function ApexAssuranceConsole() {
                 : 'IDLE'
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
 
       {/* ── 1. Above the Fold: Operational Header ───────────────────────────── */}
-      <div className="rounded-2xl border border-border bg-panel p-6 shadow-sm space-y-4">
+      <div className="rounded-xl border border-border/70 bg-panel/70 p-5 sm:p-6 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                 Kuber OS Assurance
               </h1>
-              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground/30">•</span>
               <span className="text-xs text-muted-foreground">
                 Settlement Control Console
               </span>
-              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground/30">•</span>
               {integrationMode === 'test_mode' ? (
-                <span className="rounded-full bg-gain/10 border border-gain/30 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-gain flex items-center gap-1.5">
+                <span className="rounded-full bg-gain/10 border border-gain/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-gain flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-gain animate-status-dot" />
                   RAZORPAY TEST MODE
                 </span>
               ) : (
-                <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-amber-500 flex items-center gap-1.5">
+                <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-amber-500 flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-status-dot" />
                   SANDBOX SIMULATION
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Delivery-gated seller settlement powered by the <strong className="font-semibold text-foreground">KuberRecon</strong> deterministic verification kernel.
             </p>
           </div>
 
           {/* Primary Action Button & Evidence Drawer Trigger */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => setShowEvidenceDrawer(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-panel px-4 py-2.5 text-xs sm:text-sm font-semibold text-foreground shadow-sm transition-all hover:bg-background hover:border-gold/50"
+              className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-panel/80 px-3.5 py-2 text-xs sm:text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60"
             >
-              <FileText className="h-4 w-4 text-gold" />
+              <FileText className="h-4 w-4 text-primary" />
               Decision Evidence
             </button>
             <button
               onClick={handleRunGoldenFlow}
               disabled={goldenFlowRunning || loading}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-gold px-4 py-2.5 text-xs sm:text-sm font-bold text-black shadow-lg hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-lg bg-foreground text-background px-4 py-2 text-xs sm:text-sm font-semibold shadow-sm hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer"
             >
               <Zap className={`h-4 w-4 ${goldenFlowRunning ? 'animate-bounce' : ''}`} />
-              {goldenFlowRunning ? (goldenFlowStep || 'Running Golden Flow...') : '🚀 Run Automated Golden Flow'}
+              {goldenFlowRunning ? (goldenFlowStep || 'Running Golden Flow...') : 'Run Automated Golden Flow'}
             </button>
             <button
               onClick={handleCreateContract}
               disabled={loading || goldenFlowRunning}
-              className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs sm:text-sm font-semibold text-background shadow transition-all hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-panel/80 px-3.5 py-2 text-xs sm:text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Run Step-by-Step
@@ -589,7 +589,7 @@ export function ApexAssuranceConsole() {
         </div>
 
         {/* Operational Status Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-border pt-4 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-border/60 pt-4 text-xs">
           <div>
             <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider block">Held Amount</span>
             <span className="font-mono text-sm font-bold text-foreground">
@@ -615,7 +615,7 @@ export function ApexAssuranceConsole() {
           </div>
           <div>
             <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider block">Contract ID</span>
-            <span className="font-mono text-xs text-gold truncate block">
+            <span className="font-mono text-xs text-primary truncate block">
               {contract ? contract.contract_id : '—'}
             </span>
           </div>
@@ -637,21 +637,21 @@ export function ApexAssuranceConsole() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center">
           {[
-            { label: 'HELD', active: displayStatus === 'HELD' || activeStep >= 1, color: 'text-amber-500 bg-amber-500/15 border-amber-500/50' },
-            { label: 'VERIFYING', active: displayStatus === 'VERIFYING' || activeStep >= 2, color: 'text-blue-500 bg-blue-500/15 border-blue-500/50' },
-            { label: 'REFUSED', active: displayStatus === 'REFUSED', color: 'text-danger bg-danger/15 border-danger/50' },
-            { label: 'CORRECTED', active: assertion?.assertions_passed, color: 'text-purple-500 bg-purple-500/15 border-purple-500/50' },
-            { label: 'RELEASING', active: displayStatus === 'RELEASING', color: 'text-cyan-500 bg-cyan-500/15 border-cyan-500/50' },
-            { label: 'RELEASED', active: displayStatus === 'RELEASED', color: 'text-gain bg-gain/15 border-gain/50' },
+            { label: 'HELD', active: displayStatus === 'HELD' || activeStep >= 1, color: 'text-amber-500 bg-amber-500/10 border-amber-500/30' },
+            { label: 'VERIFYING', active: displayStatus === 'VERIFYING' || activeStep >= 2, color: 'text-blue-500 bg-blue-500/10 border-blue-500/30' },
+            { label: 'REFUSED', active: displayStatus === 'REFUSED', color: 'text-danger bg-danger/10 border-danger/30' },
+            { label: 'CORRECTED', active: assertion?.assertions_passed, color: 'text-purple-500 bg-purple-500/10 border-purple-500/30' },
+            { label: 'RELEASING', active: displayStatus === 'RELEASING', color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/30' },
+            { label: 'RELEASED', active: displayStatus === 'RELEASED', color: 'text-gain bg-gain/10 border-gain/30' },
           ].map((stage, idx) => (
             <div
               key={idx}
-              className={`rounded-lg border px-3 py-2.5 transition-all ${stage.active
-                  ? `${stage.color} font-bold shadow-sm ring-1 ring-inset ring-current`
-                  : 'border-border bg-panel text-foreground/70 font-semibold'
+              className={`rounded-lg border px-3 py-2 transition-all ${stage.active
+                  ? `${stage.color} font-semibold shadow-none`
+                  : 'border-border/60 bg-panel/50 text-muted-foreground font-medium'
                 }`}
             >
-              <div className="font-mono text-[10px] uppercase">0{idx + 1}</div>
+              <div className="font-mono text-[10px] uppercase opacity-70">0{idx + 1}</div>
               <div className="font-mono text-xs">{stage.label}</div>
             </div>
           ))}
@@ -662,25 +662,25 @@ export function ApexAssuranceConsole() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Column 1: Buyer Agent */}
-        <div className="rounded-2xl border border-border bg-panel p-6 space-y-4 flex flex-col justify-between">
+        <div className="rounded-xl border border-border/70 bg-panel/70 p-5 space-y-4 flex flex-col justify-between shadow-sm">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <span className="font-mono text-xs font-bold text-foreground flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-blue-500" /> BUYER AGENT
               </span>
               <span className="font-mono text-[11px] text-muted-foreground">procurement_01</span>
             </div>
 
-            <div className="space-y-3 font-mono text-xs">
-              <div className="flex justify-between py-1 border-b border-border">
+            <div className="space-y-2 font-mono text-xs">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Request:</span>
-                <span className="font-bold text-foreground">500 Supplier Records</span>
+                <span className="font-semibold text-foreground">500 Supplier Records</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Budget:</span>
-                <span className="font-bold text-gain">₹25,000.00 (25L paise)</span>
+                <span className="font-semibold text-gain">₹25,000.00 (25L paise)</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Contract ID:</span>
                 <span className="text-foreground truncate max-w-[130px]">{contract ? contract.contract_id : '—'}</span>
               </div>
@@ -692,32 +692,32 @@ export function ApexAssuranceConsole() {
           </div>
         </div>
 
-        {/* Column 2: APEX Assurance Kernel */}
-        <div className="rounded-2xl border border-gold/40 bg-panel p-6 space-y-4 flex flex-col justify-between shadow-sm">
+        {/* Column 2: KUBER Assurance Kernel */}
+        <div className="rounded-xl border border-border/70 bg-panel/70 p-5 space-y-4 flex flex-col justify-between shadow-sm">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <span className="font-mono text-xs font-bold text-gold flex items-center gap-2">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <span className="font-mono text-xs font-bold text-primary flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" /> KUBER ASSURANCE
               </span>
-              <span className="font-mono text-[11px] text-gold">KuberRecon</span>
+              <span className="font-mono text-[11px] text-primary">KuberRecon</span>
             </div>
 
-            <div className="space-y-3 font-mono text-xs">
-              <div className="flex justify-between py-1 border-b border-border">
+            <div className="space-y-2 font-mono text-xs">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Route Hold:</span>
-                <span className={`font-bold ${contract?.on_hold ? 'text-amber-500' : contract ? 'text-gain' : 'text-muted-foreground'}`}>
+                <span className={`font-semibold ${contract?.on_hold ? 'text-amber-500' : contract ? 'text-gain' : 'text-muted-foreground'}`}>
                   {contract ? (contract.on_hold ? 'LOCKED (on_hold: true)' : 'RELEASED (on_hold: false)') : '—'}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Checksums:</span>
-                <span className={`font-bold ${assertion?.assertions_passed ? 'text-gain' : assertion ? 'text-danger' : 'text-muted-foreground'}`}>
+                <span className={`font-semibold ${assertion?.assertions_passed ? 'text-gain' : assertion ? 'text-danger' : 'text-muted-foreground'}`}>
                   {assertion ? (assertion.assertions_passed ? '100% Mod-36 Passed' : 'Checksum Refusal') : 'Awaiting Manifest'}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Exact Invariant:</span>
-                <span className="font-bold text-foreground">
+                <span className="font-semibold text-foreground">
                   {contract ? '500 Records Exact' : '—'}
                 </span>
               </div>
@@ -730,29 +730,29 @@ export function ApexAssuranceConsole() {
         </div>
 
         {/* Column 3: Seller Agent */}
-        <div className="rounded-2xl border border-border bg-panel p-6 space-y-4 flex flex-col justify-between">
+        <div className="rounded-xl border border-border/70 bg-panel/70 p-5 space-y-4 flex flex-col justify-between shadow-sm">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <span className="font-mono text-xs font-bold text-foreground flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-purple-500" /> SELLER AGENT
               </span>
               <span className="font-mono text-[11px] text-muted-foreground">seller_data_01</span>
             </div>
 
-            <div className="space-y-3 font-mono text-xs">
-              <div className="flex justify-between py-1 border-b border-border">
+            <div className="space-y-2 font-mono text-xs">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Delivered:</span>
-                <span className="font-bold text-foreground">
+                <span className="font-semibold text-foreground">
                   {assertion ? `${assertion.valid_records + assertion.failed_records} / 500 Records` : '0 / 500 Records'}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">GSTIN Status:</span>
-                <span className={`font-bold ${assertion?.failed_records ? 'text-danger' : assertion ? 'text-gain' : 'text-foreground'}`}>
+                <span className={`font-semibold ${assertion?.failed_records ? 'text-danger' : assertion ? 'text-gain' : 'text-foreground'}`}>
                   {assertion ? `${assertion.valid_records} valid / ${assertion.failed_records} invalid` : '—'}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
+              <div className="flex justify-between py-1 border-b border-border/50">
                 <span className="text-muted-foreground">Fingerprint:</span>
                 <span className="text-foreground font-mono">0x728103c3…92969</span>
               </div>
@@ -770,41 +770,41 @@ export function ApexAssuranceConsole() {
 
       {/* ── 4. Interactive Scenario Action Triggers ──────────────────────────── */}
       {contract && (
-        <div className="rounded-2xl border border-border bg-panel p-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <div className="rounded-xl border border-border/70 bg-panel/70 p-5 sm:p-6 space-y-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
             <div>
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-gold">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
                 Interactive Judge Controls
               </span>
-              <h2 className="text-base font-bold text-foreground">
-                Step 2: Simulate Seller Delivery & Assertion
+              <h2 className="text-sm sm:text-base font-bold text-foreground">
+                Step 2: Simulate Seller Delivery &amp; Assertion
               </h2>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2.5">
               <button
                 onClick={handleDeliverCorrupted}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 font-mono text-xs font-semibold text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-1.5 font-mono text-xs font-semibold text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
               >
-                <XCircle className="h-4 w-4" />
-                1. Trigger Invalid Delivery (Honest Refusal)
+                <XCircle className="h-3.5 w-3.5" />
+                1. Trigger Corrupted Delivery
               </button>
 
               <button
                 onClick={handleDeliverVerified}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg border border-gain/40 bg-gain/10 px-4 py-2 font-mono text-xs font-semibold text-gain transition-colors hover:bg-gain/20 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gain/30 bg-gain/10 px-3.5 py-1.5 font-mono text-xs font-semibold text-gain transition-colors hover:bg-gain/20 disabled:opacity-50"
               >
-                <CheckCircle2 className="h-4 w-4" />
-                2. Submit Corrected Delivery (100% Clean)
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                2. Submit Corrected Delivery
               </button>
             </div>
           </div>
 
           {/* Assertion Details & Honest Refusal Output */}
           {assertion && (
-            <div className={`rounded-xl border p-4 font-mono text-xs space-y-3 ${assertion.assertions_passed ? 'border-gain/40 bg-gain/5' : 'border-danger/40 bg-danger/5'
+            <div className={`rounded-lg border p-3.5 font-mono text-xs space-y-2.5 ${assertion.assertions_passed ? 'border-gain/30 bg-gain/5' : 'border-danger/30 bg-danger/5'
               }`}>
               <div className="flex flex-wrap items-center justify-between gap-2 font-bold">
                 <span className={`flex items-center gap-2 ${assertion.assertions_passed ? 'text-gain' : 'text-danger'}`}>
@@ -823,8 +823,8 @@ export function ApexAssuranceConsole() {
                   <div className="text-danger truncate">Refusal Cert: <code>{assertion.refusal_certificate}</code></div>
                 )}
                 {assertion.violation_samples.length > 0 && (
-                  <div className="mt-2 rounded bg-background p-3 text-danger space-y-1 border border-border">
-                    <div className="text-[11px] uppercase font-bold text-danger">Mod-36 Checksum Violations Detected:</div>
+                  <div className="mt-2 rounded-lg bg-muted/40 p-3 text-danger space-y-1 border border-border/60">
+                    <div className="text-[10px] uppercase font-bold text-danger">Mod-36 Checksum Violations Detected:</div>
                     {assertion.violation_samples.map((v, i) => (
                       <div key={i} className="text-xs font-mono">• {v}</div>
                     ))}
@@ -841,9 +841,9 @@ export function ApexAssuranceConsole() {
                   <button
                     onClick={handleReleaseHold}
                     disabled={loading}
-                    className="inline-flex items-center gap-2 rounded-lg bg-gain px-5 py-2.5 font-mono text-xs font-bold text-black transition-all hover:bg-gain/90 shadow-sm"
+                    className="inline-flex items-center gap-2 rounded-lg bg-gain px-4 py-2 font-mono text-xs font-bold text-black transition-all hover:bg-gain/90 shadow-sm"
                   >
-                    <Unlock className="h-4 w-4" />
+                    <Unlock className="h-3.5 w-3.5" />
                     3. Sign Release Intent — Local Demo Signer
                   </button>
                 </div>
@@ -853,7 +853,7 @@ export function ApexAssuranceConsole() {
 
           {/* Release Confirmation Details */}
           {release && (
-            <div className="rounded-xl border border-gain/40 bg-gain/5 p-4 font-mono text-xs space-y-2">
+            <div className="rounded-lg border border-gain/30 bg-gain/5 p-3.5 font-mono text-xs space-y-2">
               <div className="flex items-center justify-between font-bold text-gain">
                 <span className="flex items-center gap-2">
                   <Unlock className="h-4 w-4" />
@@ -867,7 +867,7 @@ export function ApexAssuranceConsole() {
               </div>
 
               {pollingTimedOut && (
-                <div className="mt-2 rounded bg-amber-500/10 border border-amber-500/30 p-2.5 text-xs text-amber-500">
+                <div className="mt-2 rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 text-xs text-amber-500">
                   ⏱️ Live Webhook Polling Timeout: Contract transitioned to <code>RELEASING</code> in database. Awaiting authoritative webhook on <code>/api/webhook/razorpay</code>.
                 </div>
               )}
@@ -880,15 +880,15 @@ export function ApexAssuranceConsole() {
       <div className="space-y-4">
 
         {/* Drawer 1: Authoritative Evidence Rail & Audit Timeline */}
-        <div className="rounded-2xl border border-border bg-panel overflow-hidden">
+        <div className="rounded-xl border border-border/70 bg-panel/70 overflow-hidden shadow-sm">
           <button
             onClick={() => setShowEvidenceDrawer(!showEvidenceDrawer)}
-            className="w-full flex items-center justify-between p-5 text-left transition-colors hover:bg-accent"
+            className="w-full flex items-center justify-between p-4 sm:p-5 text-left transition-colors hover:bg-muted/40"
           >
             <div className="flex items-center gap-2.5">
-              <Activity className="h-4 w-4 text-gold" />
-              <span className="text-sm font-bold text-foreground">
-                Authoritative Evidence Rail & Audit Timeline
+              <Activity className="h-4 w-4 text-primary" />
+              <span className="text-xs sm:text-sm font-bold text-foreground">
+                Authoritative Evidence Rail &amp; Audit Timeline
               </span>
               <span className="font-mono text-xs text-muted-foreground">
                 ({auditLogs.length} state records)
@@ -898,23 +898,23 @@ export function ApexAssuranceConsole() {
           </button>
 
           {showEvidenceDrawer && (
-            <div className="p-5 border-t border-border bg-background space-y-3 font-mono text-xs">
+            <div className="p-4 border-t border-border/60 bg-muted/20 space-y-2 font-mono text-xs">
               {auditLogs.length > 0 ? (
                 <div className="space-y-2">
                   {auditLogs.map((entry, i) => (
-                    <div key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0 last:pb-0">
+                    <div key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0">
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">#{entry.id}</span>
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${entry.status === 'RELEASED' ? 'bg-gain/20 text-gain' :
-                            entry.status === 'REFUSED' ? 'bg-danger/20 text-danger' :
-                              entry.status === 'RELEASING' ? 'bg-blue-500/20 text-blue-400' :
-                                'bg-amber-500/20 text-amber-500'
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${entry.status === 'RELEASED' ? 'bg-gain/15 text-gain border border-gain/20' :
+                            entry.status === 'REFUSED' ? 'bg-danger/15 text-danger border border-danger/20' :
+                              entry.status === 'RELEASING' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' :
+                                'bg-amber-500/15 text-amber-500 border border-amber-500/20'
                           }`}>
                           {entry.status}
                         </span>
                         <span className="text-muted-foreground truncate max-w-[240px]">{entry.proof_hash}</span>
                       </div>
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground text-[11px]">
                         {new Date(entry.timestamp * 1000).toLocaleTimeString('en-IN', { hour12: false })}
                       </span>
                     </div>
@@ -930,14 +930,14 @@ export function ApexAssuranceConsole() {
         </div>
 
         {/* Drawer 2: Agent Protocol Live Bus Stream */}
-        <div className="rounded-2xl border border-border bg-panel overflow-hidden">
+        <div className="rounded-xl border border-border/70 bg-panel/70 overflow-hidden shadow-sm">
           <button
             onClick={() => setShowTerminalDrawer(!showTerminalDrawer)}
-            className="w-full flex items-center justify-between p-5 text-left transition-colors hover:bg-accent"
+            className="w-full flex items-center justify-between p-4 sm:p-5 text-left transition-colors hover:bg-muted/40"
           >
             <div className="flex items-center gap-2.5">
               <Terminal className="h-4 w-4 text-gain" />
-              <span className="text-sm font-bold text-foreground">
+              <span className="text-xs sm:text-sm font-bold text-foreground">
                 Autonomous Agent Protocol Bus (Live Stream)
               </span>
               <span className="font-mono text-xs text-muted-foreground">
@@ -948,13 +948,13 @@ export function ApexAssuranceConsole() {
           </button>
 
           {showTerminalDrawer && (
-            <div className="p-5 border-t border-border bg-background space-y-2 font-mono text-xs max-h-60 overflow-y-auto">
+            <div className="p-4 border-t border-border/60 bg-muted/20 space-y-2 font-mono text-xs max-h-60 overflow-y-auto">
               {agentLogs.map((log, idx) => (
                 <div key={idx} className="flex items-start gap-3">
                   <span className="text-muted-foreground text-[11px] shrink-0">{log.time}</span>
-                  <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] shrink-0 ${log.type === 'buyer' ? 'bg-blue-500/10 text-blue-400' :
-                      log.type === 'seller' ? 'bg-purple-500/10 text-purple-400' :
-                        'bg-gold/10 text-gold'
+                  <span className={`font-semibold px-1.5 py-0.5 rounded text-[10px] shrink-0 ${log.type === 'buyer' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                      log.type === 'seller' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                        'bg-primary/10 text-primary border border-primary/20'
                     }`}>
                     {log.sender}
                   </span>

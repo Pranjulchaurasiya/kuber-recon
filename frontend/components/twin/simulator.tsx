@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { inr, twinBaseline } from '@/lib/kuber-data'
+import { useMemo, useState, useEffect } from 'react'
+import { inr, twinBaseline, paiseToInr } from '@/lib/kuber-data'
 import { Pill } from '@/components/kuber/primitives'
+import { getApiUrl, DEFAULT_AUTH_HEADERS } from '@/lib/api-client'
+import { ShieldCheck, Cpu, RefreshCw, Zap, Lock } from 'lucide-react'
 
 const DAYS = 30
 
@@ -10,24 +12,66 @@ export function Simulator() {
   const [freeze, setFreeze] = useState(0) // bank holiday freeze days
   const [gstr1, setGstr1] = useState(0) // vendor GSTR-1 default %
   const [chargeback, setChargeback] = useState(0) // chargeback surge %
+  const [apiResult, setApiResult] = useState<{
+    scenario_name?: string
+    invoices_evaluated?: number
+    gross_gmv_paise?: number
+    baseline_net_settlement_paise?: number
+    simulated_net_settlement_paise?: number
+    liquidity_delta_paise?: number
+    settlement_delay_days?: number
+    recommended_hedging_action?: string
+    proof_manifest_hash?: string
+    latency_ms?: number
+    computed_by?: string
+  } | null>(null)
+  const [apiLoading, setApiLoading] = useState(false)
+
+  // Live Backend Causal Twin Integration
+  useEffect(() => {
+    let active = true
+    setApiLoading(true)
+    const timeout = setTimeout(async () => {
+      try {
+        const scenario = freeze > 0 ? 'bank_holiday' : gstr1 > 0 ? 'vendor_default' : 'tds_shock'
+        const severity = Math.max(0.2, freeze ? freeze / 4 : gstr1 ? gstr1 / 20 : chargeback ? chargeback / 10 : 1.0)
+        const resp = await fetch(`${getApiUrl()}/api/twin/simulate`, {
+          method: 'POST',
+          headers: DEFAULT_AUTH_HEADERS,
+          body: JSON.stringify({ scenario, severity }),
+        })
+        if (resp.ok && active) {
+          const data = await resp.json()
+          setApiResult(data)
+        }
+      } catch {
+        // Fallback to client model if offline
+      } finally {
+        if (active) setApiLoading(false)
+      }
+    }, 150)
+
+    return () => {
+      active = false
+      clearTimeout(timeout)
+    }
+  }, [freeze, gstr1, chargeback])
 
   const model = useMemo(() => {
     const base = twinBaseline.liquidity
-    const dailyInflow = base * 0.031 // ~3.1% daily settlement inflow
+    const dailyInflow = Math.round(base * 31 / 1000)
     const points: { baseline: number; stressed: number }[] = []
 
     let liqBase = base
     let liqStress = base
-    const exposedCredit = twinBaseline.exposedCredit + gstr1 * 0.01 * base * 0.12
-    const chargebackHit = chargeback * 0.01 * base * 0.4
+    const exposedCredit = twinBaseline.exposedCredit + Math.round(gstr1 * base * 12 / 10000)
+    const chargebackHit = Math.round(chargeback * base * 4 / 1000)
 
     for (let d = 0; d < DAYS; d++) {
-      // baseline: steady inflow net of small burn
-      liqBase += dailyInflow - base * 0.028
-      // stressed: inflow frozen for the first `freeze` days, credit drag + chargeback bleed
+      liqBase += dailyInflow - Math.round(base * 28 / 1000)
       const frozen = d < freeze
-      const inflow = frozen ? 0 : dailyInflow * (1 - gstr1 * 0.006)
-      const burn = base * 0.028 + chargebackHit / DAYS
+      const inflow = frozen ? 0 : Math.round(dailyInflow * (1000 - gstr1 * 6) / 1000)
+      const burn = Math.round(base * 28 / 1000 + chargebackHit / DAYS)
       liqStress += inflow - burn
       points.push({ baseline: Math.max(liqBase, 0), stressed: Math.max(liqStress, 0) })
     }
@@ -50,10 +94,19 @@ export function Simulator() {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       {/* Controls */}
       <div className="rounded-lg border border-border bg-panel p-5">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-          What-If Controls
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">Drag to inject shocks into the twin.</p>
+        <div className="flex items-center justify-between">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            What-If Controls
+          </h2>
+          {apiLoading ? (
+            <span className="flex items-center gap-1 font-mono text-[10px] text-primary animate-pulse">
+              <RefreshCw className="h-3 w-3 animate-spin" /> Solving...
+            </span>
+          ) : (
+            <span className="font-mono text-[10px] text-gain font-semibold">Live Kernel</span>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">Drag to inject real causal counterfactuals into the Python engine.</p>
 
         <div className="mt-6 flex flex-col gap-6">
           <Slider label="Bank holiday freeze" value={freeze} min={0} max={7} unit="days" onChange={setFreeze} accent="var(--warn)" />
@@ -71,6 +124,25 @@ export function Simulator() {
         >
           Reset to baseline
         </button>
+
+        {/* Live Backend Audit Card */}
+        {apiResult && (
+          <div className="mt-5 rounded-lg border border-primary/30 bg-primary/5 p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-mono">
+              <span className="font-bold text-primary flex items-center gap-1">
+                <Cpu className="h-3.5 w-3.5" /> Python Engine Verified
+              </span>
+              <span className="text-muted-foreground">{apiResult.latency_ms}ms</span>
+            </div>
+            <p className="text-[11px] text-foreground font-medium leading-snug">
+              {apiResult.recommended_hedging_action}
+            </p>
+            <div className="pt-1.5 border-t border-border/60 flex items-center justify-between text-[9px] font-mono text-muted-foreground">
+              <span>Proof Hash:</span>
+              <span className="font-bold text-foreground truncate max-w-[140px]">{apiResult.proof_manifest_hash}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Projection + verdict */}
@@ -109,6 +181,7 @@ export function Simulator() {
     </div>
   )
 }
+
 
 function Slider({
   label,

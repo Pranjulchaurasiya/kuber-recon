@@ -9,8 +9,8 @@
 "AI agents are authorized to spend money, but the financial rails aren't ready. If an agent buys 500 B2B leads, how does the seller prove they actually delivered before they get paid? 
 Today, we are solving the Delivery-Gated Settlement problem for agentic commerce using KuberRecon and Razorpay Route."
 
-### [0:10 - 0:25] The Setup (Screen Recording: APEX Console)
-**Action:** Show the KuberRecon APEX Console. Click **"Initialize Agent Contract"**.
+### [0:10 - 0:25] The Setup (Screen Recording: Kuber OS Console)
+**Action:** Show the KuberRecon Kuber OS Console. Click **"Initialize Agent Contract"**.
 **Speaker:**
 "When a buyer agent initiates a purchase, we immediately lock the funds using Razorpay Route. The money is secured on a 'hold' state. The seller agent knows they will get paid—but *only* if they prove delivery deterministically."
 

@@ -85,3 +85,6 @@ Thumbs.db
 *DEEP_RESEARCH_AND_COMPETITOR_TEARDOWNS*
 scratch/
 scratch_*.py
+artifacts/
+reports/qa_frames/
+reports/qa_frames_subtitled/

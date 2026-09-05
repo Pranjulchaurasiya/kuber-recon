@@ -23,16 +23,16 @@ export function ProofSection() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Card 1: Traditional Credit Bureau */}
-        <div className="flex flex-col justify-between rounded-2xl border border-border bg-panel p-6 shadow-sm hover-glow animate-fade-up stagger-1">
+        <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-panel/70 p-6 shadow-sm hover-glow animate-fade-up stagger-1">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <span className="font-mono text-xs font-bold text-muted-foreground uppercase">Baseline 01</span>
-              <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+              <span className="rounded-full bg-muted/60 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground border border-border/60">
                 Historical Bank Model
               </span>
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Bureau & Bank Statements</h3>
+              <h3 className="text-base font-bold text-foreground">Bureau &amp; Bank Statements</h3>
               <p className="text-xs text-muted-foreground mt-1">Self-reported PDFs and quarterly CIBIL pull.</p>
             </div>
 
@@ -42,7 +42,7 @@ export function ProofSection() {
                 <span className="font-mono font-bold text-rose-500">12.4%</span>
               </div>
               <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                <div className="bg-rose-500 h-full rounded-full" style={{ width: '45%' }} />
+                <div className="bg-rose-500/80 h-full rounded-full" style={{ width: '45%' }} />
               </div>
 
               <div className="flex items-center justify-between text-xs">
@@ -62,23 +62,23 @@ export function ProofSection() {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-border/80 text-[11px] text-muted-foreground flex items-center gap-1.5">
+          <div className="mt-6 pt-4 border-t border-border/60 text-[11px] text-muted-foreground flex items-center gap-1.5">
             <XCircle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
             Unsecured, lagging, high default exposure.
           </div>
         </div>
 
         {/* Card 2: Probabilistic LLM Parser */}
-        <div className="flex flex-col justify-between rounded-2xl border border-border bg-panel p-6 shadow-sm hover-glow animate-fade-up stagger-2">
+        <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-panel/70 p-6 shadow-sm hover-glow animate-fade-up stagger-2">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <span className="font-mono text-xs font-bold text-muted-foreground uppercase">Baseline 02</span>
               <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-amber-500 border border-amber-500/20">
                 LLM Wrapper Pattern
               </span>
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Probabilistic LLM Recon</h3>
+              <h3 className="text-base font-bold text-foreground">Probabilistic LLM Recon</h3>
               <p className="text-xs text-muted-foreground mt-1">Prompted GPT/Claude ledger text parsing.</p>
             </div>
 
@@ -88,7 +88,7 @@ export function ProofSection() {
                 <span className="font-mono font-bold text-amber-500">0.041 (4.1% Error)</span>
               </div>
               <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: '28%' }} />
+                <div className="bg-amber-500/80 h-full rounded-full" style={{ width: '28%' }} />
               </div>
 
               <div className="flex items-center justify-between text-xs">
@@ -108,35 +108,30 @@ export function ProofSection() {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-border/80 text-[11px] text-muted-foreground flex items-center gap-1.5">
+          <div className="mt-6 pt-4 border-t border-border/60 text-[11px] text-muted-foreground flex items-center gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
             Unacceptable for RBI regulatory compliance.
           </div>
         </div>
 
         {/* Card 3: Kuber Recon Kernel (Ours) */}
-        <div className="relative flex flex-col justify-between rounded-2xl border-2 border-gain bg-panel p-6 shadow-xl ring-4 ring-gain/10 hover-glow animate-fade-up stagger-3">
-          {/* Top Tag */}
-          <div className="absolute -top-3 right-6 rounded-full bg-gain px-3 py-0.5 font-mono text-[10px] font-bold text-white uppercase shadow">
-            KUBER RECON KERNEL (OURS)
-          </div>
-
+        <div className="relative flex flex-col justify-between rounded-xl border border-gain/60 bg-panel/80 p-6 shadow-sm hover-glow animate-fade-up stagger-3">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <span className="font-mono text-xs font-bold text-gain uppercase">Determinism Standard</span>
-              <span className="rounded-full bg-gain/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-gain border border-gain/30">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <span className="font-mono text-xs font-bold text-gain uppercase">Kuber Deterministic Engine</span>
+              <span className="rounded-full bg-gain/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-gain border border-gain/20">
                 81/81 Tests Passing
               </span>
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Kuber Combinatorial + Dual-Entry Engine</h3>
-              <p className="text-xs text-muted-foreground mt-1">Paise-exact combinatorial subset solver & Route sweeps.</p>
+              <h3 className="text-base font-bold text-foreground">Kuber Combinatorial + Dual-Entry Engine</h3>
+              <p className="text-xs text-muted-foreground mt-1">Paise-exact combinatorial subset solver &amp; Route sweeps.</p>
             </div>
 
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">False Match Rate (FMR)</span>
-                <span className="font-mono font-extrabold text-gain">0.000 (Tested Fixtures)</span>
+                <span className="font-mono font-bold text-gain">0.000 (Tested Fixtures)</span>
               </div>
               <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                 <div className="bg-gain h-full rounded-full" style={{ width: '100%' }} />
@@ -159,7 +154,7 @@ export function ProofSection() {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-border/80 text-[11px] font-medium text-gain flex items-center gap-1.5">
+          <div className="mt-6 pt-4 border-t border-border/60 text-[11px] font-medium text-gain flex items-center gap-1.5">
             <CheckCircle2 className="h-4 w-4 text-gain shrink-0" />
             100% mathematically bounded and auditor-ready.
           </div>
