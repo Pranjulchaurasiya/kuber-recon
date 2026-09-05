@@ -5,9 +5,9 @@
 > **Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery**  
 > *Powered by Horowitz–Sahni Meet-in-the-Middle Combinatorial Subset-Sum Matching, GSTIN Mod-36 Checksums, and Prototype Merkle Tree Audit Chains.*
 
-| Live Web App | Backend Health API | Automated Tests | Enterprise Accounting |
+| Live Web Application | Backend API Health | Automated Test Suite | Enterprise Accounting |
 |:---:|:---:|:---:|:---:|
-| [**Open Live App ↗**](https://kuber-os.vercel.app/) | [**API Health Status ↗**](https://kuber-recon.onrender.com/health) | **287 Passed** (0 Failures) | **Tally Prime XML** |
+| [**kuber-os.vercel.app**](https://kuber-os.vercel.app/) | [`kuber-recon.onrender.com/health`](https://kuber-recon.onrender.com/health) | `287 passed (0 failures)` | `Tally Prime XML Export` |
 
 [![Live Web App](https://img.shields.io/badge/Live%20Demo-kuber--os.vercel.app-blue?logo=vercel)](https://kuber-os.vercel.app/)
 [![Backend Health](https://img.shields.io/badge/Backend%20API-kuber--recon.onrender.com-success?logo=render)](https://kuber-recon.onrender.com/health)
