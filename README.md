@@ -1,9 +1,16 @@
 # 🏛️ Kuber OS: Autonomous AI Finance Controller & Settlement Assurance
 
-> **Track 04: AI Finance Controller · Razorpay AI Buildathon 2026**
-> **Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery**
+> **Track 04: AI Finance Controller · Razorpay AI Buildathon 2026**  
+> **Solo Builder Submission: Pranjul Chaurasiya**  
+> **Multi-Source Financial Reconciliation, Statutory Tax Assurance & Autonomous Nodal Recovery**  
 > *Powered by Horowitz–Sahni Meet-in-the-Middle Combinatorial Subset-Sum Matching, GSTIN Mod-36 Checksums, and Prototype Merkle Tree Audit Chains.*
 
+| 🌐 **Live Web Application** | ⚡ **Backend API Health** | 🧪 **Automated Test Suite** | 📦 **Enterprise Accounting** |
+|:---:|:---:|:---:|:---:|
+| [**kuber-os.vercel.app**](https://kuber-os.vercel.app/) | [`kuber-recon.onrender.com/health`](https://kuber-recon.onrender.com/health) | `287 passed (0 failures)` | `Tally Prime XML Export` |
+
+[![Live Web App](https://img.shields.io/badge/Live%20Demo-kuber--os.vercel.app-blue?logo=vercel)](https://kuber-os.vercel.app/)
+[![Backend Health](https://img.shields.io/badge/Backend%20API-kuber--recon.onrender.com-success?logo=render)](https://kuber-recon.onrender.com/health)
 [![Sarvam AI Voice](https://img.shields.io/badge/Sarvam%20AI-Indic%20Voice%20(Advait)-purple)](https://sarvam.ai)
 [![Tests Passing](https://img.shields.io/badge/pytest-287%20tests%20(100%25%20green)-brightgreen)](tests/)
 [![Tally Prime Export](https://img.shields.io/badge/Tally%20Prime-XML%20Vouchers%20(%3CENVELOPE%3E)-success)](src/kuber_recon/tally.py)
@@ -16,7 +23,7 @@
 [![Security & Tenant Isolation](https://img.shields.io/badge/Tenant%20Auth-401%20Enforced%20%26%20Sanitized-purple)](tests/test_security_tenant_isolation.py)
 [![Property Tests](https://img.shields.io/badge/Hypothesis-Invariants%20Verified-orange)](tests/test_property_based_invariants.py)
 
-[ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Evaluation Benchmark ](reports/track04_evaluation_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-287-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
+[ 🌐 Live Demo ](https://kuber-os.vercel.app/) • [ ⚡ 30s Cold Start ](#-30-second-cold-start-problem-vs-solution) • [ 🎯 Evaluation Benchmark ](reports/track04_evaluation_benchmark.md) • [ 🏗️ Layer Taxonomy ](#️-system-architecture--layer-taxonomy) • [ 🏢 Razorpay Value ](#-value-for-razorpay) • [ 🏗️ Architecture ](#️-system-architecture) • [ 🛡️ Invariants ](#️-key-engineering-invariants) • [ 🧪 Test Suite ](#-full-test-suite-breakdown-287-items) • [ 🚀 Quickstart ](#-quickstart--local-reproduction)
 
 ---
 
