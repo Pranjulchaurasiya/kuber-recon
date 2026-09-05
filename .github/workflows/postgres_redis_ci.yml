@@ -72,6 +72,7 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6379/0
           REQUIRE_POSTGRES_REDIS: "true"
         run: |
+          set +e
           python -c "
           import os, psycopg2, redis
           print('=== CONTAINER PREFLIGHT CHECK ===')
@@ -90,5 +91,11 @@ jobs:
               print('Redis 127.0.0.1 error:', e)
           print('=================================')
           "
-          pytest -v -s -rA --tb=short tests/test_postgres_redis_integration.py
+          pytest -v -s -rA --tb=long tests/test_postgres_redis_integration.py 2>&1 | tee test_run.log
+          PYTEST_STATUS=${PIPESTATUS[0]}
+          if [ $PYTEST_STATUS -ne 0 ]; then
+            FAIL_SUMMARY=$(tail -n 25 test_run.log | tr '\n' ' ')
+            echo "::error title=Pytest Error::$FAIL_SUMMARY"
+            exit $PYTEST_STATUS
+          fi
 
